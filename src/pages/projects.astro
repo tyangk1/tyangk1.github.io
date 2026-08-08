@@ -1,0 +1,90 @@
+---
+import { getCollection } from 'astro:content';
+import BaseLayout from '~/layouts/BaseLayout.astro';
+import Icon from '~/components/Icon.astro';
+
+const projects = (await getCollection('projects')).sort(
+  (a, b) => b.data.year - a.data.year || Number(b.data.featured) - Number(a.data.featured),
+);
+
+const STATUS_STYLE: Record<string, string> = {
+  'đang làm': 'border-accent text-accent',
+  'hoàn thành': 'border-border text-muted',
+  'tạm dừng': 'border-border text-muted',
+};
+---
+
+<BaseLayout
+  title="Dự án"
+  description="Những thứ tôi đã tự tay xây: công cụ nhỏ, trang web, và vài thí nghiệm chưa hoàn thành. Kèm công nghệ đã dùng và tình trạng hiện tại của từng dự án."
+>
+  <div class="wrap py-12">
+    <p class="eyebrow">Đã làm</p>
+    <h1 class="display-xl mt-3 text-4xl">Dự án</h1>
+    <p class="mt-4 max-w-2xl text-lg text-muted">
+      Những thứ tôi tự xây, phần lớn để giải quyết một vấn đề của chính mình. Cái nào có mã nguồn mở
+      thì tôi để link repo.
+    </p>
+
+    <ul class="mt-10 grid gap-5 sm:grid-cols-2">
+      {
+        projects.map((project) => (
+          <li class="flex flex-col rounded-card border border-border p-6 transition-colors hover:border-accent">
+            {/* `flex-wrap` để khi phóng chữ lớn, thẻ trạng thái tụt xuống dòng
+                dưới thay vì đẩy tiêu đề tràn ra khỏi thẻ. */}
+            <div class="flex flex-wrap items-start justify-between gap-3">
+              {/* Cùng `.display` với tiêu đề thẻ bài viết — thẻ dự án và thẻ bài
+                  viết nằm trong cùng một hệ, không có lý do dùng hai kiểu chữ. */}
+              <h2 class="display text-xl">{project.data.name}</h2>
+              <span
+                class:list={[
+                  'shrink-0 rounded-full border px-2.5 py-0.5 text-xs',
+                  STATUS_STYLE[project.data.status] ?? 'border-border text-muted',
+                ]}
+              >
+                {project.data.status}
+              </span>
+            </div>
+
+            <p class="mt-3 flex-1 text-muted">{project.data.description}</p>
+
+            {/* `min-w-0` trên từng thẻ vì flex item mặc định không co được dưới
+                bề rộng min-content — thiếu nó thì một tên dài như "Cloudflare
+                Pages" sẽ đẩy thẻ tràn ra khi người dùng phóng chữ. */}
+            <ul class="mt-4 flex flex-wrap gap-1.5" aria-label="Công nghệ sử dụng">
+              {project.data.tech.map((tech: string) => (
+                <li class="min-w-0 rounded-md bg-surface px-2 py-0.5 text-xs text-muted">{tech}</li>
+              ))}
+            </ul>
+
+            <div class="mt-5 flex items-center gap-4 text-sm">
+              <span class="text-muted">{project.data.year}</span>
+
+              {project.data.url && (
+                <a
+                  href={project.data.url}
+                  rel="noopener"
+                  class="tap gap-1.5 py-1 text-accent transition-colors hover:text-accent-hover"
+                >
+                  Xem trang
+                  <Icon name="externalLink" size={14} />
+                </a>
+              )}
+
+              {project.data.repo && (
+                <a
+                  href={project.data.repo}
+                  rel="noopener"
+                  class="tap gap-1.5 py-1 text-accent transition-colors hover:text-accent-hover"
+                >
+                  Mã nguồn
+                  <Icon name="github" size={14} />
+                </a>
+              )}
+            </div>
+          </li>
+        ))
+      }
+    </ul>
+  </div>
+</BaseLayout>

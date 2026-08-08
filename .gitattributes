@@ -1,0 +1,23 @@
+# Chuẩn hoá xuống dòng: trong repo luôn là LF, ở máy Windows checkout ra CRLF.
+#
+# Không có file này thì mọi file được commit từ Windows sẽ mang CRLF, và CI chạy
+# trên Linux thấy toàn bộ file "đã đổi" — prettier --check đỏ mà không ai hiểu
+# vì sao, còn diff thì vô dụng vì mọi dòng đều được đánh dấu thay đổi.
+* text=auto eol=lf
+
+# File nhị phân: đừng đụng vào byte nào.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.webp binary
+*.avif binary
+*.woff binary
+*.woff2 binary
+*.ico binary
+
+# pnpm-lock.yaml sinh bằng máy — gộp diff lại cho gọn khi xem lịch sử.
+pnpm-lock.yaml linguist-generated=true -diff
+
+# Nội dung sinh ra từ `pnpm sync`: vẫn commit (xem .gitignore) nhưng đánh dấu là
+# sinh bằng máy để GitHub không tính nó vào thống kê ngôn ngữ.
+src/data/luot-xem.json linguist-generated=true

@@ -1,0 +1,8 @@
+dist
+.astro
+node_modules
+pnpm-lock.yaml
+
+# Nội dung sinh ra từ database — không format, vì lần sync sau sẽ ghi đè.
+src/content
+supabase/.temp

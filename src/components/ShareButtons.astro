@@ -1,0 +1,96 @@
+---
+import Icon from '~/components/Icon.astro';
+
+interface Props {
+  title: string;
+  /** URL tuyệt đối của bài viết. */
+  url: string;
+  /** `compact` bỏ nhãn "Chia sẻ:" — dùng cho cột phải hẹp. */
+  variant?: 'full' | 'compact';
+}
+
+const { title, url, variant = 'full' } = Astro.props;
+
+const encodedUrl = encodeURIComponent(url);
+const encodedTitle = encodeURIComponent(title);
+
+const targets = [
+  {
+    label: 'Chia sẻ lên X',
+    href: `https://x.com/intent/tweet?text=${encodedTitle}&url=${encodedUrl}`,
+    icon: 'x',
+  },
+  {
+    label: 'Chia sẻ lên LinkedIn',
+    href: `https://www.linkedin.com/sharing/share-offsite/?url=${encodedUrl}`,
+    icon: 'linkedin',
+  },
+  {
+    label: 'Chia sẻ lên Facebook',
+    href: `https://www.facebook.com/sharer/sharer.php?u=${encodedUrl}`,
+    icon: 'facebook',
+  },
+] as const;
+
+const buttonClass =
+  'grid size-9 place-items-center rounded-lg border border-border text-muted transition-colors hover:border-accent hover:text-accent';
+---
+
+{
+  /* `data-share` khoanh vùng một cụm nút. Trang bài viết render hai cụm (một dưới
+    bài, một ở cột phải), nên script phải tìm ô trạng thái tương đối theo cụm —
+    không dùng id, vì id thì hai cụm sẽ trùng nhau. */
+}
+<div class="flex flex-wrap items-center gap-2" data-share>
+  {variant === 'full' && <span class="text-sm text-muted">Chia sẻ:</span>}
+
+  <button
+    type="button"
+    class={buttonClass}
+    data-copy-url={url}
+    aria-label="Sao chép đường dẫn bài viết"
+  >
+    <Icon name="link" size={16} />
+  </button>
+
+  {
+    targets.map((target) => (
+      <a
+        href={target.href}
+        target="_blank"
+        rel="noopener noreferrer"
+        class={buttonClass}
+        aria-label={target.label}
+      >
+        <Icon name={target.icon} size={16} />
+      </a>
+    ))
+  }
+
+  <span role="status" aria-live="polite" class="text-sm text-accent" data-copy-status></span>
+</div>
+
+<script>
+  // Một listener duy nhất ở document, phục vụ mọi cụm nút trên trang.
+  document.addEventListener('click', async (event) => {
+    const button = (event.target as HTMLElement | null)?.closest<HTMLButtonElement>(
+      '[data-copy-url]',
+    );
+    if (!button) return;
+
+    const status = button.closest('[data-share]')?.querySelector<HTMLElement>('[data-copy-status]');
+
+    try {
+      await navigator.clipboard.writeText(button.dataset['copyUrl'] ?? '');
+      if (status) {
+        status.textContent = 'Đã sao chép';
+        window.setTimeout(() => {
+          status.textContent = '';
+        }, 2000);
+      }
+    } catch {
+      // Trình duyệt từ chối quyền clipboard (thường do trang không chạy HTTPS).
+      if (status) status.textContent = 'Không sao chép được';
+    }
+  });
+</script>

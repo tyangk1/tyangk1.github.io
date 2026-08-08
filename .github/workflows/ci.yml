@@ -1,0 +1,73 @@
+name: CI
+
+# Chặn code hỏng trước khi nó lên production. Cùng bộ kiểm tra với `pnpm check:all`
+# chạy ở máy, nên không có chuyện "ở máy tôi chạy được".
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# Push liên tiếp lên cùng một nhánh thì huỷ lần chạy cũ, khỏi tốn phút CI.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Cài dependency
+        run: pnpm install --frozen-lockfile
+
+      - name: Kiểm định dạng
+        run: pnpm format:check
+
+      - name: Kiểm kiểu dữ liệu
+        run: pnpm typecheck
+
+      # `build:ci`, KHÔNG phải `build`.
+      #
+      # `pnpm build` chạy db-sync trước, và nó cố tình vỡ khi không nối được
+      # database — đúng cho máy của người viết, vì deploy âm thầm bằng nội dung cũ
+      # là loại lỗi tệ nhất. Nhưng database chạy cục bộ nên CI không bao giờ với
+      # tới; đặt `pnpm build` ở đây thì CI đỏ vĩnh viễn.
+      #
+      # Nội dung đã được commit (xem .gitignore), nên CI build thẳng từ file.
+      - name: Build
+        run: pnpm build:ci
+
+      - name: Kiểm frontmatter mọi bài viết
+        run: pnpm check:content
+
+      - name: Kiểm HTML đã build
+        run: pnpm check:html
+
+      - name: Đưa bản build sang job deploy
+        uses: actions/upload-artifact@v4
+        with:
+          name: site
+          path: dist
+          retention-days: 1
+
+      # Giữ lại bản build để tải về xem khi CI đỏ mà ở máy lại xanh.
+      - name: Lưu bản build khi thất bại
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist-loi
+          path: dist
+          retention-days: 3

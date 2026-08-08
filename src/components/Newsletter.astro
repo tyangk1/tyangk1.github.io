@@ -1,0 +1,192 @@
+---
+import { ENV, cheDoNewsletter } from '~/env';
+
+/**
+ * Khối đăng ký nhận bài mới. Hai chế độ, tự chọn theo cấu hình có sẵn:
+ *
+ *  - `provider`  — form POST thẳng tới Buttondown / MailerLite / Listmonk.
+ *                  Chạy được cả khi người đọc tắt JavaScript.
+ *  - `supabase`  — lưu vào database của chính bạn qua một hàm RPC. Cần JavaScript.
+ *
+ * Chưa cấu hình gì thì khối tự ẩn ở production — thà không có còn hơn hiện một
+ * cái form bấm vào không chạy.
+ */
+interface Props {
+  heading?: string;
+}
+
+const { heading = 'Nhận bài mới qua email' } = Astro.props;
+
+const isDev = import.meta.env.DEV;
+const hien = cheDoNewsletter !== 'tat' || isDev;
+const duongDanHienTai = Astro.url.pathname;
+---
+
+{
+  hien && (
+    <section
+      class:list={[
+        'my-12 rounded-card border p-6 sm:p-8',
+        cheDoNewsletter === 'tat'
+          ? 'border-dashed border-accent bg-transparent'
+          : 'border-border bg-surface',
+      ]}
+      aria-labelledby="newsletter-heading"
+      data-newsletter
+      data-che-do={cheDoNewsletter}
+      data-supabase-url={ENV.publicSupabaseUrl}
+      data-supabase-key={ENV.publicSupabaseAnonKey}
+      data-tu-trang={duongDanHienTai}
+    >
+      {cheDoNewsletter === 'tat' && (
+        <p class="mb-4 text-sm font-bold text-accent">
+          TODO — chưa cấu hình. Cách nhanh nhất: điền <code>PUBLIC_SUPABASE_URL</code> và{' '}
+          <code>PUBLIC_SUPABASE_ANON_KEY</code> để lưu email vào database của bạn. Khối này tự ẩn ở
+          production tới khi có giá trị.
+        </p>
+      )}
+
+      <h2 id="newsletter-heading" class="display text-xl">
+        {heading}
+      </h2>
+      <p class="mt-2 text-muted">
+        Mỗi khi có bài mới tôi gửi một email. Không quảng cáo, huỷ đăng ký bất cứ lúc nào.
+      </p>
+
+      <form
+        action={ENV.newsletterAction || undefined}
+        method="post"
+        target={cheDoNewsletter === 'provider' ? '_blank' : undefined}
+        class="mt-5 flex flex-col gap-3 sm:flex-row"
+        data-newsletter-form
+      >
+        <label for="newsletter-email" class="sr-only">
+          Địa chỉ email
+        </label>
+        <input
+          id="newsletter-email"
+          type="email"
+          name="email"
+          required
+          autocomplete="email"
+          placeholder="ban@email.com"
+          class="min-w-0 flex-1 rounded-lg border border-border bg-bg px-4 py-2.5 text-fg placeholder:text-muted"
+        />
+
+        {/*
+          Bẫy bot: người thật không bao giờ thấy ô này nên không bao giờ điền.
+          Dùng `sr-only` + `tabindex=-1` thay vì `display:none` vì một số bot biết
+          bỏ qua trường bị ẩn hẳn.
+        */}
+        <input
+          type="text"
+          name="hp"
+          tabindex="-1"
+          autocomplete="off"
+          aria-hidden="true"
+          class="sr-only"
+        />
+
+        <button
+          type="submit"
+          class="rounded-lg bg-accent px-5 py-2.5 font-bold text-on-accent transition-colors hover:bg-accent-hover disabled:opacity-60"
+        >
+          Đăng ký
+        </button>
+      </form>
+
+      {cheDoNewsletter === 'supabase' && (
+        <>
+          <p class="mt-3 min-h-5 text-sm" role="status" aria-live="polite" data-newsletter-status />
+          <noscript>
+            <p class="mt-3 text-sm text-muted">
+              Ô đăng ký này cần JavaScript. Bạn có thể theo dõi bằng RSS thay thế.
+            </p>
+          </noscript>
+        </>
+      )}
+    </section>
+  )
+}
+
+<script>
+  const khoi = document.querySelector<HTMLElement>('[data-newsletter][data-che-do="supabase"]');
+  const form = khoi?.querySelector<HTMLFormElement>('[data-newsletter-form]');
+
+  if (khoi && form) {
+    const nhap = form.querySelector<HTMLInputElement>('input[type=email]');
+    const bay = form.querySelector<HTMLInputElement>('input[name=hp]');
+    const nut = form.querySelector<HTMLButtonElement>('button[type=submit]');
+    const oTrangThai = khoi.querySelector<HTMLElement>('[data-newsletter-status]');
+
+    const url = khoi.dataset['supabaseUrl'] ?? '';
+    const key = khoi.dataset['supabaseKey'] ?? '';
+    const tuTrang = khoi.dataset['tuTrang'] ?? '';
+
+    // Hàm RPC chỉ trả về mã trạng thái, không trả dữ liệu — nên phía này tự dịch
+    // sang câu tiếng Việt. Thông điệp của `moi` cố ý KHÔNG nói "kiểm tra email":
+    // chưa cắm nhà cung cấp gửi thư thì chưa có email nào được gửi cả.
+    const CAU: Record<string, { text: string; loi: boolean }> = {
+      moi: { text: 'Đã ghi nhận. Bạn sẽ nhận email khi có bài mới.', loi: false },
+      da_co: { text: 'Địa chỉ này đã có trong danh sách rồi.', loi: false },
+      email_sai: { text: 'Địa chỉ email không đúng. Kiểm tra lại giúp tôi.', loi: true },
+    };
+
+    function hien(text: string, loi: boolean) {
+      if (!oTrangThai) return;
+      oTrangThai.textContent = text;
+      oTrangThai.className = `mt-3 min-h-5 text-sm ${loi ? 'text-accent' : 'text-muted'}`;
+    }
+
+    /**
+     * Xoá thông báo ngay khi người dùng gõ lại.
+     *
+     * Vì sao cần: ô nhập là `type=email` nên trình duyệt tự chặn submit khi địa
+     * chỉ sai định dạng — tức là handler bên dưới KHÔNG chạy. Không xoá ở đây thì
+     * thông báo của lần gửi trước vẫn nằm đó, và người dùng đọc được một câu
+     * không liên quan tới việc họ vừa làm.
+     */
+    nhap?.addEventListener('input', () => hien('', false));
+
+    form.addEventListener('submit', async (event) => {
+      event.preventDefault();
+
+      // Bẫy bot có chữ nghĩa là không phải người — báo thành công rồi bỏ qua.
+      if (bay?.value) {
+        hien(CAU['moi']!.text, false);
+        return;
+      }
+
+      const email = nhap?.value.trim() ?? '';
+      if (!email) return;
+
+      if (nut) nut.disabled = true;
+      hien('Đang gửi…', false);
+
+      try {
+        const res = await fetch(`${url}/rest/v1/rpc/dang_ky_newsletter`, {
+          method: 'POST',
+          headers: {
+            apikey: key,
+            Authorization: `Bearer ${key}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ dia_chi: email, tu_trang: tuTrang }),
+        });
+
+        if (!res.ok) throw new Error(String(res.status));
+
+        const ma: unknown = await res.json();
+        const cau = typeof ma === 'string' ? CAU[ma] : undefined;
+        hien(cau?.text ?? 'Đã ghi nhận.', cau?.loi ?? false);
+
+        // Chỉ xoá ô nhập khi thành công, để người dùng sửa được email viết sai.
+        if (!cau?.loi && nhap) nhap.value = '';
+      } catch {
+        hien('Không gửi được lúc này. Thử lại sau giúp tôi.', true);
+      } finally {
+        if (nut) nut.disabled = false;
+      }
+    });
+  }
+</script>

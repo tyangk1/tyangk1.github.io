@@ -1,0 +1,152 @@
+---
+title: "Viết CSS cho tiếng Việt: dấu thanh, chiều cao dòng và font"
+description: "Chữ tiếng Việt cao hơn chữ Latin vì có hai tầng dấu. Đây là những chỉnh sửa CSS cụ thể tôi rút ra sau khi trang web của mình bị dính dấu vào nhau."
+publishedAt: 2026-06-18
+tags: ["CSS","Typography","Web"]
+takeaways: ["Vì sao line-height 1.5 luôn chật với tiếng Việt và nên dùng bao nhiêu","Cách phát hiện một font thiếu subset tiếng Việt trong ba mươi giây","Ba dòng CSS nhỏ giúp dấu thanh không lẫn vào đường gạch chân"]
+draft: false
+featured: false
+---
+
+Phần lớn hướng dẫn về typography trên web viết cho tiếng Anh. Áp thẳng vào tiếng Việt thì có một thứ luôn sai: **chiều cao dòng**.
+
+Lý do nằm ở cấu tạo chữ. Chữ "ế" mang hai tầng dấu chồng lên nhau — dấu mũ rồi dấu sắc. Chữ "ợ" thì có dấu móc bên phải và dấu nặng nằm dưới đường chân chữ. Chiều cao thực tế của một dòng tiếng Việt lớn hơn tiếng Anh đáng kể, dù cỡ chữ khai báo y hệt.
+
+## Chiều cao dòng: 1.7 thay vì 1.5
+
+Con số `1.5` được nhắc đi nhắc lại trong các hướng dẫn tiếng Anh. Với tiếng Việt nó chật:
+
+```css
+/* Chật với tiếng Việt — dấu của dòng dưới gần chạm dấu nặng của dòng trên */
+.prose {
+  line-height: 1.5;
+}
+
+/* Thoáng, đọc đường dài không mỏi */
+.prose {
+  line-height: 1.7;
+}
+```
+
+Cách kiểm tra nhanh: viết một đoạn có nhiều chữ hai tầng dấu — "Hiểu rõ những điều đó" — rồi thu hẹp cửa sổ cho nó xuống dòng. Nếu dấu của dòng dưới trông như dính vào dòng trên thì tăng `line-height`.
+
+Với tiêu đề thì ngược lại. Tiêu đề cỡ lớn dùng `1.7` sẽ rời rạc:
+
+```css
+h1,
+h2,
+h3 {
+  line-height: 1.25;
+  letter-spacing: -0.015em;
+}
+```
+
+Chữ càng lớn thì khoảng cách giữa các ký tự trông càng rộng. Kéo `letter-spacing` âm một chút sẽ làm tiêu đề chắc lại.
+
+## Độ dài dòng: đếm bằng ch
+
+Dòng quá dài khiến mắt lạc chỗ khi nhảy xuống dòng kế. Ngưỡng thường được khuyên là 65–75 ký tự.
+
+```css
+.prose {
+  max-width: 68ch;
+}
+```
+
+Đơn vị `ch` bằng bề rộng chữ "0" của font đang dùng, nên nó tự co giãn theo cỡ chữ. Với tiếng Việt tôi để hơi rộng hơn tiếng Anh một chút — từ tiếng Việt ngắn nên cùng một số ký tự sẽ chứa được nhiều từ hơn.
+
+## Chọn font có đủ dấu
+
+Đây là chỗ dễ sai nhất. Rất nhiều font đẹp trên Google Fonts **không có subset tiếng Việt**. Trình duyệt gặp chữ có dấu sẽ lặng lẽ lấy chữ đó từ font dự phòng của hệ điều hành. Kết quả: một dòng chữ mà "Ha Noi" một kiểu còn "Hà Nội" một kiểu khác, lệch nhau vài phần trăm chiều cao.
+
+Lỗi này khó thấy vì nó _gần như_ đúng. Cách phát hiện: viết một dòng trộn cả hai — "Ha Noi va Hà Nội" — rồi phóng to lên 400%.
+
+Vài font tôi đã kiểm và có đủ dấu tiếng Việt:
+
+| Font           | Kiểu  | Ghi chú                                    |
+| -------------- | ----- | ------------------------------------------ |
+| Be Vietnam Pro | Sans  | Thiết kế riêng cho tiếng Việt, dấu cân đối |
+| Inter          | Sans  | Rất phổ biến, dấu hơi cao                  |
+| Nunito Sans    | Sans  | Mềm, hợp blog cá nhân                      |
+| Lora           | Serif | Đẹp cho nội dung dài                       |
+| JetBrains Mono | Mono  | Có dấu, hiếm với font lập trình            |
+
+## Tự host, đừng gọi Google Fonts
+
+Gọi thẳng Google Fonts nghĩa là mỗi người đọc gửi địa chỉ IP của họ sang máy chủ Google, và bạn thêm một lần bắt tay DNS trước khi chữ hiện ra.
+
+Fontsource đóng gói cùng những font đó thành package npm:
+
+```bash
+pnpm add @fontsource/be-vietnam-pro
+```
+
+```css
+@import '@fontsource/be-vietnam-pro/400.css';
+@import '@fontsource/be-vietnam-pro/700.css';
+```
+
+Mỗi file CSS đó khai báo `unicode-range` cho từng subset, nên trình duyệt chỉ tải phần chứa ký tự thực sự xuất hiện trên trang. Người đọc trang toàn tiếng Việt không phải tải subset Cyrillic.
+
+## font-display: swap
+
+Mặc định, trình duyệt giấu chữ tối đa ba giây trong lúc chờ font tải xong. Ba giây nhìn vào khoảng trắng.
+
+```css
+@font-face {
+  font-family: 'Be Vietnam Pro';
+  font-display: swap;
+  src: url(...) format('woff2');
+}
+```
+
+`swap` bảo trình duyệt hiện chữ ngay bằng font hệ thống, đổi sang font thật khi tải xong. Fontsource đã đặt sẵn `swap`, nhưng nếu bạn tự khai `@font-face` thì phải tự thêm.
+
+Để giảm cú nhảy lúc đổi font, chọn font dự phòng có tỷ lệ gần giống:
+
+```css
+font-family: 'Be Vietnam Pro', ui-sans-serif, system-ui, sans-serif;
+```
+
+## Ba thứ nhỏ nhưng đáng làm
+
+**Chống nhảy trang khi đổi trang.** Trang ngắn không có thanh cuộn, trang dài có — chuyển qua lại làm nội dung nhích ngang vài pixel:
+
+```css
+html {
+  scrollbar-gutter: stable;
+}
+```
+
+**Tôn trọng người nhạy cảm với chuyển động.** Không phải ai cũng chịu được hiệu ứng:
+
+```css
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+```
+
+**Gạch chân link tránh chữ thò xuống.** Gạch chân mặc định cắt ngang phần đuôi của chữ "g", "y", "ạ":
+
+```css
+a {
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.2em;
+}
+```
+
+Với tiếng Việt, `text-underline-offset` còn quan trọng hơn tiếng Anh, vì dấu nặng nằm ngay dưới nguyên âm và rất dễ lẫn vào đường gạch chân.
+
+## Cách tôi kiểm lại
+
+Không có công cụ tự động nào bắt được những lỗi này. Tôi làm thủ công, mất khoảng năm phút:
+
+1. Mở trang trên điện thoại thật, không phải chế độ giả lập.
+2. Phóng to 200% và xem chữ có tràn ra khỏi khung không.
+3. Viết một đoạn thử nhiều dấu chồng: "Những điều tôi đã hiểu rõ sau đợt ấy".
+4. Bật dark mode và xem lại — chữ mảnh trên nền tối trông nhạt hơn, đôi khi phải tăng độ đậm lên một bậc.

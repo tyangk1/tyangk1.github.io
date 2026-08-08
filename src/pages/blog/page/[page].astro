@@ -1,0 +1,57 @@
+---
+import type { GetStaticPaths } from 'astro';
+import { SITE } from '~/site.config';
+import { getPublishedPosts, type Post } from '~/utils/posts';
+import BaseLayout from '~/layouts/BaseLayout.astro';
+import PostCard from '~/components/PostCard.astro';
+import Pagination from '~/components/Pagination.astro';
+import { blogPageHref } from '~/lib/routes';
+
+/**
+ * Trang 1 nằm ở `/blog` (xem `blog/index.astro`), nên ở đây chỉ sinh từ trang 2
+ * trở đi. Làm vậy để `/blog` và `/blog/page/1` không cùng tồn tại với nội dung
+ * y hệt — Google sẽ coi đó là nội dung trùng lặp.
+ */
+export const getStaticPaths: GetStaticPaths = async () => {
+  const posts = await getPublishedPosts();
+  const lastPage = Math.max(1, Math.ceil(posts.length / SITE.postsPerPage));
+
+  return Array.from({ length: Math.max(0, lastPage - 1) }, (_, index) => {
+    const page = index + 2;
+    return {
+      params: { page: String(page) },
+      props: {
+        page,
+        lastPage,
+        items: posts.slice((page - 1) * SITE.postsPerPage, page * SITE.postsPerPage),
+      },
+    };
+  });
+};
+
+interface Props {
+  page: number;
+  lastPage: number;
+  items: Post[];
+}
+
+const { page, lastPage, items } = Astro.props;
+---
+
+<BaseLayout
+  title={`Bài viết — trang ${page}`}
+  description={`Trang ${page} trong danh sách bài viết của blog. Các bài về phát triển web, kiến trúc hệ thống và cách làm việc, sắp xếp theo thứ tự mới nhất trước.`}
+>
+  <div class="wrap py-12">
+    <p class="eyebrow">Lưu trữ</p>
+    <h1 class="display-xl mt-3 text-4xl">
+      Bài viết <span class="text-muted">— trang {page}</span>
+    </h1>
+
+    <div class="mt-8 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+      {items.map((post) => <PostCard post={post} />)}
+    </div>
+
+    <Pagination currentPage={page} lastPage={lastPage} hrefFor={blogPageHref} />
+  </div>
+</BaseLayout>

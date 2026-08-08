@@ -1,0 +1,52 @@
+---
+title: "Làm việc một mình không có nghĩa là tuỳ ý"
+description: "Dự án một người thiếu mọi thứ mà nhóm có sẵn: review, CI đỏ trước mặt người khác, và ai đó hỏi vì sao. Bốn quy tắc tôi tự đặt để bù lại."
+publishedAt: 2026-04-14
+tags: ["Nghề nghiệp","Năng suất"]
+takeaways: ["Ba thứ nhóm cho bạn miễn phí mà làm một mình thì mất","Cách tự review khi không có ai review giúp","Vì sao viết lý do ra giấy hiệu quả hơn nhớ trong đầu"]
+draft: false
+featured: false
+---
+
+Làm một mình nhanh hơn. Đó cũng chính là vấn đề: không có ai bắt bạn dừng lại.
+
+## Ba thứ nhóm cho miễn phí
+
+| Trong nhóm | Làm một mình |
+| --- | --- |
+| Reviewer hỏi "vì sao làm thế này" | Không ai hỏi |
+| CI đỏ trước mặt cả nhóm | CI đỏ, bạn bỏ qua |
+| Người khác đọc code của bạn | Chỉ bạn đọc, và bạn đã biết nó làm gì |
+
+Cả ba đều là **ma sát có ích**. Bỏ hết thì bạn đi nhanh hơn về một hướng có thể sai.
+
+## Bốn quy tắc tôi tự đặt
+
+<Steps>
+1. **Ngưỡng phải là số, không phải cảm giác.** "Trang này nhanh" không kiểm được. "Lighthouse ≥ 95, JS < 50KB" thì kiểm được, và kiểm được nghĩa là không tự lừa được.
+2. **Viết lý do ra trước khi làm.** Một đoạn ngắn: đang giải quyết gì, đã cân nhắc cách nào, vì sao chọn cách này. Viết ra thì những chỗ chưa nghĩ tới tự lộ.
+3. **Để CI chặn thật.** Nếu bạn cho phép mình bỏ qua CI đỏ thì CI không còn là cổng, chỉ là tiếng ồn.
+4. **Đọc lại code của mình sau hai ngày.** Không sửa gì trong hai ngày đó. Khoảng nghỉ làm bạn đọc nó như người lạ.
+</Steps>
+
+<Callout type="tip" title="Quy tắc số 2 là quy tắc rẻ nhất và hiệu quả nhất">
+  Không cần công cụ gì, không mất quá năm phút. Nhưng nó bắt bạn chuyển từ "tôi
+  cảm thấy nên làm thế này" sang "đây là lý do", và hai thứ đó khác nhau rất xa.
+</Callout>
+
+<PullQuote>
+  Kỷ luật trong nhóm đến từ người khác. Làm một mình thì phải tự dựng, và nó chỉ
+  hoạt động khi bạn viết nó ra thành thứ kiểm được.
+</PullQuote>
+
+## Thứ tôi đã thử rồi bỏ
+
+**Tự review qua pull request.** Tôi từng mở PR cho chính mình rồi tự approve. Vô nghĩa: tôi đọc lại ngay sau khi viết, tức là vẫn nhìn bằng con mắt vừa viết ra nó. Quy tắc "đọc lại sau hai ngày" thay thế nó và hiệu quả hơn nhiều.
+
+**Checklist dài.** Danh sách hai mươi mục thì đến mục thứ tám tôi bắt đầu tick mà không đọc. Bốn mục thì tôi thực sự làm.
+
+## Cách kiểm xem có đang tự lừa hay không
+
+Một câu hỏi: *nếu có người khác trong nhóm, thay đổi này có qua được review không?*
+
+Nếu câu trả lời là "chắc họ sẽ hỏi vì sao chỗ này làm vậy" — thì hãy tự trả lời câu đó trước khi commit.

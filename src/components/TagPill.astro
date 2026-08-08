@@ -1,0 +1,36 @@
+---
+import { slugify } from '~/utils/format';
+import { tagHref } from '~/lib/routes';
+import { hueForTag } from '~/lib/cover-image';
+
+interface Props {
+  name: string;
+  count?: number;
+  /** Hiển thị đậm hơn khi đang là tag được chọn. */
+  active?: boolean;
+}
+
+const { name, count, active = false } = Astro.props;
+
+// Cùng công thức màu với ảnh bìa, nên chấm màu ở đây khớp với bìa của các bài
+// thuộc chủ đề đó. Đây là thứ làm hệ thống trông có chủ đích chứ không rời rạc.
+const hue = hueForTag(name);
+---
+
+<a
+  href={tagHref(slugify(name))}
+  aria-current={active ? 'page' : undefined}
+  class:list={[
+    'inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-sm transition-colors',
+    active
+      ? 'border-accent bg-accent-soft font-bold text-fg'
+      : 'border-border text-muted hover:border-accent hover:text-fg',
+  ]}
+>
+  <span
+    class="size-2 shrink-0 rounded-full"
+    style={`background-color: hsl(${hue} 70% 58%)`}
+    aria-hidden="true"></span>
+  <span>{name}</span>
+  {count !== undefined && <span class="text-xs tabular-nums opacity-60">{count}</span>}
+</a>

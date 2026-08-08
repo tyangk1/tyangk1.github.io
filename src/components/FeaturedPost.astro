@@ -1,0 +1,85 @@
+---
+import type { Post } from '~/utils/posts';
+import { formatDate, toISODate, slugify } from '~/utils/format';
+import { readingTime } from '~/utils/readingTime';
+import { postHref } from '~/lib/routes';
+import Icon from '~/components/Icon.astro';
+
+interface Props {
+  post: Post;
+}
+
+const { post } = Astro.props;
+const { minutes } = readingTime(post.body ?? '');
+const primaryTag = post.data.tags[0];
+const href = postHref(post.id);
+---
+
+<article class="group grid items-center gap-8 lg:grid-cols-[1.25fr_1fr] lg:gap-12">
+  <a
+    href={href}
+    tabindex="-1"
+    aria-hidden="true"
+    class="block aspect-16/10 overflow-hidden rounded-card border border-border"
+  >
+    {
+      /*
+      Ảnh bìa bài nổi bật là thứ lớn nhất trên màn hình đầu tiên, nên nó gần như
+      luôn là phần tử LCP. `loading="eager"` + `fetchpriority="high"` để trình
+      duyệt kéo nó về trước mọi ảnh khác.
+    */
+    }
+    <img
+      src={`/covers/${post.id}.svg`}
+      alt=""
+      width="1600"
+      height="1000"
+      loading="eager"
+      fetchpriority="high"
+      decoding="async"
+      class="cover transition-transform duration-700 ease-out group-hover:scale-[1.03]"
+    />
+  </a>
+
+  <div>
+    {
+      primaryTag && (
+        <a href={`/tags/${slugify(primaryTag)}`} class="eyebrow hover:underline">
+          {primaryTag}
+        </a>
+      )
+    }
+
+    <h2 class="display-xl mt-3 text-3xl text-balance sm:text-4xl">
+      <a href={href} class="transition-colors group-hover:text-accent">
+        {post.data.title}
+      </a>
+    </h2>
+
+    <p class="mt-4 text-lg text-muted">{post.data.description}</p>
+
+    <div class="mt-5 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted">
+      <time datetime={toISODate(post.data.publishedAt)}>{formatDate(post.data.publishedAt)}</time>
+      <span aria-hidden="true">·</span>
+      <span>{minutes} phút đọc</span>
+      {
+        post.data.seriesName && (
+          <>
+            <span aria-hidden="true">·</span>
+            <span>
+              {post.data.seriesName} · phần {post.data.seriesPart}
+            </span>
+          </>
+        )
+      }
+    </div>
+
+    <a
+      href={href}
+      class="mt-6 inline-flex items-center gap-2 font-medium text-accent transition-colors hover:text-accent-hover"
+    >
+      Đọc bài này
+      <Icon name="arrowRight" size={16} class="transition-transform group-hover:translate-x-1" />
+    </a>
+  </div>
+</article>

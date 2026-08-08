@@ -1,0 +1,549 @@
+---
+import type { GetStaticPaths } from 'astro';
+import { render } from 'astro:content';
+import { Image } from 'astro:assets';
+
+import { SITE, AUTHOR } from '~/site.config';
+import {
+  getPublishedPosts,
+  relatedPosts,
+  adjacentPosts,
+  seriesPosts,
+  type Post,
+} from '~/utils/posts';
+import { formatDate, toISODate, absoluteUrl, slugify } from '~/utils/format';
+import { readingTime } from '~/utils/readingTime';
+import { docLuotXem, baiDocNhieuNhat } from '~/utils/views';
+import { postHref } from '~/lib/routes';
+
+import BaseLayout from '~/layouts/BaseLayout.astro';
+import TableOfContents from '~/components/TableOfContents.astro';
+import ShareButtons from '~/components/ShareButtons.astro';
+import Comments from '~/components/Comments.astro';
+import Newsletter from '~/components/Newsletter.astro';
+import PostCard from '~/components/PostCard.astro';
+import ViewCount from '~/components/ViewCount.astro';
+import Icon from '~/components/Icon.astro';
+
+import Callout from '~/components/mdx/Callout.astro';
+import PullQuote from '~/components/mdx/PullQuote.astro';
+import Steps from '~/components/mdx/Steps.astro';
+import Figure from '~/components/mdx/Figure.astro';
+import Takeaways from '~/components/mdx/Takeaways.astro';
+
+/**
+ * Bộ thành phần dùng được trong mọi file MDX mà KHÔNG cần import ở từng bài.
+ * Khai báo một chỗ ở đây, thêm thành phần mới là mọi bài cũ cũng dùng được ngay.
+ */
+const mdxComponents = { Callout, PullQuote, Steps, Figure, Takeaways };
+
+export const getStaticPaths: GetStaticPaths = async () => {
+  const posts = await getPublishedPosts();
+  return posts.map((post) => ({
+    params: { slug: post.id },
+    props: { post, posts },
+  }));
+};
+
+interface Props {
+  post: Post;
+  posts: Post[];
+}
+
+const { post, posts } = Astro.props;
+const { Content, headings } = await render(post);
+
+const { minutes } = readingTime(post.body ?? '');
+const related = relatedPosts(post, posts);
+const { newer, older } = adjacentPosts(post, posts);
+const series = seriesPosts(post, posts);
+
+// Phần kế tiếp trong series, hiện ở cột phải — lối đi tiếp rõ ràng nhất cho
+// người vừa đọc xong một phần.
+const currentPart = post.data.seriesPart ?? 0;
+const nextInSeries = series.find((item) => (item.data.seriesPart ?? 0) === currentPart + 1);
+
+// Bài đọc nhiều nhất, hiện ở cột phải. Bỏ chính bài đang đọc ra khỏi danh sách.
+const phoBienTrongCot = baiDocNhieuNhat(
+  posts.filter((p) => p.id !== post.id),
+  await docLuotXem(),
+  { soLuong: 3, toiThieu: 2 },
+);
+
+const url = absoluteUrl(postHref(post.id));
+
+// Hai khối dữ liệu có cấu trúc: một mô tả bài viết, một mô tả đường dẫn phân cấp.
+// BreadcrumbList làm Google hiện "Blog › Tên bài" thay vì URL trần.
+const schema = [
+  {
+    '@context': 'https://schema.org',
+    '@type': 'BlogPosting',
+    headline: post.data.title,
+    description: post.data.description,
+    datePublished: post.data.publishedAt.toISOString(),
+    dateModified: (post.data.updatedAt ?? post.data.publishedAt).toISOString(),
+    inLanguage: SITE.lang,
+    keywords: post.data.tags.join(', '),
+    wordCount: readingTime(post.body ?? '').words,
+    mainEntityOfPage: { '@type': 'WebPage', '@id': url },
+    image: absoluteUrl(`/og/${post.id}.png`),
+    author: { '@type': 'Person', name: AUTHOR.name, url: SITE.url },
+    publisher: { '@type': 'Person', name: AUTHOR.name, url: SITE.url },
+  },
+  {
+    '@context': 'https://schema.org',
+    '@type': 'BreadcrumbList',
+    itemListElement: [
+      { '@type': 'ListItem', position: 1, name: 'Trang chủ', item: SITE.url },
+      { '@type': 'ListItem', position: 2, name: 'Bài viết', item: absoluteUrl('/blog') },
+      { '@type': 'ListItem', position: 3, name: post.data.title, item: url },
+    ],
+  },
+];
+---
+
+<BaseLayout
+  title={post.data.title}
+  description={post.data.description}
+  type="article"
+  ogImage={`/og/${post.id}.png`}
+  publishedAt={post.data.publishedAt}
+  updatedAt={post.data.updatedAt}
+  schema={schema}
+>
+  {/* Thuần trang trí, không mang thông tin — ẩn khỏi screen reader. */}
+  <div class="reading-progress" aria-hidden="true"></div>
+
+  {
+    /*
+      Lưới BA cột: [cột trái | bài viết | cột phải]. Cả hai cột bên đều CÓ nội
+      dung — cột trái là danh tính người viết + nút chia sẻ, cột phải là mục lục
+      + series + bài đọc nhiều.
+
+      Vì sao ba cột: với lưới hai cột `[bài | cột phải]` rồi căn giữa cả khối,
+      cột chữ bị lệch sang trái đúng bằng nửa bề rộng cột phải — đo được 151px
+      trên màn hình 1865px. Mắt nhận ra ngay là "bố cục lệch" dù không chỉ được
+      ra chỗ nào sai. Cột 1 và cột 3 cùng `1fr` thì cột chữ nằm đúng tâm trang.
+
+      Nhưng để cột 1 TRỐNG thì cái giá còn đắt hơn: trên màn 1890px đó là 593px
+      trắng bên trái đối lại một cột phải có chữ, và trang đọc như bị dồn sang
+      phải. Đưa nút chia sẻ từ cột phải sang cột trái thì hai bên cân nhau mà
+      không thêm khối trùng lặp nào.
+
+      Ngưỡng là `xl` (1280px), không phải `lg` (1024px). Ở 1024px mỗi cột bên chỉ
+      còn 92px — mục lục trong 92px thì không đọc được, và có hai cột hẹp như vậy
+      còn tệ hơn một cột đơn. Dưới 1280px trang về một cột, mục lục dùng bản gập
+      trong `<details>`.
+    */
+  }
+  <div class="wrap py-10 xl:grid xl:grid-cols-[1fr_minmax(0,44rem)_1fr] xl:gap-10">
+    {
+      /* `data-pagefind-body` khoanh vùng phần Pagefind đưa vào chỉ mục tìm kiếm.
+        Những khối lặp lại ở mọi bài (điều hướng, bài liên quan, bình luận) được
+        đánh `data-pagefind-ignore` để chúng không làm nhiễu kết quả. */
+    }
+    <article
+      class="mx-auto w-full max-w-[44rem] xl:col-start-2 xl:row-start-1 xl:mx-0"
+      data-pagefind-body
+    >
+      <nav aria-label="Đường dẫn" class="text-sm text-muted" data-pagefind-ignore>
+        <a href="/blog" class="tap gap-1.5 py-1 transition-colors hover:text-accent">
+          <Icon name="arrowLeft" size={14} />
+          Tất cả bài viết
+        </a>
+      </nav>
+
+      <header class="mt-6">
+        {
+          post.data.tags[0] && (
+            <a href={`/tags/${slugify(post.data.tags[0])}`} class="eyebrow hover:underline">
+              {post.data.tags[0]}
+            </a>
+          )
+        }
+
+        <h1 class="display-xl mt-3 text-4xl text-balance sm:text-5xl">
+          {post.data.title}
+        </h1>
+
+        <div class="mt-5 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted">
+          <time datetime={toISODate(post.data.publishedAt)}>
+            {formatDate(post.data.publishedAt)}
+          </time>
+          <span aria-hidden="true">·</span>
+          <span class="inline-flex items-center gap-1.5">
+            <Icon name="clock" size={14} />
+            {minutes} phút đọc
+          </span>
+          {
+            /* Số lượt đọc lấy trực tiếp từ database sau khi trang đã vẽ xong.
+              Bài chưa đủ 5 lượt thì tự ẩn — "1 lượt đọc" phản tác dụng. */
+          }
+          <ViewCount slug={post.id} />
+          {
+            post.data.updatedAt && (
+              <>
+                <span aria-hidden="true">·</span>
+                <span>Cập nhật {formatDate(post.data.updatedAt)}</span>
+              </>
+            )
+          }
+        </div>
+
+        {
+          /*
+            Ảnh bìa ở đây là một DẢI MỎNG, không phải một tấm ảnh lớn.
+
+            Bản trước dùng khung 16:9 → cao 396px trên màn hình rộng, và đẩy chữ
+            đầu tiên của bài xuống mốc 1087px. Nghĩa là người đọc mở bài ra và
+            không thấy một câu nội dung nào. Với một bìa chỉ mang màu nhận diện
+            chứ không mang thông tin, đó là cái giá quá đắt.
+
+            Dải mỏng giữ được màu nhận diện của chủ đề mà chỉ tốn ~70px. Tấm bìa
+            đầy đủ vẫn dùng ở danh sách bài và ở ảnh chia sẻ (OG) — đúng chỗ nó
+            có việc để làm.
+
+            Ảnh bìa THẬT do người viết đặt thì vẫn hiện đầy đủ: đã bỏ công chọn
+            ảnh thì ảnh đó mang thông tin.
+          */
+        }
+        {
+          post.data.coverImage && post.data.coverAlt ? (
+            <Image
+              src={post.data.coverImage}
+              alt={post.data.coverAlt}
+              widths={[640, 960, 1280]}
+              sizes="(min-width: 44rem) 44rem, 100vw"
+              class="mt-8 w-full rounded-card border border-border"
+              loading="eager"
+              fetchpriority="high"
+            />
+          ) : (
+            <img
+              src={`/covers/${post.id}.svg`}
+              alt=""
+              width="1600"
+              height="140"
+              decoding="async"
+              class="mt-7 h-[70px] w-full rounded-lg object-cover"
+            />
+          )
+        }
+      </header>
+
+      {
+        series.length > 1 && (
+          <nav
+            aria-labelledby="series-heading"
+            class="mt-8 rounded-card border border-border bg-surface p-5"
+          >
+            <p id="series-heading" class="text-sm font-bold">
+              Series: {post.data.seriesName}
+            </p>
+            {/* `.tap` trên link: dòng một hàng chỉ cao 18px, dưới sàn 24px của
+                WCAG 2.5.8. Comment phải nằm NGOÀI ternary bên dưới — đặt trong
+                một nhánh thì nhánh đó có hai node và Astro không biên dịch được. */}
+            <ol class="mt-3 space-y-1.5">
+              {series.map((item) => (
+                <li class="text-sm">
+                  {item.id === post.id ? (
+                    <span aria-current="true" class="font-medium">
+                      Phần {item.data.seriesPart}. {item.data.title}
+                    </span>
+                  ) : (
+                    <a
+                      href={postHref(item.id)}
+                      class="tap text-muted transition-colors hover:text-accent"
+                    >
+                      Phần {item.data.seriesPart}. {item.data.title}
+                    </a>
+                  )}
+                </li>
+              ))}
+            </ol>
+          </nav>
+        )
+      }
+
+      {
+        /*
+          Mục lục cho màn hình nhỏ, GẬP LẠI sẵn.
+
+          Bản mở sẵn chiếm khoảng 250px và đẩy hộp điểm chính xuống mốc 838px trên
+          điện thoại — người đọc mở bài ra không thấy nội dung nào. Gập lại thì nó
+          còn một dòng.
+
+          Dùng `<details>` chứ không phải JavaScript: nó gập/mở được cả khi JS bị
+          chặn, và bàn phím + screen reader hiểu sẵn.
+        */
+      }
+      <details class="group mt-8 rounded-card border border-border xl:hidden" data-pagefind-ignore>
+        <summary
+          class="flex cursor-pointer items-center justify-between px-5 py-3.5 text-sm font-bold"
+        >
+          Nội dung bài
+          <Icon
+            name="arrowRight"
+            size={16}
+            class="text-muted transition-transform group-open:rotate-90"
+          />
+        </summary>
+        <div class="px-5 pb-5">
+          <TableOfContents headings={headings} id="toc-mobile" anTieuDe />
+        </div>
+      </details>
+
+      <div class="prose mt-10">
+        {
+          /* Hộp điểm chính đặt trước nội dung, không nằm trong file MDX — nhờ vậy
+            nó luôn ở đúng vị trí và người viết chỉ cần điền frontmatter. */
+        }
+        {post.data.takeaways && <Takeaways items={post.data.takeaways} />}
+        <Content components={mdxComponents} />
+      </div>
+
+      {
+        /*
+          Tag đặt ở CUỐI bài, không phải đầu.
+
+          Chúng là điều hướng, không phải nội dung để đọc. Ở đầu bài chúng chiếm
+          một hàng nữa giữa tiêu đề và chữ đầu tiên, mà tag chính thì dòng nhãn
+          phía trên tiêu đề đã hiện rồi — trùng lặp. Ở cuối bài chúng đúng lúc:
+          người vừa đọc xong và đang tìm bài kế tiếp.
+        */
+      }
+      <div class="mt-12 border-t border-border pt-6" data-pagefind-ignore>
+        <ul class="flex flex-wrap gap-2" aria-label="Chủ đề của bài này">
+          {
+            post.data.tags.map((tag: string) => (
+              <li>
+                <a
+                  href={`/tags/${slugify(tag)}`}
+                  class="tap rounded-full border border-border px-3 py-1 text-sm text-muted transition-colors hover:border-accent hover:text-accent"
+                >
+                  {tag}
+                </a>
+              </li>
+            ))
+          }
+        </ul>
+
+        <div class="mt-5">
+          <ShareButtons title={post.data.title} url={url} />
+        </div>
+      </div>
+
+      <aside
+        class="mt-10 flex flex-col gap-4 rounded-card border border-border bg-surface p-6 sm:flex-row sm:items-center"
+        data-pagefind-ignore
+      >
+        {
+          /* Chữ đầu của tên làm ảnh đại diện tạm. Có ảnh thật thì thay bằng
+            <Image>, nhưng một khối màu có chữ vẫn hơn là không có gì — người đọc
+            cần thấy bài này do một con người viết ra. */
+        }
+        <span
+          class="grid size-14 shrink-0 place-items-center rounded-full bg-accent text-xl font-bold text-on-accent"
+          aria-hidden="true"
+        >
+          {AUTHOR.name.trim().charAt(0)}
+        </span>
+        <div>
+          <p class="text-sm text-muted">Viết bởi</p>
+          <p class="font-bold">{AUTHOR.name}</p>
+          <p class="mt-1.5 text-sm text-muted">{AUTHOR.bio}</p>
+        </div>
+      </aside>
+
+      {
+        (newer || older) && (
+          <nav
+            aria-label="Bài trước và bài sau"
+            class="mt-10 grid gap-4 sm:grid-cols-2"
+            data-pagefind-ignore
+          >
+            {older ? (
+              <a
+                href={postHref(older.id)}
+                rel="prev"
+                class="rounded-card border border-border p-4 transition-colors hover:border-accent"
+              >
+                <span class="text-sm text-muted">← Bài trước</span>
+                <span class="mt-1 block font-medium">{older.data.title}</span>
+              </a>
+            ) : (
+              <div />
+            )}
+
+            {newer && (
+              <a
+                href={postHref(newer.id)}
+                rel="next"
+                class="rounded-card border border-border p-4 text-right transition-colors hover:border-accent sm:col-start-2"
+              >
+                <span class="text-sm text-muted">Bài sau →</span>
+                <span class="mt-1 block font-medium">{newer.data.title}</span>
+              </a>
+            )}
+          </nav>
+        )
+      }
+
+      {
+        related.length > 0 && (
+          <section class="mt-14" aria-labelledby="related-heading" data-pagefind-ignore>
+            <h2 id="related-heading" class="eyebrow">
+              Bài liên quan
+            </h2>
+            <div class="mt-3">
+              {related.map((item) => (
+                <PostCard post={item} headingLevel="h3" variant="row" />
+              ))}
+            </div>
+          </section>
+        )
+      }
+
+      <div data-pagefind-ignore>
+        <Newsletter heading="Có bài mới thì tôi báo" />
+      </div>
+
+      <div data-pagefind-ignore>
+        <Comments />
+      </div>
+    </article>
+
+    {
+      /*
+        CỘT TRÁI — nhưng đặt SAU `<article>` trong DOM.
+
+        Grid cho phép tách thứ tự hiển thị khỏi thứ tự DOM: `xl:col-start-1
+        xl:row-start-1` đưa khối này về ô bên trái, còn bàn phím và screen reader
+        vẫn đi qua bài viết trước rồi mới tới phần phụ trợ. Đặt nó trước
+        `<article>` trong nguồn thì Tab sẽ chạm nút chia sẻ trước cả tiêu đề bài.
+
+        Nội dung chọn theo nguyên tắc "thứ cần TRONG LÚC đọc, không phải thứ để
+        đọc": ai viết bài này, và cách gửi bài cho người khác.
+      */
+    }
+    <aside
+      class="hidden xl:col-start-1 xl:row-start-1 xl:block"
+      aria-label="Về bài viết này"
+      data-pagefind-ignore
+    >
+      {
+        /*
+          `ml-auto` đẩy khối áp vào phía bài viết, và `max-w-64` khớp bề rộng với
+          cột phải. Không có hai thứ này thì khối dạt ra mép ngoài: đo được lề
+          ngoài 245px bên trái đối 297px bên phải, và cột trái cách bài 124px
+          trong khi cột phải chỉ cách 40px — hai lề trông không cùng một hệ.
+        */
+      }
+      <div class="sticky top-24 ml-auto flex max-w-64 flex-col gap-7">
+        <div>
+          <p class="eyebrow">Viết bởi</p>
+          <div class="mt-3 flex items-center gap-3">
+            <span
+              class="grid size-10 shrink-0 place-items-center rounded-full bg-accent font-bold text-on-accent"
+              aria-hidden="true"
+            >
+              {AUTHOR.name.trim().charAt(0)}
+            </span>
+            <span class="text-sm font-bold">{AUTHOR.name}</span>
+          </div>
+          <p class="mt-3 text-sm text-muted">{AUTHOR.bio}</p>
+        </div>
+
+        <div class="border-t border-border pt-6">
+          <p class="eyebrow">Gửi cho ai đó</p>
+          <div class="mt-3">
+            <ShareButtons title={post.data.title} url={url} variant="compact" />
+          </div>
+        </div>
+      </div>
+    </aside>
+
+    {
+      /*
+        Cột phải, giới hạn 16rem: mục lục → phần kế tiếp trong series → bài đọc
+        nhiều nhất.
+
+        Trước đây cột này chỉ cao 95px trên một trang cao hơn 5000px, tức là gần
+        như toàn bộ chiều cao bên phải là khoảng trống chết. Thêm khối "đọc nhiều
+        nhất" vừa lấp chỗ đó vừa tạo lối đi tiếp — nó là danh sách link nội bộ
+        đứng cạnh người đọc suốt bài.
+      */
+    }
+    <aside class="hidden xl:col-start-3 xl:row-start-1 xl:block" data-pagefind-ignore>
+      {
+        /* Nới từ 14rem lên 16rem cùng lúc với `--container-wrap` 80rem → 90rem:
+          cột phải giờ rộng 308px, để nội dung ở 224px thì dư ra 84px trống. */
+      }
+      <div class="sticky top-24 flex max-w-64 flex-col gap-7">
+        <TableOfContents headings={headings} id="toc-desktop" />
+
+        {
+          nextInSeries && (
+            <div class="border-t border-border pt-6">
+              <p class="eyebrow">Tiếp theo trong series</p>
+              <a
+                href={postHref(nextInSeries.id)}
+                class="mt-2 block text-sm font-bold transition-colors hover:text-accent"
+              >
+                Phần {nextInSeries.data.seriesPart}. {nextInSeries.data.title}
+              </a>
+            </div>
+          )
+        }
+
+        {
+          phoBienTrongCot.length > 0 && (
+            <div class="border-t border-border pt-6">
+              <p class="eyebrow">Đọc nhiều nhất</p>
+              <ol class="mt-3 space-y-3">
+                {phoBienTrongCot.map((item, i) => (
+                  <li class="grid grid-cols-[1.25rem_1fr] gap-2">
+                    <span class="font-mono text-xs text-muted tabular-nums" aria-hidden="true">
+                      {String(i + 1).padStart(2, '0')}
+                    </span>
+                    <a
+                      href={postHref(item.post.id)}
+                      class="text-sm text-muted transition-colors hover:text-accent"
+                    >
+                      {item.post.data.title}
+                    </a>
+                  </li>
+                ))}
+              </ol>
+            </div>
+          )
+        }
+      </div>
+    </aside>
+  </div>
+</BaseLayout>
+
+<script>
+  // Nút copy đã được chèn sẵn vào HTML lúc build (xem src/lib/rehype-content.ts).
+  // Ở đây chỉ cần đúng một listener gắn ở document, thay vì gắn cho từng nút.
+  document.addEventListener('click', async (event) => {
+    const button = (event.target as HTMLElement | null)?.closest<HTMLButtonElement>(
+      '[data-copy-code]',
+    );
+    if (!button) return;
+
+    const code = button.parentElement?.querySelector('code')?.textContent ?? '';
+
+    try {
+      await navigator.clipboard.writeText(code);
+      button.dataset['copied'] = 'true';
+      button.setAttribute('aria-label', 'Đã sao chép');
+      window.setTimeout(() => {
+        delete button.dataset['copied'];
+        button.setAttribute('aria-label', 'Sao chép đoạn mã');
+      }, 1800);
+    } catch {
+      button.setAttribute('aria-label', 'Trình duyệt không cho sao chép');
+    }
+  });
+</script>

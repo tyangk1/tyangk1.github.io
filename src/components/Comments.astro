@@ -1,0 +1,70 @@
+---
+import { ENV, commentsEnabled } from '~/env';
+---
+
+{
+  commentsEnabled && (
+    <section class="mt-16 border-t border-border pt-10" aria-labelledby="comments-heading">
+      <h2 id="comments-heading" class="text-xl font-bold tracking-tight">
+        Bình luận
+      </h2>
+      <p class="mt-1 text-sm text-muted">
+        Bình luận chạy trên GitHub Discussions — cần tài khoản GitHub để viết.
+      </p>
+
+      <div class="mt-6" id="giscus-container" />
+
+      {/*
+        `is:inline` để Astro không gói script này vào bundle: giscus cần đúng thẻ
+        script gốc với đầy đủ data-* thì mới tự khởi tạo được.
+        `data-loading="lazy"` giữ cho iframe chưa tải tới khi người đọc cuộn
+        xuống, nhờ vậy nó không kéo tụt điểm hiệu năng của trang.
+      */}
+      <script
+        is:inline
+        src="https://giscus.app/client.js"
+        data-repo={ENV.giscusRepo}
+        data-repo-id={ENV.giscusRepoId}
+        data-category={ENV.giscusCategory}
+        data-category-id={ENV.giscusCategoryId}
+        data-mapping="pathname"
+        data-strict="1"
+        data-reactions-enabled="1"
+        data-emit-metadata="0"
+        data-input-position="top"
+        data-theme="preferred_color_scheme"
+        data-lang="vi"
+        data-loading="lazy"
+        crossorigin="anonymous"
+        async
+      />
+    </section>
+  )
+}
+
+<script>
+  // giscus nằm trong iframe nên không nhận được class `dark` của trang chủ.
+  // Cách duy nhất để đổi giao diện của nó là gửi message vào iframe.
+  const FRAME_ORIGIN = 'https://giscus.app';
+
+  function sendTheme() {
+    const iframe = document.querySelector<HTMLIFrameElement>('iframe.giscus-frame');
+    if (!iframe?.contentWindow) return;
+
+    const theme = document.documentElement.classList.contains('dark') ? 'dark' : 'light';
+    iframe.contentWindow.postMessage({ giscus: { setConfig: { theme } } }, FRAME_ORIGIN);
+  }
+
+  if (document.getElementById('giscus-container')) {
+    // Theo dõi class trên <html> để bắt lúc người dùng bấm nút đổi giao diện.
+    new MutationObserver(sendTheme).observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ['class'],
+    });
+
+    // iframe được chèn vào sau, nên phải đợi giscus báo đã sẵn sàng rồi mới gửi.
+    window.addEventListener('message', (event) => {
+      if (event.origin === FRAME_ORIGIN) sendTheme();
+    });
+  }
+</script>

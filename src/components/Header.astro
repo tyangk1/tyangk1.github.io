@@ -1,0 +1,132 @@
+---
+import { SITE, NAV } from '~/site.config';
+import { canonicalPath } from '~/utils/format';
+import Icon from '~/components/Icon.astro';
+import ThemeToggle from '~/components/ThemeToggle.astro';
+
+const current = canonicalPath(Astro.url.pathname);
+
+function isActive(href: string): boolean {
+  return href === '/' ? current === '/' : current === href || current.startsWith(`${href}/`);
+}
+---
+
+<header class="sticky top-0 z-50 border-b border-border bg-bg">
+  {
+    /*
+    `flex-wrap` + `min-h-16` thay vì `h-16` cố định: khi người dùng phóng chữ lên
+    200% (Firefox có chế độ chỉ phóng chữ), ba nút bên phải mỗi cái thành 72px và
+    không còn vừa một hàng. Cho phép xuống dòng thì chúng tự tụt xuống dưới thay
+    vì tràn ra ngoài khung nhìn.
+  */
+  }
+  <div class="wrap flex min-h-16 flex-wrap items-center justify-between gap-x-4 gap-y-2 py-2">
+    {
+      /* Dấu nhận diện: một ô vuông mang chữ đầu của tên. Nhỏ, nhưng đây là thứ
+        làm header trông có chủ, thay vì chỉ là một dòng chữ trơ. */
+    }
+    <a href="/" class="group flex min-w-0 shrink items-center gap-2.5">
+      <span
+        class="grid size-8 place-items-center rounded-lg bg-accent text-sm font-bold text-on-accent transition-transform group-hover:-rotate-6"
+        aria-hidden="true"
+      >
+        {SITE.title.trim().charAt(0)}
+      </span>
+      <span class="display truncate text-base transition-colors group-hover:text-accent"
+        >{SITE.title}</span
+      >
+    </a>
+
+    <div class="flex flex-wrap items-center justify-end gap-1">
+      <nav aria-label="Điều hướng chính" class="hidden md:block">
+        <ul class="flex flex-wrap items-center justify-end gap-1">
+          {
+            NAV.map((item) => (
+              <li>
+                <a
+                  href={item.href}
+                  aria-current={isActive(item.href) ? 'page' : undefined}
+                  class="rounded-lg px-3 py-2 text-sm text-muted transition-colors hover:bg-surface hover:text-fg aria-[current=page]:font-bold aria-[current=page]:text-fg"
+                >
+                  {item.label}
+                </a>
+              </li>
+            ))
+          }
+        </ul>
+      </nav>
+
+      <a
+        href="/search"
+        class="grid size-9 place-items-center rounded-lg border border-border text-muted transition-colors hover:bg-surface hover:text-fg"
+        aria-label="Tìm kiếm bài viết"
+      >
+        <Icon name="search" size={18} />
+      </a>
+
+      <ThemeToggle />
+
+      <button
+        type="button"
+        id="nav-toggle"
+        class="grid size-9 place-items-center rounded-lg border border-border text-muted transition-colors hover:bg-surface hover:text-fg md:hidden"
+        aria-label="Mở menu"
+        aria-expanded="false"
+        aria-controls="mobile-nav"
+      >
+        <Icon name="menu" size={18} id="nav-menu-icon" />
+        <Icon name="close" size={18} class="hidden" id="nav-close-icon" />
+      </button>
+    </div>
+  </div>
+
+  <nav
+    id="mobile-nav"
+    aria-label="Điều hướng chính (di động)"
+    class="hidden border-t border-border bg-bg md:hidden!"
+  >
+    <ul class="wrap flex flex-col py-2">
+      {
+        NAV.map((item) => (
+          <li>
+            <a
+              href={item.href}
+              aria-current={isActive(item.href) ? 'page' : undefined}
+              class="block rounded-lg px-3 py-2.5 text-muted transition-colors hover:bg-surface hover:text-fg aria-[current=page]:font-bold aria-[current=page]:text-fg"
+            >
+              {item.label}
+            </a>
+          </li>
+        ))
+      }
+    </ul>
+  </nav>
+</header>
+
+<script>
+  const toggle = document.getElementById('nav-toggle');
+  const nav = document.getElementById('mobile-nav');
+  const menuIcon = document.getElementById('nav-menu-icon');
+  const closeIcon = document.getElementById('nav-close-icon');
+
+  function setOpen(open: boolean) {
+    if (!toggle || !nav) return;
+    nav.classList.toggle('hidden', !open);
+    toggle.setAttribute('aria-expanded', String(open));
+    toggle.setAttribute('aria-label', open ? 'Đóng menu' : 'Mở menu');
+    menuIcon?.classList.toggle('hidden', open);
+    closeIcon?.classList.toggle('hidden', !open);
+  }
+
+  toggle?.addEventListener('click', () => {
+    setOpen(nav?.classList.contains('hidden') ?? true);
+  });
+
+  // Bấm Escape để đóng — người dùng bàn phím trông đợi điều này.
+  document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape' && !nav?.classList.contains('hidden')) {
+      setOpen(false);
+      toggle?.focus();
+    }
+  });
+</script>

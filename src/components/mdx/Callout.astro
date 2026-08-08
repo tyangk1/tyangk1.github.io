@@ -1,0 +1,38 @@
+---
+import Icon from '~/components/Icon.astro';
+import type { IconName } from '~/lib/icons';
+
+/**
+ * Hộp ghi chú trong bài viết. Bốn kiểu, mỗi kiểu một màu và một icon.
+ *
+ * Đây là thành phần đáng giá nhất trong bộ này: một bài 1.500 từ toàn chữ đọc
+ * rất nặng, chỉ cần hai ba hộp như vậy là mắt có chỗ nghỉ và người đọc nhận ra
+ * đâu là phần quan trọng.
+ */
+interface Props {
+  type?: 'note' | 'tip' | 'warning' | 'danger';
+  /** Tiêu đề riêng; bỏ trống thì dùng nhãn mặc định theo kiểu. */
+  title?: string;
+}
+
+const { type = 'note', title } = Astro.props;
+
+const PRESET: Record<string, { icon: IconName; label: string }> = {
+  note: { icon: 'info', label: 'Ghi chú' },
+  tip: { icon: 'bulb', label: 'Mách nhỏ' },
+  warning: { icon: 'warning', label: 'Lưu ý' },
+  danger: { icon: 'danger', label: 'Cẩn thận' },
+};
+
+const preset = PRESET[type] ?? PRESET['note']!;
+---
+
+<aside class:list={['callout', `callout--${type}`]}>
+  <p class="callout__label">
+    <Icon name={preset.icon} size={17} />
+    <span>{title ?? preset.label}</span>
+  </p>
+  <div class="callout__body">
+    <slot />
+  </div>
+</aside>

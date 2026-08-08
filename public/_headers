@@ -1,0 +1,29 @@
+# Cấu hình header cho Cloudflare Pages (Netlify cũng đọc file này).
+# Vercel dùng vercel.json thay cho file này.
+
+/*
+  # Chặn trang bị nhúng vào iframe của site khác (chống clickjacking).
+  X-Frame-Options: DENY
+  # Không cho trình duyệt tự đoán kiểu file.
+  X-Content-Type-Options: nosniff
+  # Chỉ gửi domain (không gửi đường dẫn đầy đủ) khi người đọc bấm sang site khác.
+  Referrer-Policy: strict-origin-when-cross-origin
+  # Site không dùng camera/mic/vị trí — khai báo tường minh để tắt hẳn.
+  Permissions-Policy: camera=(), microphone=(), geolocation=(), interest-cohort=()
+
+# Tài nguyên có hash trong tên file thì không bao giờ đổi nội dung — cache vĩnh viễn.
+/_astro/*
+  Cache-Control: public, max-age=31536000, immutable
+
+/og/*
+  Cache-Control: public, max-age=31536000, immutable
+
+# Chỉ mục tìm kiếm đổi mỗi lần build; cache ngắn rồi kiểm lại.
+/pagefind/*
+  Cache-Control: public, max-age=3600, must-revalidate
+
+/*.png
+  Cache-Control: public, max-age=604800
+
+/*.svg
+  Cache-Control: public, max-age=604800

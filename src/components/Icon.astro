@@ -1,0 +1,33 @@
+---
+import { STROKE_ICONS, FILLED_ICONS, isFilledIcon, type IconName } from '~/lib/icons';
+
+interface Props {
+  name: IconName;
+  size?: number;
+  class?: string;
+  /** Thuộc tính khác (id, data-*, ...) được truyền thẳng xuống thẻ <svg>. */
+  [key: string]: unknown;
+}
+
+const { name, size = 20, class: className = '', ...rest } = Astro.props;
+
+const filled = isFilledIcon(name);
+const paths = filled ? FILLED_ICONS[name] : STROKE_ICONS[name];
+---
+
+<svg
+  xmlns="http://www.w3.org/2000/svg"
+  width={size}
+  height={size}
+  viewBox="0 0 24 24"
+  fill={filled ? 'currentColor' : 'none'}
+  stroke={filled ? 'none' : 'currentColor'}
+  stroke-width="2"
+  stroke-linecap="round"
+  stroke-linejoin="round"
+  class={className}
+  aria-hidden="true"
+  focusable="false"
+  {...rest}
+  set:html={paths}
+/>

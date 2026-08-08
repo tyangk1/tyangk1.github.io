@@ -1,0 +1,12 @@
+{
+  "name": "Bảng tra cứu CSS tiếng Việt",
+  "description": "Trang tra cứu nhanh các thuộc tính CSS hay quên, dịch và chú giải bằng tiếng Việt. Khoảng 3.000 lượt truy cập mỗi tháng, gần như toàn bộ từ tìm kiếm.",
+  "year": 2025,
+  "status": "hoàn thành",
+  "tech": [
+    "Astro",
+    "MDX"
+  ],
+  "featured": false,
+  "url": "https://css.tenban.com"
+}

@@ -1,0 +1,207 @@
+---
+import { getPublishedPosts, collectTags } from '~/utils/posts';
+import BaseLayout from '~/layouts/BaseLayout.astro';
+import Icon from '~/components/Icon.astro';
+import PostCard from '~/components/PostCard.astro';
+import TagPill from '~/components/TagPill.astro';
+
+/**
+ * Một trang tìm kiếm chỉ có ô nhập là đường cùng: ai chưa biết blog có gì thì
+ * không biết gõ từ nào. Nên dưới ô nhập luôn có sẵn chủ đề và bài mới nhất để
+ * duyệt. Khối đó tự ẩn khi có truy vấn, tránh đứng chen với kết quả.
+ */
+const posts = await getPublishedPosts();
+const tags = collectTags(posts);
+const baiMoi = posts.slice(0, 5);
+---
+
+<BaseLayout
+  title="Tìm kiếm"
+  description="Tìm bài viết theo từ khoá. Chỉ mục được dựng sẵn lúc build và chạy hoàn toàn trong trình duyệt, nên không có truy vấn nào của bạn được gửi đi đâu cả."
+  noindex
+>
+  <div class="wrap-prose py-12">
+    <p class="eyebrow">Tra cứu</p>
+    <h1 class="display-xl mt-3 text-4xl">Tìm kiếm</h1>
+    <p class="mt-4 text-muted">
+      Tìm kiếm chạy hoàn toàn trong trình duyệt của bạn. Không có truy vấn nào được gửi lên máy chủ.
+    </p>
+
+    <div class="relative mt-8">
+      <span class="pointer-events-none absolute top-1/2 left-4 -translate-y-1/2 text-muted">
+        <Icon name="search" size={18} />
+      </span>
+      <label for="search-input" class="sr-only">Từ khoá tìm kiếm</label>
+      <input
+        id="search-input"
+        type="search"
+        autocomplete="off"
+        placeholder="Nhập từ khoá, ví dụ: astro, css, seo"
+        class="w-full rounded-lg border border-border bg-bg py-3 pr-4 pl-12 text-fg placeholder:text-muted"
+      />
+    </div>
+
+    <p id="search-status" role="status" aria-live="polite" class="mt-4 text-sm text-muted"></p>
+
+    <ul id="search-results" class="mt-2 divide-y divide-border"></ul>
+
+    <div id="search-browse" class="mt-10 border-t border-border pt-8">
+      <h2 class="eyebrow">Duyệt theo chủ đề</h2>
+      <ul class="mt-4 flex flex-wrap gap-2">
+        {
+          tags.slice(0, 12).map((tag) => (
+            <li>
+              <TagPill name={tag.name} count={tag.count} />
+            </li>
+          ))
+        }
+      </ul>
+
+      <h2 class="eyebrow mt-9">Bài mới nhất</h2>
+      <div class="mt-3">
+        {baiMoi.map((post, i) => <PostCard post={post} variant="compact" index={i + 1} />)}
+      </div>
+
+      <a
+        href="/blog"
+        class="tap mt-5 inline-block py-1 text-sm text-accent transition-colors hover:text-accent-hover"
+      >
+        Xem tất cả {posts.length} bài viết →
+      </a>
+    </div>
+  </div>
+</BaseLayout>
+
+{
+  /*
+  Phần nạp Pagefind bắt buộc phải nằm trong script `is:inline`.
+
+  Lý do: `/pagefind/` chỉ tồn tại SAU khi `astro build` chạy xong, nên Vite không
+  thể phân giải nó lúc build. Tệ hơn, Vite bọc mọi `import()` động bằng helper
+  preload có chứa placeholder `__VITE_PRELOAD__`; với script được nhúng thẳng vào
+  HTML thì placeholder đó không được thay thế và trang sẽ ném ReferenceError.
+  `is:inline` khiến Astro để nguyên đoạn này, Vite không đụng tới.
+*/
+}
+<script is:inline type="module">
+  import('/pagefind/pagefind.js')
+    .then(async (pagefind) => {
+      await pagefind.init();
+      window.__pagefind = pagefind;
+      window.dispatchEvent(new CustomEvent('pagefind:ready'));
+    })
+    .catch(() => {
+      window.dispatchEvent(new CustomEvent('pagefind:failed'));
+    });
+</script>
+
+<script>
+  interface PagefindResultData {
+    url: string;
+    excerpt: string;
+    meta: { title?: string };
+  }
+
+  interface PagefindApi {
+    init: () => Promise<void>;
+    search: (query: string) => Promise<{ results: { data: () => Promise<PagefindResultData> }[] }>;
+  }
+
+  /** Pagefind do script `is:inline` ở trên gắn vào `window` sau khi nạp xong. */
+  const pagefindOnWindow = () => (window as unknown as { __pagefind?: PagefindApi }).__pagefind;
+
+  const input = document.getElementById('search-input') as HTMLInputElement | null;
+  const list = document.getElementById('search-results');
+  const status = document.getElementById('search-status');
+  const browse = document.getElementById('search-browse');
+
+  let pending = '';
+
+  /**
+   * Khối duyệt chỉ ẩn khi thật sự đang có truy vấn. Xoá hết chữ trong ô nhập thì
+   * nó hiện lại — nếu không, người vừa xoá từ khoá sẽ nhìn vào một trang trắng.
+   */
+  function hienKhoiDuyet(hien: boolean) {
+    browse?.toggleAttribute('hidden', !hien);
+  }
+
+  function escapeHtml(value: string): string {
+    const div = document.createElement('div');
+    div.textContent = value;
+    return div.innerHTML;
+  }
+
+  async function runSearch(query: string) {
+    if (!list || !status) return;
+
+    if (query.trim().length < 2) {
+      list.innerHTML = '';
+      status.textContent = '';
+      hienKhoiDuyet(true);
+      return;
+    }
+
+    hienKhoiDuyet(false);
+
+    const api = pagefindOnWindow();
+    if (!api) {
+      // Chỉ mục chưa nạp xong — nhớ lại truy vấn để chạy khi nó sẵn sàng.
+      pending = query;
+      status.textContent = 'Đang tải chỉ mục…';
+      return;
+    }
+
+    status.textContent = 'Đang tìm…';
+    const search = await api.search(query);
+    const results = await Promise.all(search.results.slice(0, 10).map((result) => result.data()));
+
+    status.textContent =
+      results.length === 0
+        ? `Không có kết quả cho “${query}”.`
+        : `${search.results.length} kết quả cho “${query}”.`;
+
+    // Không có kết quả là lúc khối duyệt có giá trị nhất — cho nó hiện lại.
+    if (results.length === 0) hienKhoiDuyet(true);
+
+    // `excerpt` do Pagefind trả về đã chứa thẻ <mark> quanh từ khoá và đã được
+    // chính Pagefind escape, nên gán thẳng vào innerHTML là an toàn.
+    list.innerHTML = results
+      .map(
+        (result) => `
+          <li class="py-5">
+            <a href="${result.url}" class="font-bold hover:text-accent">
+              ${escapeHtml(result.meta.title ?? 'Không rõ tiêu đề')}
+            </a>
+            <p class="mt-1.5 text-sm text-muted">${result.excerpt}</p>
+          </li>`,
+      )
+      .join('');
+  }
+
+  window.addEventListener('pagefind:ready', () => {
+    if (pending) void runSearch(pending);
+  });
+
+  window.addEventListener('pagefind:failed', () => {
+    if (status) {
+      status.textContent =
+        'Chỉ mục tìm kiếm chưa được dựng. Chạy `pnpm build` rồi `pnpm preview` để thử.';
+    }
+  });
+
+  // Chờ 200ms sau lần gõ cuối rồi mới tìm — tránh chạy tìm kiếm cho từng phím.
+  let timer: number | undefined;
+  input?.addEventListener('input', () => {
+    window.clearTimeout(timer);
+    timer = window.setTimeout(() => void runSearch(input.value), 200);
+  });
+
+  // Cho phép mở thẳng /search?q=astro, tiện khi chia sẻ link kết quả.
+  const initialQuery = new URLSearchParams(window.location.search).get('q');
+  if (input && initialQuery) {
+    input.value = initialQuery;
+    void runSearch(initialQuery);
+  }
+
+  input?.focus();
+</script>

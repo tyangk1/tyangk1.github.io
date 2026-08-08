@@ -1,0 +1,101 @@
+---
+title: "Bốn thói quen giúp tôi đọc code nhanh hơn"
+description: "Lập trình viên đọc code nhiều hơn viết code, nhưng gần như không ai luyện việc đọc. Đây là bốn thói quen tôi dùng khi nhảy vào một codebase hoàn toàn lạ."
+publishedAt: 2026-05-20
+tags: ["Nghề nghiệp","Năng suất"]
+takeaways: ["Vì sao đọc ngược từ output nhanh hơn đọc xuôi từ main","Dùng git để hiểu vì sao code thành ra như vậy, không chỉ nó đang thế nào","Mẫu ghi chú ba mục biến giả định thành thứ kiểm chứng được"]
+draft: false
+featured: false
+---
+
+Tháng trước tôi nhận việc trong một codebase có hơn hai trăm nghìn dòng và không ai còn ở lại từ nhóm viết ra nó. Tuần đầu tôi làm sai cách: mở thư mục gốc, đọc từ trên xuống. Đến thứ Tư thì tôi thuộc tên file mà vẫn không hiểu hệ thống làm gì.
+
+Bốn thói quen dưới đây là thứ thực sự có tác dụng.
+
+## 1. Đi ngược từ output
+
+Đừng bắt đầu từ `main`. Bắt đầu từ thứ người dùng nhìn thấy, rồi lần ngược lại.
+
+Cụ thể: chọn một hành vi có thật — "khi bấm nút Xuất báo cáo thì chuyện gì xảy ra" — rồi tìm chuỗi chữ hiện trên màn hình:
+
+```bash
+rg "Xuất báo cáo" --type ts
+```
+
+Từ chỗ đó lần ngược: component nào render nó, handler nào chạy, API nào được gọi, hàm nào xử lý. Bạn sẽ đi qua đúng những lớp mà hệ thống thực sự dùng, và bỏ qua toàn bộ phần chết.
+
+Đọc xuôi từ `main` thì bạn phải hiểu mọi thứ trước khi hiểu bất cứ thứ gì. Đọc ngược từ output thì mỗi bước đều có một câu hỏi cụ thể dẫn đường.
+
+## 2. Đọc lịch sử, không chỉ đọc trạng thái
+
+Code cho bạn biết hệ thống **đang** thế nào. Git cho bạn biết **vì sao** nó thành ra thế.
+
+Khi gặp một đoạn trông vô lý, tôi hỏi git trước khi hỏi người:
+
+```bash
+# Ai viết dòng này và trong commit nào
+git log -L 42,58:src/billing/invoice.ts
+
+# Toàn bộ lịch sử của một file, kể cả khi đã đổi tên
+git log --follow --oneline -- src/billing/invoice.ts
+```
+
+Chín trên mười lần, đoạn code "vô lý" là một bản vá cho một lỗi thật, và commit message giải thích lỗi đó. Xoá nó đi là làm lỗi quay lại.
+
+> Trước khi gỡ một hàng rào giữa cánh đồng, hãy tìm hiểu vì sao ai đó dựng nó ở đó.
+
+Đây cũng là lý do commit message tệ tốn kém hơn ta tưởng. `fix bug` không giúp được ai sau sáu tháng.
+
+## 3. Đọc test trước khi đọc implementation
+
+Test là tài liệu duy nhất chắc chắn còn đúng — vì nếu nó sai, CI đã đỏ.
+
+Với một module lạ, tôi mở file test trước:
+
+```ts
+describe('tinhPhiVanChuyen', () => {
+  it('miễn phí khi đơn trên 500k', ...);
+  it('tính theo vùng khi dưới ngưỡng', ...);
+  it('ném lỗi khi thiếu mã tỉnh', ...);
+});
+```
+
+Ba dòng tên test đó cho tôi biết nhiều hơn hai trăm dòng implementation: đầu vào là gì, các nhánh nghiệp vụ nào tồn tại, và trường hợp nào bị coi là lỗi.
+
+Nếu module không có test — đó cũng là một thông tin. Nó nói rằng phần này chưa từng được ai định nghĩa rõ hành vi, và bạn nên cẩn thận khi sửa.
+
+## 4. Ghi lại bản đồ trong lúc đọc
+
+Thói quen này nghe thừa nhưng lại có tác dụng lớn nhất. Vừa đọc tôi vừa ghi vào một file `NOTES.md` để tạm, theo đúng ba mục:
+
+```markdown
+## Vào ở đâu
+
+- HTTP: src/server/routes/*.ts
+- Cron: src/jobs/index.ts
+
+## Chỗ tôi chưa hiểu
+
+- Vì sao `InvoiceQueue` có hai hàng đợi? (hỏi Minh)
+- File `legacy-sync.ts` còn chạy không?
+
+## Điều tôi đoán, chưa xác nhận
+
+- Có vẻ mọi ghi vào DB đều đi qua `repo/` — cần kiểm lại
+```
+
+Mục thứ ba quan trọng nhất. Khi đọc một hệ thống lạ, bạn liên tục đưa ra giả định mà không nhận ra. Viết chúng ra biến giả định thành thứ có thể kiểm chứng — và ngăn bạn xây một tuần công sức trên nền một điều tưởng đúng.
+
+Sau khi hiểu xong, phần "Vào ở đâu" thường trở thành một trang trong tài liệu nội bộ. Người tiếp theo tiết kiệm được vài ngày.
+
+## Thứ tôi đã bỏ
+
+Tôi từng dùng công cụ vẽ sơ đồ phụ thuộc tự động. Chúng cho ra một mạng nhện mấy trăm node — đúng về mặt kỹ thuật, vô dụng về mặt hiểu biết.
+
+Một sơ đồ vẽ tay năm ô, chỉ chứa những phần liên quan tới việc bạn đang làm, có giá trị hơn nhiều.
+
+## Tóm lại
+
+Đọc code là kỹ năng luyện được, nhưng gần như không ai luyện nó có chủ đích. Bốn thói quen trên đều xoay quanh một ý: **đi vào codebase với một câu hỏi cụ thể**, thay vì cố nạp mọi thứ vào đầu.
+
+Ở codebase hai trăm nghìn dòng kia, tuần thứ hai tôi làm theo cách này và ra được bản vá đầu tiên vào thứ Ba.

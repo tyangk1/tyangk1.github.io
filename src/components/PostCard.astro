@@ -1,0 +1,154 @@
+---
+import type { Post } from '~/utils/posts';
+import { formatDate, toISODate, slugify } from '~/utils/format';
+import { readingTime } from '~/utils/readingTime';
+import { postHref, tagHref } from '~/lib/routes';
+
+interface Props {
+  post: Post;
+  /** Đổi theo ngữ cảnh để giữ đúng thứ bậc heading của trang. */
+  headingLevel?: 'h2' | 'h3';
+  /**
+   * `card`    — thẻ dọc có ảnh bìa, dùng cho lưới.
+   * `row`     — hàng ngang có ảnh thu nhỏ, dùng cho khối bài liên quan.
+   * `compact` — chỉ số thứ tự và tiêu đề, không ảnh. Dùng để đổi mật độ: một
+   *             trang toàn thẻ có ảnh thì đều tăm tắp và mắt không có chỗ nghỉ.
+   */
+  variant?: 'card' | 'row' | 'compact';
+  /** Số thứ tự hiện ở biến thể `compact`. */
+  index?: number;
+}
+
+const { post, headingLevel = 'h2', variant = 'card', index } = Astro.props;
+const Heading = headingLevel;
+
+const { minutes } = readingTime(post.body ?? '');
+const primaryTag = post.data.tags[0];
+const href = postHref(post.id);
+---
+
+{
+  variant === 'card' && (
+    <article class="card reveal group flex h-full flex-col overflow-hidden rounded-card border border-border bg-bg">
+      <div class="relative aspect-16/9 overflow-hidden">
+        {/* Ảnh bìa sinh bằng code, không mang thông tin — alt rỗng để screen
+            reader bỏ qua thay vì đọc một mô tả vô nghĩa. Link phủ ảnh cũng bị ẩn
+            khỏi AT vì tiêu đề bên dưới đã là link tới cùng bài. */}
+        <a href={href} tabindex="-1" aria-hidden="true" class="block size-full">
+          <img
+            src={`/covers/${post.id}.svg`}
+            alt=""
+            width="1600"
+            height="900"
+            loading="lazy"
+            decoding="async"
+            class="cover"
+          />
+        </a>
+
+        {/* Nhãn chủ đề đặt bằng HTML lên trên ảnh, không vẽ vào SVG — nhờ vậy nó
+            dùng đúng font của site và vẫn là một link bấm được. */}
+        {primaryTag && (
+          <a href={tagHref(slugify(primaryTag))} class="cover-label">
+            {primaryTag}
+          </a>
+        )}
+      </div>
+
+      <div class="flex flex-1 flex-col p-5">
+        <Heading class="display text-xl">
+          <a href={href} class="transition-colors group-hover:text-accent">
+            {post.data.title}
+          </a>
+        </Heading>
+
+        <p class="mt-2.5 flex-1 text-sm text-muted">{post.data.description}</p>
+
+        <div class="mt-4 flex items-center gap-2 text-xs text-muted">
+          <time datetime={toISODate(post.data.publishedAt)}>
+            {formatDate(post.data.publishedAt)}
+          </time>
+          <span aria-hidden="true">·</span>
+          <span>{minutes} phút đọc</span>
+        </div>
+      </div>
+    </article>
+  )
+}
+
+{
+  variant === 'row' && (
+    <article class="group grid grid-cols-[5rem_1fr] gap-4 border-b border-border py-5 last:border-b-0 sm:grid-cols-[8rem_1fr] sm:gap-5">
+      <a
+        href={href}
+        tabindex="-1"
+        aria-hidden="true"
+        class="block aspect-16/9 overflow-hidden rounded-lg border border-border"
+      >
+        <img
+          src={`/covers/${post.id}.svg`}
+          alt=""
+          width="1600"
+          height="900"
+          loading="lazy"
+          decoding="async"
+          class="cover"
+        />
+      </a>
+
+      <div class="min-w-0">
+        <div class="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted">
+          <time datetime={toISODate(post.data.publishedAt)}>
+            {formatDate(post.data.publishedAt)}
+          </time>
+          <span aria-hidden="true">·</span>
+          <span>{minutes} phút đọc</span>
+          {post.data.seriesName && (
+            <>
+              <span aria-hidden="true">·</span>
+              <span>
+                {post.data.seriesName} · phần {post.data.seriesPart}
+              </span>
+            </>
+          )}
+        </div>
+
+        <Heading class="display mt-1.5 text-lg">
+          <a href={href} class="transition-colors group-hover:text-accent">
+            {post.data.title}
+          </a>
+        </Heading>
+
+        <p class="mt-1.5 line-clamp-2 text-sm text-muted">{post.data.description}</p>
+      </div>
+    </article>
+  )
+}
+
+{
+  variant === 'compact' && (
+    <article class="group grid grid-cols-[2.5rem_1fr] items-baseline gap-3 border-b border-border py-4 last:border-b-0 sm:grid-cols-[3rem_1fr]">
+      <span class="font-mono text-sm text-muted tabular-nums" aria-hidden="true">
+        {String(index ?? 0).padStart(2, '0')}
+      </span>
+
+      <div class="min-w-0">
+        <Heading class="display text-lg">
+          <a href={href} class="transition-colors group-hover:text-accent">
+            {post.data.title}
+          </a>
+        </Heading>
+
+        <div class="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted">
+          {primaryTag && <span>{primaryTag}</span>}
+          <span aria-hidden="true">·</span>
+          <time datetime={toISODate(post.data.publishedAt)}>
+            {formatDate(post.data.publishedAt)}
+          </time>
+          <span aria-hidden="true">·</span>
+          <span>{minutes} phút đọc</span>
+        </div>
+      </div>
+    </article>
+  )
+}

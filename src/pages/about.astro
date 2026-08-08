@@ -1,0 +1,99 @@
+---
+import { AUTHOR, SOCIALS } from '~/site.config';
+import BaseLayout from '~/layouts/BaseLayout.astro';
+import Icon from '~/components/Icon.astro';
+import type { IconName } from '~/lib/icons';
+---
+
+<BaseLayout
+  title="Giới thiệu"
+  description="Tôi là ai, tôi làm gì, và vì sao tôi viết blog này. Kèm cách liên hệ nếu bạn muốn trao đổi về công việc, hợp tác hoặc đơn giản là góp ý cho một bài viết."
+>
+  <div class="wrap-prose py-12">
+    <p class="eyebrow">Về tôi</p>
+    <h1 class="display-xl mt-3 text-4xl">Giới thiệu</h1>
+
+    <div class="prose mt-8">
+      <p>
+        Chào bạn, tôi là {AUTHOR.name}. Tôi làm kỹ sư phần mềm, phần lớn thời gian làm việc với
+        TypeScript và hạ tầng web. Hiện tôi sống ở TP.HCM.
+      </p>
+
+      <h2>Vì sao có blog này</h2>
+      <p>
+        Tôi viết ở đây vì một lý do khá ích kỷ: viết ra buộc tôi phải hiểu thật. Rất nhiều lần tôi
+        tưởng mình đã nắm được một khái niệm, tới lúc ngồi giải thích nó thành câu mới phát hiện
+        mình chỉ đang thuộc lòng cái tên.
+      </p>
+      <p>
+        Lợi ích phụ là những bài này trở thành ghi chú cho chính tôi sáu tháng sau. Nếu chúng có ích
+        cho bạn nữa thì càng tốt.
+      </p>
+
+      <h2>Tôi viết về gì</h2>
+      <ul>
+        <li>
+          <strong>Phát triển web</strong> — chủ yếu là những đánh đổi kỹ thuật, không phải hướng dẫn từng
+          bước. Hướng dẫn thì tài liệu chính thức đã làm tốt hơn tôi.
+        </li>
+        <li>
+          <strong>Kiến trúc hệ thống</strong> — những gì tôi học được khi một thiết kế gặp tải thật.
+        </li>
+        <li>
+          <strong>Cách làm việc</strong> — thói quen, công cụ, và cả những thứ tôi đã thử rồi bỏ.
+        </li>
+      </ul>
+
+      <h2>Nguyên tắc khi viết</h2>
+      <p>Ba điều tôi tự đặt ra và cố giữ:</p>
+      <ol>
+        <li>
+          <strong>Chỉ viết về thứ đã tự làm.</strong> Không tổng hợp lại bài tiếng Anh rồi ký tên mình.
+        </li>
+        <li>
+          <strong>Nói cả phần không hiệu quả.</strong> Bài viết chỉ khoe phần thành công thì vô dụng với
+          người đang gặp vấn đề thật.
+        </li>
+        <li>
+          <strong>Sai thì sửa công khai.</strong> Bài nào có chỉnh sửa đáng kể đều ghi rõ ngày cập nhật
+          ở đầu bài.
+        </li>
+      </ol>
+
+      <h2>Về trang này</h2>
+      <p>
+        Blog xây bằng Astro và Tailwind CSS, host trên Cloudflare Pages, không dùng dịch vụ trả phí
+        nào. Không có cookie theo dõi, không có quảng cáo, không có popup xin email chặn giữa màn
+        hình. Thống kê truy cập dùng Umami — chỉ đếm lượt xem, không lưu bất cứ thứ gì nhận dạng
+        được bạn.
+      </p>
+      <p>
+        Nếu bạn muốn dựng một trang tương tự, tôi đã viết lại toàn bộ quá trình trong series
+        <a href="/blog/dung-blog-bang-astro-phan-1">Dựng blog bằng Astro</a>.
+      </p>
+
+      <h2>Liên hệ</h2>
+      <p>
+        Tôi đọc mọi email, dù không phải lúc nào cũng trả lời kịp. Nếu bạn góp ý cho một bài viết cụ
+        thể, ghi kèm đường dẫn giúp tôi.
+      </p>
+    </div>
+
+    <ul class="mt-8 flex flex-wrap gap-3">
+      {
+        SOCIALS.map((social) => (
+          <li>
+            <a
+              href={social.href}
+              rel="me noopener"
+              class="tap gap-2 rounded-lg border border-border px-4 py-2 text-sm transition-colors hover:border-accent hover:text-accent"
+            >
+              <Icon name={social.icon as IconName} size={16} />
+              {social.label}
+            </a>
+          </li>
+        ))
+      }
+    </ul>
+  </div>
+</BaseLayout>

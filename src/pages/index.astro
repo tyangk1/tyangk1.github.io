@@ -1,0 +1,213 @@
+---
+import { SITE, AUTHOR, SOCIALS } from '~/site.config';
+import { getPublishedPosts, featuredPosts, collectTags } from '~/utils/posts';
+import { absoluteUrl } from '~/utils/format';
+import { docLuotXem, baiDocNhieuNhat } from '~/utils/views';
+import BaseLayout from '~/layouts/BaseLayout.astro';
+import FeaturedPost from '~/components/FeaturedPost.astro';
+import PopularPosts from '~/components/PopularPosts.astro';
+import PostCard from '~/components/PostCard.astro';
+import TagPill from '~/components/TagPill.astro';
+import Newsletter from '~/components/Newsletter.astro';
+import Icon from '~/components/Icon.astro';
+import type { IconName } from '~/lib/icons';
+
+const posts = await getPublishedPosts();
+const tags = collectTags(posts);
+
+/**
+ * Trang chủ đi theo ba mật độ giảm dần: một bài chiếm trọn phần đầu → lưới thẻ
+ * có ảnh → danh sách gọn chỉ có chữ. Nếu tất cả cùng một mật độ thì trang dài
+ * bao nhiêu cũng chỉ có một nhịp, và người đọc không có lý do gì để cuộn tiếp.
+ */
+const hero = featuredPosts(posts, 1)[0] ?? posts[0];
+
+const remaining = posts.filter((post) => post.id !== hero?.id);
+const grid = remaining.slice(0, 6);
+const compact = remaining.slice(6, 6 + SITE.latestPostsOnHome);
+
+// Khối "Đọc nhiều nhất" tự ẩn khi chưa đủ dữ liệu thật.
+const phoBien = baiDocNhieuNhat(posts, await docLuotXem());
+
+// Năm của bài cũ nhất — dùng cho dòng số liệu.
+const oldest = posts.at(-1);
+const startYear = oldest ? oldest.data.publishedAt.getFullYear() : new Date().getFullYear();
+
+// Cả ba giá trị đều là SỐ. Bản trước để "từ 2026" cạnh "8" và "10" — ba ô cùng
+// một hàng mà một ô là cụm chữ thì hàng đó trông như xếp sai.
+const stats = [
+  { value: String(posts.length), label: 'bài viết' },
+  { value: String(tags.length), label: 'chủ đề' },
+  { value: String(startYear), label: 'viết từ' },
+] as const;
+
+const schema = {
+  '@context': 'https://schema.org',
+  '@type': 'Person',
+  name: AUTHOR.name,
+  description: AUTHOR.bio,
+  url: SITE.url,
+  email: AUTHOR.email,
+  sameAs: SOCIALS.filter((s) => !s.href.startsWith('mailto:')).map((s) => s.href),
+};
+---
+
+<BaseLayout title={SITE.title} description={SITE.description} schema={schema}>
+  {
+    /* Măng-sét: giới thiệu ngắn, không chiếm hết màn hình đầu tiên — bài viết mới
+      là thứ người đọc tới đây để tìm. */
+  }
+  {
+    /*
+      Măng-sét chia HAI cột trên màn hình rộng: chữ bên trái, số liệu bên phải.
+
+      Bản trước dồn hết sang trái nên trên màn hình 1880px có gần 480px trống bên
+      phải — khối chữ trông như bị đẩy vào một góc. Đưa số liệu sang phải vừa lấp
+      chỗ đó bằng nội dung thật, vừa cho hàng số liệu đủ chỗ để đọc.
+
+      `items-end` để đáy khối số liệu thẳng với đáy khối chữ.
+    */
+  }
+  <section class="wrap border-b border-border py-12 sm:py-16">
+    <div class="lg:grid lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end lg:gap-16">
+      <div>
+        <p class="eyebrow">Blog cá nhân</p>
+        <h1 class="display-xl mt-4 text-4xl text-balance">{SITE.tagline}</h1>
+        <p class="mt-5 max-w-2xl text-lg text-muted">{AUTHOR.bio}</p>
+
+        <div class="mt-7 flex flex-wrap items-center gap-3">
+          <a
+            href="/blog"
+            class="inline-flex items-center gap-2 rounded-lg bg-accent px-5 py-2.5 font-bold text-on-accent transition-colors hover:bg-accent-hover"
+          >
+            Đọc bài viết
+            <Icon name="arrowRight" size={16} />
+          </a>
+
+          {
+            SOCIALS.map((social) => (
+              <a
+                href={social.href}
+                rel="me noopener"
+                class="grid size-10 place-items-center rounded-lg border border-border text-muted transition-colors hover:border-accent hover:text-accent"
+                aria-label={social.label}
+              >
+                <Icon name={social.icon as IconName} size={18} />
+              </a>
+            ))
+          }
+        </div>
+      </div>
+
+      {
+        /*
+          Số liệu: nhỏ nhưng cho người mới tới biết ngay đây là blog còn sống,
+          không phải một trang bỏ hoang từ ba năm trước.
+
+          Trên màn hình rộng nó xếp dọc ở cột phải, có vạch phân cách — vừa lấp
+          khoảng trống vừa đọc rõ. Trên màn hình hẹp nó về lại một hàng ngang.
+        */
+      }
+      <dl
+        class="mt-10 flex flex-wrap gap-x-10 gap-y-4 lg:mt-0 lg:shrink-0 lg:flex-col lg:gap-y-7 lg:border-l lg:border-border lg:pl-10"
+      >
+        {
+          stats.map((stat) => (
+            <div>
+              <dt class="text-xs tracking-wide text-muted uppercase">{stat.label}</dt>
+              <dd class="display mt-1 text-3xl tabular-nums">{stat.value}</dd>
+            </div>
+          ))
+        }
+      </dl>
+    </div>
+  </section>
+
+  {
+    hero && (
+      <section class="wrap py-12 sm:py-16" aria-labelledby="hero-heading">
+        <h2 id="hero-heading" class="sr-only">
+          Bài đáng đọc trước
+        </h2>
+        <FeaturedPost post={hero} />
+      </section>
+    )
+  }
+
+  {
+    grid.length > 0 && (
+      <section class="wrap border-t border-border py-12" aria-labelledby="latest-heading">
+        <div class="flex items-baseline justify-between gap-4">
+          <h2 id="latest-heading" class="eyebrow">
+            Mới nhất
+          </h2>
+          <a
+            href="/blog"
+            class="tap py-1 text-sm text-accent transition-colors hover:text-accent-hover"
+          >
+            Tất cả bài viết →
+          </a>
+        </div>
+
+        <div class="mt-6 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+          {grid.map((post) => (
+            <PostCard post={post} headingLevel="h3" />
+          ))}
+        </div>
+      </section>
+    )
+  }
+
+  <PopularPosts items={phoBien} />
+
+  {
+    compact.length > 0 && (
+      <section class="wrap border-t border-border py-12" aria-labelledby="archive-heading">
+        <h2 id="archive-heading" class="eyebrow">
+          Lùi về trước
+        </h2>
+        <div class="mt-4 max-w-3xl">
+          {compact.map((post, i) => (
+            <PostCard post={post} headingLevel="h3" variant="compact" index={i + 1} />
+          ))}
+        </div>
+      </section>
+    )
+  }
+
+  {
+    tags.length > 0 && (
+      <section class="wrap border-t border-border py-12" aria-labelledby="topics-heading">
+        <div class="flex items-baseline justify-between gap-4">
+          <h2 id="topics-heading" class="eyebrow">
+            Đọc theo chủ đề
+          </h2>
+          <a
+            href="/tags"
+            class="tap py-1 text-sm text-accent transition-colors hover:text-accent-hover"
+          >
+            Tất cả chủ đề →
+          </a>
+        </div>
+        <ul class="mt-5 flex flex-wrap gap-2">
+          {tags.slice(0, 10).map((tag) => (
+            <li>
+              <TagPill name={tag.name} count={tag.count} />
+            </li>
+          ))}
+        </ul>
+      </section>
+    )
+  }
+
+  <div class="wrap">
+    <Newsletter />
+  </div>
+
+  <p class="wrap pb-6 text-sm text-muted">
+    Thích đọc bằng trình đọc feed? <a
+      href={absoluteUrl('/rss.xml')}
+      class="text-accent hover:underline">Đăng ký RSS</a
+    >.
+  </p>
+</BaseLayout>

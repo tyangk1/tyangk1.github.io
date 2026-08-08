@@ -1,0 +1,64 @@
+---
+title: "Cache HTTP ba tầng: trình duyệt, CDN, và máy chủ"
+description: "Ba tầng cache độc lập nhau, và mỗi tầng nghe một header khác. Đây là cách tôi phân biệt chúng sau lần xoá cache CDN mà người dùng vẫn thấy bản cũ."
+publishedAt: 2026-08-02
+tags: ["Hiệu năng","Web"]
+takeaways: ["Vì sao xoá cache CDN xong người dùng vẫn thấy bản cũ","Khác biệt giữa max-age, s-maxage và stale-while-revalidate","Khi nào dùng immutable và khi nào tuyệt đối đừng"]
+draft: false
+featured: false
+---
+
+Tôi từng mất một buổi chiều vì tin rằng "xoá cache CDN" là xong. Xoá rồi, mở trang, vẫn bản cũ. Nguyên nhân: có ba tầng cache, và tôi chỉ vừa xoá một tầng.
+
+## Ba tầng, ba chủ
+
+<Steps>
+1. **Cache trình duyệt** — nằm trên máy người đọc. Bạn KHÔNG xoá được từ xa. Đây là tầng nguy hiểm nhất.
+2. **Cache CDN** — nằm ở máy chủ biên. Xoá được, và xoá có hiệu lực ngay.
+3. **Cache máy chủ** — Redis, cache của framework, cache truy vấn database.
+</Steps>
+
+Xoá tầng 2 không đụng gì tới tầng 1. Người dùng đã tải trang một lần thì trình duyệt của họ vẫn giữ bản cũ cho tới khi `max-age` hết hạn.
+
+<Callout type="warning" title="Đây là chỗ không sửa lại được">
+  Đặt `max-age=31536000` cho một file không có hash trong tên là tự khoá mình một
+  năm. Không có cách nào bảo trình duyệt của người khác bỏ bản đã lưu — chỉ còn
+  cách đổi URL.
+</Callout>
+
+## Ba header cần phân biệt
+
+| Header | Ai nghe | Ý nghĩa |
+| --- | --- | --- |
+| `max-age` | Trình duyệt **và** CDN | Giữ bản này bao lâu |
+| `s-maxage` | Chỉ CDN | Ghi đè `max-age` ở tầng CDN |
+| `stale-while-revalidate` | Cả hai | Cứ trả bản cũ, đồng thời lấy bản mới ở phía sau |
+
+Cặp tôi dùng cho HTML của một trang tĩnh:
+
+```
+Cache-Control: public, max-age=0, s-maxage=300, stale-while-revalidate=86400
+```
+
+Đọc ra tiếng người: *trình duyệt đừng giữ gì cả; CDN giữ 5 phút; sau 5 phút vẫn cứ trả bản cũ cho nhanh, đồng thời đi lấy bản mới.* Kết quả là người đọc luôn nhận phản hồi tức thì, còn nội dung mới lên trong vòng vài phút mà không cần xoá cache tay.
+
+## `immutable` — chỉ khi tên file có hash
+
+```
+# ĐÚNG: tên file có hash, nội dung không bao giờ đổi
+/_astro/style.C7Ai3vqH.css   →  max-age=31536000, immutable
+
+# SAI: tên file cố định, nội dung sẽ đổi
+/logo.svg                    →  max-age=31536000, immutable
+```
+
+<PullQuote>
+  Chỉ đặt immutable cho URL mà bạn cam kết nội dung sau nó không bao giờ đổi. Nếu
+  không cam kết được, đừng đặt.
+</PullQuote>
+
+## Cách tôi kiểm
+
+Mở DevTools → Network → xem cột Size. `(disk cache)` là tầng 1. Header `cf-cache-status: HIT` (Cloudflare) hay `x-vercel-cache: HIT` là tầng 2. Không thấy gì trong hai cái đó thì request đã đi tới máy chủ.
+
+Muốn bỏ tầng 1 khi đang thử: tick "Disable cache" trong DevTools. Nhưng nhớ rằng người đọc thật không có cái tick đó.

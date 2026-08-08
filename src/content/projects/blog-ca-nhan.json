@@ -1,0 +1,14 @@
+{
+  "name": "Blog cá nhân",
+  "description": "Chính trang bạn đang đọc. Astro + Tailwind, không dùng dịch vụ trả phí nào, Lighthouse 100 ở cả bốn hạng mục. Mã nguồn mở để ai cũng dùng lại được.",
+  "year": 2026,
+  "status": "đang làm",
+  "tech": [
+    "Astro",
+    "TypeScript",
+    "Tailwind CSS",
+    "Cloudflare Pages"
+  ],
+  "featured": true,
+  "repo": "https://github.com/tenban/blog"
+}

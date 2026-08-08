@@ -1,0 +1,53 @@
+{
+  "name": "blog-ca-nhan",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "node scripts/db-sync.mjs --drafts --allow-offline && astro dev",
+    "build": "node scripts/db-sync.mjs && astro build && pagefind --site dist",
+    "build:ci": "astro build && pagefind --site dist",
+    "preview": "astro preview",
+    "sync": "node scripts/db-sync.mjs",
+    "sync:drafts": "node scripts/db-sync.mjs --drafts",
+    "db:start": "supabase start",
+    "db:stop": "supabase stop",
+    "db:push": "node scripts/db-push.mjs",
+    "db:reset": "supabase db reset",
+    "db:subscribers": "node scripts/db-subscribers.mjs",
+    "giscus:setup": "node scripts/giscus-setup.mjs",
+    "typecheck": "astro check",
+    "check:content": "node scripts/check-frontmatter.mjs",
+    "check:html": "node scripts/check-html.mjs",
+    "check:all": "pnpm typecheck && pnpm build && pnpm check:content && pnpm check:html",
+    "lighthouse": "pnpm dlx lighthouse@12 http://localhost:4321/ --output=html --output-path=./lighthouse-report.html --chrome-flags=\"--headless=new\"",
+    "icons": "node scripts/generate-icons.mjs",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "astro": "astro"
+  },
+  "dependencies": {
+    "@astrojs/markdown-remark": "^7.2.2",
+    "@astrojs/mdx": "^7.0.5",
+    "@astrojs/rss": "^4.0.19",
+    "@astrojs/sitemap": "^3.7.3",
+    "@fontsource/be-vietnam-pro": "^5.3.0",
+    "@fontsource/playfair-display": "^5.3.0",
+    "@supabase/supabase-js": "^2.112.2",
+    "@tailwindcss/vite": "^4.3.3",
+    "astro": "^7.2.0",
+    "pagefind": "^1.5.2",
+    "satori": "^0.29.0",
+    "sharp": "^0.35.3",
+    "tailwindcss": "^4.3.3"
+  },
+  "devDependencies": {
+    "@astrojs/check": "^0.9.10",
+    "@types/hast": "^3.0.5",
+    "prettier": "^3.9.6",
+    "prettier-plugin-astro": "^0.14.1",
+    "prettier-plugin-tailwindcss": "^0.8.1",
+    "typescript": "^6.0.3",
+    "yaml": "^2.9.0"
+  }
+}

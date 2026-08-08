@@ -1,0 +1,42 @@
+---
+import { NOW } from '~/site.config';
+import { formatDate, toISODate } from '~/utils/format';
+import BaseLayout from '~/layouts/BaseLayout.astro';
+---
+
+<BaseLayout
+  title="Now"
+  description="Hiện tại tôi đang làm gì, đang học gì và đang đọc gì. Trang này theo chuẩn nownownow.com và được cập nhật mỗi khi có thay đổi đáng kể trong công việc."
+>
+  <div class="wrap-prose py-12">
+    <p class="eyebrow">Hiện tại</p>
+    <h1 class="display-xl mt-3 text-4xl">Now</h1>
+    <p class="mt-4 text-muted">
+      Cập nhật lần cuối
+      <time datetime={toISODate(NOW.updatedAt)}>{formatDate(NOW.updatedAt)}</time>.
+    </p>
+
+    <div class="prose mt-10">
+      {
+        NOW.sections.map((section) => (
+          <>
+            <h2>{section.heading}</h2>
+            <ul>
+              {section.items.map((item) => (
+                <li>{item}</li>
+              ))}
+            </ul>
+          </>
+        ))
+      }
+
+      <hr />
+
+      <p>
+        Đây là một trang <a href="https://nownownow.com/about" rel="noopener">/now</a> — ý tưởng của Derek
+        Sivers. Khác với trang giới thiệu (kể về quá khứ), trang này chỉ nói về thứ tôi đang tập trung
+        vào ngay lúc này.
+      </p>
+    </div>
+  </div>
+</BaseLayout>

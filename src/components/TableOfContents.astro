@@ -1,0 +1,96 @@
+---
+import type { MarkdownHeading } from 'astro';
+
+interface Props {
+  headings: MarkdownHeading[];
+  /**
+   * Trang bài viết render hai bản mục lục (một cho màn hình nhỏ, một cố định
+   * bên phải). Mỗi bản phải có id riêng, nếu không trang sẽ có id trùng nhau —
+   * screen reader đọc sai và HTML không hợp lệ.
+   */
+  id: string;
+  /**
+   * Ẩn dòng tiêu đề "Nội dung bài".
+   * Dùng khi component nằm trong một `<details>` mà `<summary>` đã là tiêu đề —
+   * nếu không sẽ có hai dòng tiêu đề giống nhau chồng nhau.
+   */
+  anTieuDe?: boolean;
+}
+
+const { headings, id, anTieuDe = false } = Astro.props;
+
+// Chỉ lấy h2 và h3. Xuống tới h4 thì mục lục dài hơn cả bài, đọc rối.
+const items = headings.filter((h) => h.depth === 2 || h.depth === 3);
+const titleId = `${id}-title`;
+---
+
+{
+  items.length >= 3 && (
+    <nav
+      aria-labelledby={anTieuDe ? undefined : titleId}
+      aria-label={anTieuDe ? 'Nội dung bài' : undefined}
+      class="toc"
+    >
+      {!anTieuDe && (
+        <p id={titleId} class="text-sm font-bold">
+          Nội dung bài
+        </p>
+      )}
+      <ul class:list={['space-y-1.5 border-l border-border', !anTieuDe && 'mt-3']}>
+        {items.map((heading) => (
+          <li>
+            <a
+              href={`#${heading.slug}`}
+              data-toc-link={heading.slug}
+              class:list={[
+                '-ml-px block border-l border-transparent py-0.5 text-sm text-muted transition-colors hover:border-accent hover:text-fg',
+                heading.depth === 2 ? 'pl-4' : 'pl-8',
+              ]}
+            >
+              {heading.text}
+            </a>
+          </li>
+        ))}
+      </ul>
+    </nav>
+  )
+}
+
+<style>
+  /* Mục đang đọc được tô đậm. Trạng thái do JS gắn qua thuộc tính data-active. */
+  .toc a[data-active='true'] {
+    color: var(--accent);
+    border-color: var(--accent);
+    font-weight: 500;
+  }
+</style>
+
+<script>
+  const links = document.querySelectorAll<HTMLAnchorElement>('[data-toc-link]');
+  if (links.length > 0) {
+    const headings = [...links]
+      .map((link) => document.getElementById(link.dataset['tocLink'] ?? ''))
+      .filter((el): el is HTMLElement => el !== null);
+
+    const setActive = (slug: string | null) => {
+      links.forEach((link) => {
+        link.dataset['active'] = String(link.dataset['tocLink'] === slug);
+      });
+    };
+
+    // rootMargin cắt bớt phần trên và dưới viewport: mục được coi là "đang đọc"
+    // khi nó nằm ở khoảng 1/3 trên màn hình, giống cảm giác đọc thật.
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const visible = entries
+          .filter((entry) => entry.isIntersecting)
+          .sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top);
+
+        if (visible[0]) setActive(visible[0].target.id);
+      },
+      { rootMargin: '-80px 0px -66% 0px', threshold: 0 },
+    );
+
+    headings.forEach((heading) => observer.observe(heading));
+  }
+</script>

@@ -1,0 +1,14 @@
+---
+import { ENV, analyticsEnabled } from '~/env';
+---
+
+{
+  /*
+    Umami: không cookie, không lưu dữ liệu cá nhân, nên không cần banner đồng ý.
+    Script chỉ ~2KB và luôn `defer` — không chặn quá trình vẽ trang.
+    Chỉ nạp ở production, để số liệu không bị bẩn bởi lượt truy cập lúc dev.
+  */
+  analyticsEnabled && (
+    <script is:inline defer src={ENV.umamiSrc} data-website-id={ENV.umamiWebsiteId} />
+  )
+}

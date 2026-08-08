@@ -1,0 +1,12 @@
+{
+  "name": "imgslug",
+  "description": "CLI đổi tên hàng loạt file ảnh sang slug không dấu và nén sang AVIF. Viết ra vì tôi phát chán việc đổi tên tay mỗi lần chụp màn hình để chèn vào bài.",
+  "year": 2025,
+  "status": "hoàn thành",
+  "tech": [
+    "Node.js",
+    "sharp"
+  ],
+  "featured": true,
+  "repo": "https://github.com/tenban/imgslug"
+}

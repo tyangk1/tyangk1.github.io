@@ -1,0 +1,12 @@
+{
+  "name": "Sổ chi tiêu offline",
+  "description": "Ứng dụng ghi chi tiêu chạy hoàn toàn trong trình duyệt, dữ liệu nằm ở máy người dùng, không có tài khoản và không có máy chủ. Đang tạm dừng ở bản dùng được.",
+  "year": 2024,
+  "status": "tạm dừng",
+  "tech": [
+    "Svelte",
+    "IndexedDB",
+    "PWA"
+  ],
+  "featured": false
+}

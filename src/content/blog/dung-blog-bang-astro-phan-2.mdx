@@ -1,0 +1,122 @@
+---
+title: "Dựng blog bằng Astro — phần 2: SEO và hiệu năng"
+description: "Sitemap, canonical, JSON-LD và ảnh OG sinh tự động. Kèm cách giữ JavaScript gửi xuống trình duyệt dưới 5KB mà vẫn có dark mode và mục lục bài viết."
+publishedAt: 2026-07-26
+tags: ["Astro","SEO","Hiệu năng"]
+takeaways: ["Ba thẻ meta chiếm phần lớn giá trị SEO, và thẻ hay bị làm sai nhất","Sinh ảnh xem trước cho từng bài lúc build, kể cả với dấu tiếng Việt","Ba thứ tưởng cần JavaScript nhưng hoá ra không","Cái bẫy nháy trắng của dark mode và cách sửa đúng"]
+seriesName: "Dựng blog bằng Astro"
+seriesPart: 2
+draft: false
+featured: true
+---
+
+[Phần 1](/blog/dung-blog-bang-astro-phan-1) nói về cách tổ chức nội dung. Phần này nói về hai thứ quyết định bài viết của bạn có ai đọc hay không: máy tìm kiếm hiểu được nó, và người đọc không bỏ đi vì trang tải chậm.
+
+## Ba thẻ meta không được thiếu
+
+Có rất nhiều thẻ SEO. Ba thẻ dưới đây chiếm phần lớn giá trị:
+
+```html
+<title>Tiêu đề bài — Tên blog</title>
+<meta name="description" content="120 tới 160 ký tự mô tả bài viết." />
+<link rel="canonical" href="https://tenban.com/blog/slug" />
+```
+
+Thẻ `canonical` là thẻ hay bị làm sai nhất. Nếu site của bạn trả về nội dung ở cả `/blog` lẫn `/blog/`, Google coi đó là **hai trang khác nhau có nội dung trùng** và chia đôi giá trị của chúng. Cách xử lý là chuẩn hoá một lần rồi dùng ở mọi nơi:
+
+```ts
+export function canonicalPath(pathname: string): string {
+  if (pathname === '/') return '/';
+  return pathname.replace(/\/+$/, '');
+}
+```
+
+## JSON-LD: nói cho Google biết đây là bài viết
+
+Máy tìm kiếm đoán khá tốt, nhưng nói thẳng vẫn hơn. JSON-LD là một khối dữ liệu mô tả trang bằng ngôn ngữ máy hiểu:
+
+```ts
+const schema = {
+  '@context': 'https://schema.org',
+  '@type': 'BlogPosting',
+  headline: post.data.title,
+  description: post.data.description,
+  datePublished: post.data.publishedAt.toISOString(),
+  author: { '@type': 'Person', name: 'Tên Của Bạn' },
+};
+```
+
+Kiểm tra bằng công cụ Rich Results Test của Google. Nếu nó đọc được thì Google đọc được.
+
+Ba loại đáng làm cho blog cá nhân, và chỉ ba loại này thôi:
+
+- `Person` ở trang chủ — cho Google biết blog này là của ai.
+- `BlogPosting` ở mỗi bài.
+- `BreadcrumbList` — hiện đường dẫn phân cấp thay vì URL trần trong kết quả tìm kiếm.
+
+## Ảnh OG sinh tự động
+
+Khi ai đó dán link bài viết vào Slack hay Facebook, thứ quyết định họ có bấm vào hay không là tấm ảnh xem trước. Làm tay từng bài thì được vài tuần rồi bỏ.
+
+Cách bền hơn là sinh ảnh lúc build. Astro cho phép tạo một endpoint trả về ảnh:
+
+```ts title="src/pages/og/[...slug].png.ts"
+export const GET: APIRoute = async ({ props }) => {
+  const svg = await satori(markup, { width: 1200, height: 630, fonts });
+  const png = await sharp(Buffer.from(svg)).png().toBuffer();
+  return new Response(png, { headers: { 'Content-Type': 'image/png' } });
+};
+```
+
+`satori` dựng SVG từ một cấu trúc giống HTML, `sharp` đổi nó thành PNG. Cả hai đều chạy lúc build nên người đọc chỉ nhận về file ảnh tĩnh.
+
+Một chi tiết dành riêng cho tiếng Việt: font phải chứa đủ dấu. Fontsource tách font theo subset, nên bạn cần nạp cả `vietnamese` lẫn `latin` và cho satori chọn theo thứ tự. Thiếu bước này thì tiêu đề "Kiến trúc hệ thống" sẽ hiện ra thành một hàng ô vuông.
+
+## Giữ JavaScript dưới 5KB
+
+Trang bài viết của blog này gửi xuống chưa tới 5KB JavaScript. Không phải nhờ tối ưu — nhờ **không viết** phần lớn số JS mà một blog thường có.
+
+Ba thứ tôi từng nghĩ là cần JS, hoá ra không:
+
+**Nút copy ở code block.** Trước đây tôi chạy JS lúc trang tải để quét tất cả thẻ `pre` rồi chèn nút vào. Việc đó tốn JS và gây nhảy layout. Giờ nút được chèn lúc build bằng một rehype plugin; JS còn lại chỉ là một listener duy nhất gắn ở `document`.
+
+**Mục lục.** Astro trả về danh sách heading ngay khi render nội dung. Không cần đọc DOM:
+
+```ts
+const { Content, headings } = await render(post);
+```
+
+Phần duy nhất cần JS là tô đậm mục đang đọc, làm bằng `IntersectionObserver` — khoảng mười dòng.
+
+**Dark mode.** Chuyển màu là việc của CSS. JS chỉ làm đúng một việc: bật/tắt một class trên thẻ `html` và ghi lựa chọn vào `localStorage`.
+
+## Cái bẫy nháy trắng
+
+Đây là lỗi tôi thấy trên gần như mọi blog có dark mode. Người dùng chọn giao diện tối, tải lại trang, và thấy một khung trắng loé lên khoảng 100 mili giây trước khi trang chuyển sang tối.
+
+Nguyên nhân: đoạn script đọc `localStorage` chạy sau khi trình duyệt đã vẽ khung hình đầu tiên. Cách sửa là đặt nó **đồng bộ, trong thẻ head, trước mọi CSS**:
+
+```html
+<script is:inline>
+  const stored = localStorage.getItem('theme');
+  const isDark = stored
+    ? stored === 'dark'
+    : matchMedia('(prefers-color-scheme: dark)').matches;
+  document.documentElement.classList.toggle('dark', isDark);
+</script>
+```
+
+`is:inline` là bắt buộc. Thiếu nó, Astro sẽ gom script vào bundle và nạp bằng `type=module`, mà module thì luôn bị hoãn — đúng thứ ta đang cần tránh.
+
+## Ngưỡng để tự kiểm
+
+Tôi không tin vào cảm giác "trang này có vẻ nhanh". Tôi đặt ngưỡng cụ thể và đo:
+
+| Chỉ số | Ngưỡng | Đo bằng |
+|---|---|---|
+| Lighthouse Performance | ≥ 95 | Chạy trên bản build production |
+| Lighthouse Accessibility | 100 | Không có ngoại lệ |
+| JS gửi xuống mỗi trang | < 50KB gzip | Bảng Network của DevTools |
+| Ảnh lớn nhất | < 200KB | Sau khi đã chuyển sang AVIF |
+
+Điều quan trọng: chạy Lighthouse trên **bản build production**, không phải bản dev. Bản dev không nén, không tách bundle, và cho ra con số thấp hơn thực tế rất nhiều — đủ để bạn bỏ cả buổi tối đi sửa một vấn đề không tồn tại.

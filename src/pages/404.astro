@@ -1,0 +1,70 @@
+---
+import { getPublishedPosts, collectTags } from '~/utils/posts';
+import BaseLayout from '~/layouts/BaseLayout.astro';
+import Icon from '~/components/Icon.astro';
+import PostCard from '~/components/PostCard.astro';
+import TagPill from '~/components/TagPill.astro';
+
+/**
+ * Trang 404 chỉ có hai cái nút là bắt người đọc tự đi tìm. Kèm luôn bài mới
+ * nhất và chủ đề thì lỗi đường dẫn biến thành một chỗ để đọc tiếp.
+ */
+const posts = await getPublishedPosts();
+const tags = collectTags(posts);
+const baiMoi = posts.slice(0, 4);
+---
+
+<BaseLayout
+  title="Không tìm thấy trang"
+  description="Đường dẫn bạn vừa mở không tồn tại hoặc đã bị đổi. Thử quay lại danh sách bài viết, dùng ô tìm kiếm, hoặc đọc một trong những bài mới nhất bên dưới."
+  noindex
+>
+  <div class="wrap flex flex-col items-center py-16 text-center sm:py-20">
+    <p class="font-mono text-sm text-muted">404</p>
+    <h1 class="display-xl mt-3 text-4xl">Không tìm thấy trang này</h1>
+    <p class="mt-4 max-w-md text-muted">
+      Đường dẫn có thể đã bị đổi, hoặc bài viết chưa từng tồn tại. Thử tìm lại theo cách khác.
+    </p>
+
+    <div class="mt-8 flex flex-wrap items-center justify-center gap-3">
+      <a
+        href="/blog"
+        class="rounded-lg bg-accent px-5 py-2.5 font-bold text-on-accent transition-colors hover:bg-accent-hover"
+      >
+        Xem tất cả bài viết
+      </a>
+      <a
+        href="/search"
+        class="inline-flex items-center gap-2 rounded-lg border border-border px-5 py-2.5 transition-colors hover:bg-surface"
+      >
+        <Icon name="search" size={16} />
+        Tìm kiếm
+      </a>
+    </div>
+
+    <ul class="mt-8 flex max-w-2xl flex-wrap justify-center gap-2">
+      {
+        tags.slice(0, 8).map((tag) => (
+          <li>
+            <TagPill name={tag.name} count={tag.count} />
+          </li>
+        ))
+      }
+    </ul>
+  </div>
+
+  {
+    baiMoi.length > 0 && (
+      <section class="wrap border-t border-border py-12" aria-labelledby="goi-y-heading">
+        <h2 id="goi-y-heading" class="eyebrow">
+          Hay là đọc bài này
+        </h2>
+        <div class="mt-6 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+          {baiMoi.map((post) => (
+            <PostCard post={post} headingLevel="h3" />
+          ))}
+        </div>
+      </section>
+    )
+  }
+</BaseLayout>

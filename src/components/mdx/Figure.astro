@@ -1,0 +1,23 @@
+---
+/**
+ * Ảnh kèm chú thích. Dùng thay cho cú pháp ảnh của Markdown khi cần chú thích.
+ *
+ * `alt` là thuộc tính bắt buộc — chú thích phía dưới KHÔNG thay thế được nó.
+ * Chú thích là thứ mọi người đọc; alt là thứ dành riêng cho người dùng screen
+ * reader, và hai nội dung đó thường phải khác nhau.
+ */
+interface Props {
+  src: string;
+  alt: string;
+  caption?: string;
+  width?: number;
+  height?: number;
+}
+
+const { src, alt, caption, width, height } = Astro.props;
+---
+
+<figure class="figure">
+  <img src={src} alt={alt} width={width} height={height} loading="lazy" decoding="async" />
+  {caption && <figcaption>{caption}</figcaption>}
+</figure>

@@ -1,0 +1,39 @@
+---
+import { SITE } from '~/site.config';
+import BaseHead from '~/components/BaseHead.astro';
+import Header from '~/components/Header.astro';
+import Footer from '~/components/Footer.astro';
+import Analytics from '~/components/Analytics.astro';
+
+interface Props {
+  title: string;
+  description?: string;
+  type?: 'website' | 'article';
+  ogImage?: string;
+  publishedAt?: Date;
+  updatedAt?: Date;
+  noindex?: boolean;
+  schema?: Record<string, unknown> | Record<string, unknown>[];
+}
+---
+
+<!doctype html>
+<html lang={SITE.lang}>
+  <head>
+    <BaseHead {...Astro.props} />
+    <slot name="head" />
+  </head>
+
+  <body class="flex min-h-dvh flex-col">
+    <a href="#main" class="skip-link">Bỏ qua, tới nội dung chính</a>
+
+    <Header />
+
+    <main id="main" class="flex-1">
+      <slot />
+    </main>
+
+    <Footer />
+    <Analytics />
+  </body>
+</html>

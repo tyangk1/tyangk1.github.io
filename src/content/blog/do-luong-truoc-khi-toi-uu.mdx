@@ -1,0 +1,58 @@
+---
+title: "Đo trước khi tối ưu: ba lần tôi đoán sai chỗ chậm"
+description: "Cả ba lần tôi đều tin mình biết chỗ nào chậm, và cả ba lần đều sai. Đây là những con số thật và công cụ đã chỉ ra thủ phạm mà tôi không ngờ tới."
+publishedAt: 2026-06-01
+tags: ["Hiệu năng","Nghề nghiệp"]
+takeaways: ["Ba lần đoán sai chỗ chậm, kèm con số thật","Vì sao trực giác về hiệu năng gần như luôn sai","Thứ tự đo: từ ngoài vào trong, không phải từ code ra"]
+draft: false
+featured: false
+---
+
+Tôi có thành tích rất tệ trong việc đoán chỗ chậm. Ba ví dụ, đều là code của chính tôi.
+
+## Lần một: tưởng do vòng lặp, thật ra do font
+
+Trang danh sách 200 dòng, cuộn giật. Tôi đi tối ưu hàm render, thay `map` bằng vòng `for`, gộp bớt phép tính. Không đổi gì.
+
+Mở Performance panel: **Style & Layout 890ms**, Script 40ms. Thủ phạm là chín file font, mỗi lần một file tải xong lại kéo theo một lần tính lại bố cục toàn trang.
+
+Sửa: bớt một trọng lượng font và preload phần cần cho khung hình đầu. Từ 890ms xuống 350ms. Không sửa một dòng JavaScript nào.
+
+## Lần hai: tưởng do database, thật ra do N+1 ở tầng trên
+
+API trả trong 2,3 giây. Tôi thêm index, viết lại truy vấn, bật cache. Xuống 2,1 giây.
+
+Bật log SQL: **147 truy vấn** cho một request. Truy vấn chính nhanh 8ms; 146 cái còn lại là vòng lặp gọi `getAuthor()` cho từng bài.
+
+<PullQuote>
+  Một truy vấn chậm dễ thấy và dễ sửa. Một trăm truy vấn nhanh thì không ai để ý,
+  và cộng lại còn tệ hơn nhiều.
+</PullQuote>
+
+## Lần ba: tưởng do ảnh, thật ra do một script bên thứ ba
+
+LCP 4,1 giây. Tôi nén lại toàn bộ ảnh, chuyển sang AVIF, thêm `fetchpriority`. LCP 3,9 giây.
+
+Xem waterfall: một script chat widget chặn 1,8 giây trước khi ảnh bắt đầu tải. Bỏ nó ra, LCP về 1,4 giây.
+
+<Callout type="warning" title="Script bên thứ ba là chỗ nên soi trước, không phải sau">
+  Chúng không nằm trong code của bạn nên rất dễ bị bỏ qua khi đi tìm. Mở tab
+  Network, sắp theo thời gian, và xem cái gì chạy trước ảnh LCP.
+</Callout>
+
+## Thứ tự tôi dùng bây giờ
+
+<Steps>
+1. **Đo ở ngoài trước.** Lighthouse trên bản production, không phải bản dev. Lấy con số tổng.
+2. **Xem waterfall.** Cái gì tải, theo thứ tự nào, cái nào chặn cái nào.
+3. **Xem main thread.** Style & Layout / Script / Rendering — cái nào lớn nhất.
+4. **Chỉ tới bước này mới mở code.** Và mở đúng chỗ mà ba bước trên đã chỉ.
+</Steps>
+
+Cái giá của việc bỏ ba bước đầu: cả ba lần trên tôi đều tối ưu đúng kỹ thuật, đúng cách, vào **sai chỗ**. Công sức không sai, mục tiêu sai.
+
+## Một mốc để tự kiểm
+
+Trước khi sửa, viết ra một câu: *"Tôi tin chỗ chậm là X, và nếu đúng thì sau khi sửa con số Y sẽ giảm khoảng Z."*
+
+Nếu không viết nổi câu đó thì bạn đang đoán, chưa đo.

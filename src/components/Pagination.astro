@@ -1,0 +1,61 @@
+---
+import Icon from '~/components/Icon.astro';
+
+interface Props {
+  currentPage: number;
+  lastPage: number;
+  /** Hàm sinh URL cho một số trang, để component không cần biết cấu trúc route. */
+  hrefFor: (page: number) => string;
+}
+
+const { currentPage, lastPage, hrefFor } = Astro.props;
+
+// Chỉ hiện tối đa 5 số quanh trang hiện tại — nhiều hơn thì rối trên màn hình hẹp.
+const start = Math.max(1, Math.min(currentPage - 2, lastPage - 4));
+const end = Math.min(lastPage, start + 4);
+const pages = Array.from({ length: end - start + 1 }, (_, i) => start + i);
+
+const linkBase =
+  'grid h-10 min-w-10 place-items-center rounded-lg border border-border px-3 text-sm transition-colors';
+---
+
+{
+  lastPage > 1 && (
+    <nav aria-label="Phân trang" class="mt-12 flex items-center justify-center gap-2">
+      {currentPage > 1 ? (
+        <a href={hrefFor(currentPage - 1)} class={`${linkBase} hover:bg-surface`} rel="prev">
+          <Icon name="arrowLeft" size={16} />
+          <span class="sr-only">Trang trước</span>
+        </a>
+      ) : (
+        <span class={`${linkBase} opacity-40`} aria-hidden="true">
+          <Icon name="arrowLeft" size={16} />
+        </span>
+      )}
+
+      {pages.map((page) =>
+        page === currentPage ? (
+          <span class={`${linkBase} border-accent bg-accent-soft font-bold`} aria-current="page">
+            {page}
+          </span>
+        ) : (
+          <a href={hrefFor(page)} class={`${linkBase} text-muted hover:bg-surface hover:text-fg`}>
+            <span class="sr-only">Trang </span>
+            {page}
+          </a>
+        ),
+      )}
+
+      {currentPage < lastPage ? (
+        <a href={hrefFor(currentPage + 1)} class={`${linkBase} hover:bg-surface`} rel="next">
+          <span class="sr-only">Trang sau</span>
+          <Icon name="arrowRight" size={16} />
+        </a>
+      ) : (
+        <span class={`${linkBase} opacity-40`} aria-hidden="true">
+          <Icon name="arrowRight" size={16} />
+        </span>
+      )}
+    </nav>
+  )
+}

@@ -1,0 +1,36 @@
+---
+import Icon from '~/components/Icon.astro';
+
+/**
+ * Hộp "điểm chính". Đặt ở ĐẦU bài, không phải cuối.
+ *
+ * Người đọc trên mạng quyết định ở lại hay đóng tab trong khoảng mười giây đầu.
+ * Cho họ thấy trước bài này sẽ trả lời được gì thì tỷ lệ đọc tiếp cao hơn hẳn
+ * so với bắt họ tự đoán qua ba đoạn mở đầu.
+ */
+interface Props {
+  items: readonly string[];
+  title?: string;
+}
+
+const { items, title = 'Bài này trả lời' } = Astro.props;
+---
+
+{
+  items.length > 0 && (
+    <aside class="takeaways">
+      <p class="takeaways__title">
+        <Icon name="layers" size={16} />
+        <span>{title}</span>
+      </p>
+      <ul class="takeaways__list">
+        {items.map((item) => (
+          <li>
+            <Icon name="checkCircle" size={17} class="takeaways__check" />
+            <span>{item}</span>
+          </li>
+        ))}
+      </ul>
+    </aside>
+  )
+}

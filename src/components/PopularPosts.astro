@@ -1,0 +1,59 @@
+---
+import type { Post } from '~/utils/posts';
+import { dinhDangLuot } from '~/utils/views';
+import { postHref } from '~/lib/routes';
+
+/**
+ * Khối "Đọc nhiều nhất" — social proof mạnh nhất mà một blog có thể có.
+ *
+ * Số chốt tại thời điểm build, không phải số trực tiếp. Đó là chủ đích: khối này
+ * để người mới tới biết nên đọc bài nào trước, không phải để đếm chính xác. Con
+ * số trực tiếp nằm ở từng trang bài.
+ *
+ * Component tự ẩn khi chưa đủ dữ liệu — xem `baiDocNhieuNhat()`. Blog mới chạy mà
+ * hiện "Đọc nhiều nhất: 3 lượt" thì nói với người đọc rằng chưa ai đọc cả.
+ */
+interface Props {
+  items: { post: Post; views: number }[];
+}
+
+const { items } = Astro.props;
+---
+
+{
+  items.length > 0 && (
+    <section class="wrap border-t border-border py-12" aria-labelledby="popular-heading">
+      {/* Không thêm icon: các nhãn mục khác trên trang chủ đều là chữ trơn,
+          thêm icon riêng cho một mục làm hệ thống trông chắp vá. */}
+      <h2 id="popular-heading" class="eyebrow">
+        Đọc nhiều nhất
+      </h2>
+
+      <ol class="mt-5 max-w-3xl">
+        {items.map((item, i) => (
+          <li class="group grid grid-cols-[2.5rem_1fr_auto] items-baseline gap-3 border-b border-border py-4 last:border-b-0 sm:grid-cols-[3rem_1fr_auto]">
+            <span class="font-mono text-sm text-muted tabular-nums" aria-hidden="true">
+              {String(i + 1).padStart(2, '0')}
+            </span>
+
+            <div class="min-w-0">
+              <h3 class="display text-lg">
+                <a href={postHref(item.post.id)} class="transition-colors group-hover:text-accent">
+                  {item.post.data.title}
+                </a>
+              </h3>
+              {item.post.data.tags[0] && (
+                <p class="mt-1 text-xs text-muted">{item.post.data.tags[0]}</p>
+              )}
+            </div>
+
+            <span class="text-sm text-muted tabular-nums">
+              {dinhDangLuot(item.views)}
+              <span class="sr-only"> lượt đọc</span>
+            </span>
+          </li>
+        ))}
+      </ol>
+    </section>
+  )
+}

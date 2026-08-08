@@ -1,0 +1,24 @@
+---
+import Icon from '~/components/Icon.astro';
+
+/**
+ * Câu trích cỡ lớn, tràn rộng hơn cột chữ.
+ *
+ * Việc nó phá khỏi bề rộng cột là có chủ đích: đó chính là thứ tạo nhịp cho một
+ * bài dài. Đọc mãi một cột chữ đều đặn thì mắt không có mốc nào để nghỉ.
+ */
+interface Props {
+  /** Nguồn của câu trích. Bỏ trống nếu là ý của chính tác giả. */
+  cite?: string;
+}
+
+const { cite } = Astro.props;
+---
+
+<figure class="pullquote">
+  <Icon name="quote" size={30} class="pullquote__mark" />
+  <blockquote class="pullquote__text">
+    <slot />
+  </blockquote>
+  {cite && <figcaption class="pullquote__cite">{cite}</figcaption>}
+</figure>

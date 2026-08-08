@@ -1,0 +1,49 @@
+# build output
+dist/
+.astro/
+
+# Nội dung sinh ra từ `pnpm sync` ĐƯỢC COMMIT. Đừng bỏ vào đây.
+#
+# Trước đây hai thư mục src/content/blog/ và src/content/projects/ bị loại vì
+# "database là nguồn sự thật". Nhưng database chạy cục bộ (127.0.0.1:55321), nên
+# CI và máy build không bao giờ với tới nó. Checkout mới không có file nội dung
+# nào và cũng không có database → db-sync.mjs thoát mã 1 → build vỡ mọi lần.
+#
+# Cách hiểu đúng: database là nguồn sự thật lúc SOẠN, file trong src/content/ là
+# đầu vào lúc BUILD. Quan hệ giống pnpm-lock.yaml — sinh ra bằng máy nhưng vẫn
+# commit, để build ở đâu cũng cho ra đúng một kết quả.
+#
+# Quy trình: sửa nội dung trong Supabase → pnpm sync → commit file thay đổi.
+
+# báo cáo Lighthouse sinh bởi `pnpm lighthouse`
+lighthouse-report.html
+
+# dependencies
+node_modules/
+
+# logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# environment variables
+.env
+.env.production
+.env.local
+
+# Thư mục nháp của Supabase CLI. Chứa cả
+# supabase/.temp/start-secrets/**/docker.env với SUPABASE_INTERNAL_JWT_SECRET,
+# SUPABASE_INTERNAL_SECRET_KEY và SUPABASE_DB_URL của stack cục bộ. Với stack
+# cục bộ đó là giá trị demo ai cũng biết, nhưng commit một file tên
+# `start-secrets/.../docker.env` thì lần nào đổi giá trị thật là lộ thật.
+supabase/.temp/
+
+# macOS / Windows
+.DS_Store
+Thumbs.db
+
+# editor
+.vscode/*
+!.vscode/extensions.json
+.idea/

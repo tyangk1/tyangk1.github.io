@@ -1,0 +1,60 @@
+---
+title: "Viết commit message cho người đọc nó sáu tháng sau"
+description: "Commit message tệ chỉ tốn kém khi bạn cần nó, mà lúc đó thì đã muộn. Một khuôn ba dòng tôi dùng, và ba loại thông tin không bao giờ nên bỏ ra ngoài."
+publishedAt: 2026-07-05
+tags: ["Nghề nghiệp","Git"]
+takeaways: ["Vì sao \"fix bug\" tốn kém hơn ta tưởng","Khuôn ba dòng: làm gì, vì sao, và điều gì đã cân nhắc rồi bỏ","Cái gì thuộc commit message, cái gì thuộc comment trong code"]
+draft: false
+featured: false
+---
+
+Có một lúc duy nhất commit message trở nên quan trọng: khi bạn đang `git log -L` một dòng code trông vô lý và cần biết vì sao nó tồn tại. Đúng lúc đó, `fix bug` là một cú tát.
+
+## Khuôn ba dòng
+
+```
+Chặn double-submit ở form đăng ký
+
+Người dùng bấm nhanh hai lần tạo hai tài khoản trùng email; ràng buộc
+unique ở DB ném lỗi 500 chứ không phải lỗi hợp lệ.
+
+Đã cân nhắc debounce ở client nhưng bỏ: request đầu vẫn đi, chỉ chậm hơn.
+Khoá ở tầng service là chỗ duy nhất chắc chắn.
+```
+
+Ba phần, mỗi phần trả lời một câu hỏi khác nhau:
+
+<Steps>
+1. **Dòng đầu — làm gì.** Câu ngắn, thể chủ động, không dấu chấm. Đây là dòng hiện trong `git log --oneline`, nên nó phải đứng một mình được.
+2. **Đoạn giữa — vì sao.** Triệu chứng thật, không phải mô tả code. Code đã tự nói nó làm gì rồi.
+3. **Đoạn cuối — đã bỏ gì.** Phần này ít ai viết và là phần giá trị nhất.
+</Steps>
+
+<Callout type="tip" title="Đoạn cuối cứu bạn khỏi việc làm lại vòng cũ">
+  Người tiếp theo (hoặc chính bạn) nhìn đoạn code sẽ nghĩ "sao không debounce cho
+  gọn". Nếu lý do bỏ debounce không được ghi lại, họ sẽ thử, sẽ mất một buổi, và
+  sẽ tới đúng kết luận cũ.
+</Callout>
+
+## Cái gì thuộc commit, cái gì thuộc comment
+
+Ranh giới tôi dùng:
+
+| Loại thông tin | Đặt ở đâu |
+| --- | --- |
+| Vì sao thay đổi này tồn tại | Commit message |
+| Vì sao dòng code này viết kiểu lạ | Comment trong code |
+| Cách dùng module | README hoặc JSDoc |
+
+Lý do: commit message gắn với **một thời điểm**, comment gắn với **một dòng code**. Nhét lý do lịch sử vào comment thì sáu tháng sau nó thành rác; nhét lý do kỹ thuật vào commit thì không ai tìm thấy.
+
+<PullQuote>
+  Commit message không viết cho reviewer hôm nay. Nó viết cho người mở git blame
+  sáu tháng sau, và người đó rất có thể là bạn.
+</PullQuote>
+
+## Hai thứ tôi đã bỏ
+
+**Conventional Commits** (`feat:`, `fix:`, `chore:`). Với dự án một người thì tiền tố không mua được gì, còn tốn công tranh luận cái nào là `chore`. Với dự án có tự sinh changelog thì nó đáng.
+
+**Commit nhỏ cực đoan.** Tôi từng tách mọi thứ thành commit một dòng. Kết quả là `git log` đầy nhiễu và không commit nào đứng riêng có nghĩa. Giờ tôi dùng một mốc: **một commit là một thay đổi mà tôi có thể revert độc lập.**

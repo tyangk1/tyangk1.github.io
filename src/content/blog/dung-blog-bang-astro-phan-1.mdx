@@ -1,0 +1,133 @@
+---
+title: "Dựng blog bằng Astro — phần 1: kiến trúc và nội dung"
+description: "Cách tôi tổ chức một blog tĩnh bằng Astro: content collection có schema, quy ước đặt tên file, và lý do để build thất bại khi bài viết sai định dạng."
+publishedAt: 2026-07-12
+tags: ["Astro","Kiến trúc","Web"]
+takeaways: ["Vì sao một blog thuần nội dung không nên dùng framework hướng ứng dụng","Cách viết schema Zod để bài sai định dạng làm build hỏng ngay","Ba quy ước đặt tên file mà đổi về sau là mất hết backlink","Hàm bỏ dấu tiếng Việt đúng cả với chữ đ"]
+seriesName: "Dựng blog bằng Astro"
+seriesPart: 1
+draft: false
+featured: true
+---
+
+Tôi viết lại blog này lần thứ tư. Ba lần trước đều chết vì cùng một lý do: viết bài trở nên phiền hơn là vui. Lần này tôi đặt ra một ràng buộc duy nhất — **thêm một bài mới chỉ được phép tốn đúng một thao tác: tạo một file**.
+
+Bài này nói về phần nền: cách tổ chức nội dung. Phần 2 nói về SEO và hiệu năng.
+
+## Vì sao là Astro
+
+Tôi từng dùng Next.js. Nó tốt, nhưng cho một blog thuần nội dung thì tôi phải trả giá cho những thứ không dùng đến: một runtime React gửi xuống trình duyệt chỉ để hiển thị chữ tĩnh.
+
+Astro đảo ngược mặc định đó. Mặc định là **không gửi JavaScript nào cả**. Muốn có tương tác ở đâu thì khai báo tường minh ở chỗ đó.
+
+|                         | Next.js (App Router) | Astro          |
+| ----------------------- | -------------------- | -------------- |
+| JS mặc định gửi xuống   | ~80–90KB             | 0KB            |
+| Cấu hình để đạt điều đó | Phải tự cắt          | Là mặc định    |
+| Hợp nhất với            | App có trạng thái    | Trang nội dung |
+
+Không có framework nào "tốt hơn". Chỉ có framework khớp với thứ bạn đang xây.
+
+## Nội dung phải có schema
+
+Sai lầm lớn nhất của tôi ở ba lần trước là để nội dung tự do. Không schema, nên mỗi bài một kiểu: chỗ thì `date`, chỗ thì `publishedAt`, có bài quên hẳn phần mô tả. Lỗi chỉ lộ ra khi ai đó chia sẻ link lên Facebook và thấy ô mô tả trống trơn.
+
+Astro cho phép mô tả hình dạng nội dung bằng Zod:
+
+```ts title="src/content.config.ts"
+import { defineCollection, z } from 'astro:content';
+import { glob } from 'astro/loaders';
+
+const blog = defineCollection({
+  loader: glob({ base: './src/content/blog', pattern: '**/*.mdx' }),
+  schema: z.object({
+    title: z.string().max(70),
+    description: z.string().min(120).max(160),
+    publishedAt: z.coerce.date(),
+    tags: z.array(z.string()).min(1).max(5),
+    draft: z.boolean().default(false),
+  }),
+});
+
+export const collections = { blog };
+```
+
+Điểm quan trọng nằm ở hai dòng `max(70)` và `min(120).max(160)`. Đó không phải trang trí:
+
+- **70 ký tự** là chỗ Google cắt tiêu đề trên trang kết quả.
+- **120–160 ký tự** là khoảng mô tả hiển thị đủ, không bị cụt.
+
+Viết chúng vào schema nghĩa là tôi không cần nhớ. Máy nhớ hộ.
+
+<PullQuote>
+  Nếu một thứ có thể sai và bạn phải *nhớ* để nó không sai, hãy biến nó thành lỗi lúc build.
+</PullQuote>
+
+<Callout type="tip" title="Đặt ràng buộc vào schema, đừng đặt vào đầu">
+  Mọi quy tắc bạn tự nhắc mình trước khi đăng bài — độ dài tiêu đề, số tag, có mô tả chưa — đều là
+  ứng viên để chuyển thành một dòng Zod. Quy tắc nằm trong đầu thì sớm muộn cũng quên; nằm trong
+  schema thì không.
+</Callout>
+
+## Để build thất bại
+
+Đây là phần nhiều người bỏ qua. Khi một bài sai schema, Astro dừng build và in ra đúng file nào, trường nào:
+
+```
+[InvalidContentEntryFrontmatterError] blog → bai-moi.mdx
+  description: String must contain at least 120 character(s)
+```
+
+Nghe có vẻ khó chịu. Thực tế thì ngược lại: nó khó chịu **một lần**, lúc tôi đang viết. Còn nếu không có nó, cái sai sẽ âm thầm nằm trên production hàng tháng trời.
+
+## Quy ước đặt tên file
+
+Tên file chính là URL. Tôi chọn ba quy ước và không phá lệ:
+
+<Steps>
+1. **Không dấu, viết thường, nối bằng gạch ngang.** `dung-blog-bang-astro-phan-1.mdx`
+2. **Không có ngày trong tên file.** Ngày nằm trong frontmatter. Đưa ngày vào URL nghĩa là bài viết trông cũ đi theo thời gian, dù nội dung vẫn đúng.
+3. **Không đổi tên sau khi đã đăng.** Nếu buộc phải đổi, thêm redirect.
+</Steps>
+
+<Callout type="warning" title="Đổi URL là vứt bỏ backlink">
+  Mỗi đường dẫn bạn đổi sau khi đã đăng là một lần xoá sạch mọi liên kết trỏ tới nó — từ Google, từ
+  bài của người khác, từ tin nhắn ai đó lưu lại. Đây là loại thiệt hại không thấy ngay và không lấy
+  lại được.
+</Callout>
+
+## Chuẩn hoá slug tiếng Việt
+
+Tag thì tôi viết có dấu — "Kiến trúc" đọc dễ hơn "Kien truc". Nhưng URL thì phải bỏ dấu. Hàm chuyển đổi ngắn hơn bạn tưởng:
+
+```ts title="src/utils/format.ts"
+export function slugify(input: string): string {
+  return input
+    .normalize('NFD') // tách "ế" thành "e" + dấu
+    .replace(/\p{M}/gu, '') // xoá toàn bộ dấu
+    .replace(/[đĐ]/g, 'd') // đ không phải "d + dấu", phải xử lý riêng
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+}
+```
+
+Dòng `[đĐ]` là chỗ hầu hết thư viện slugify nước ngoài làm sai với tiếng Việt. `normalize('NFD')` tách được dấu thanh ra khỏi nguyên âm, nhưng chữ **đ** là một ký tự riêng chứ không phải "d cộng dấu", nên NFD không đụng tới nó. Không có dòng đó thì "Đà Nẵng" ra `-a-nang`.
+
+## Bài draft không được lên production
+
+Một dòng duy nhất, đặt ở đúng một chỗ:
+
+```ts
+const posts = await getCollection('blog', ({ data }) => import.meta.env.DEV || !data.draft);
+```
+
+Ở máy tôi thì thấy hết, kể cả bài đang viết dở. Ở production thì bài `draft: true` biến mất hoàn toàn — không có trong danh sách, không có trong sitemap, không có trong RSS.
+
+Điều kiện để nó an toàn: **mọi trang đều phải lấy bài qua đúng hàm này**. Chỉ cần một trang gọi thẳng `getCollection('blog')` là bài nháp rò rỉ ra ngoài.
+
+## Điều tôi sẽ làm khác
+
+Nếu bắt đầu lại, tôi sẽ viết schema trước cả khi viết dòng giao diện đầu tiên. Lần này tôi làm ngược — dựng giao diện xong mới nghĩ tới cấu trúc dữ liệu, và phải sửa lại toàn bộ bài đã viết cho khớp.
+
+Phần 2 sẽ nói về nửa còn lại: làm sao để trang này tải xong dưới một giây và Google hiểu được nó nói về cái gì.

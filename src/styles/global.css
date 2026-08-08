@@ -1,0 +1,858 @@
+@import 'tailwindcss';
+
+/* Font tự host qua Fontsource — không gọi Google Fonts, không rò rỉ IP người đọc.
+   Mỗi file đã tách subset theo unicode-range nên trình duyệt chỉ tải phần cần dùng.
+
+   CHỈ hai trọng lượng. Tiếng Việt cần cả ba subset (latin, latin-ext cho ơ/ư,
+   và vietnamese), nên mỗi trọng lượng thêm vào là ba file phải tải và ba lần
+   trình duyệt phải tính lại bố cục khi font đổi. Bỏ 600, dồn hết về 700. */
+@import '@fontsource/be-vietnam-pro/400.css';
+@import '@fontsource/be-vietnam-pro/700.css';
+/* Serif chỉ dùng cho tiêu đề lớn — cặp serif display + sans body là cách ghép
+   kinh điển của báo in, và nó tách bạch rõ "tiêu đề" với "nội dung".
+   Nạp theo từng subset, bỏ Cyrillic vì blog không dùng tới. */
+@import '@fontsource/playfair-display/vietnamese-700.css';
+@import '@fontsource/playfair-display/latin-ext-700.css';
+@import '@fontsource/playfair-display/latin-700.css';
+
+/* KHÔNG nạp font mono riêng — dùng font mono của hệ điều hành.
+   Đo được: JetBrains Mono là 3 file nữa phải tải, và code block là vùng DOM lớn
+   nhất trên trang bài viết, nên mỗi lần font đó swap là một lần tính lại bố cục
+   rất đắt. Bỏ nó ra làm Style & Layout giảm khoảng một nửa. Font mono có sẵn
+   trên mọi hệ điều hành hiện nay đều đủ tốt và hiển thị đúng dấu tiếng Việt. */
+
+/* Dark mode điều khiển bằng class trên <html>, không phải media query thuần,
+   để nút toggle ghi đè được lựa chọn của hệ điều hành. */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* ==========================================================================
+   1. DESIGN TOKEN
+   Mọi màu của site khai báo đúng một lần ở đây. Đổi màu nhấn = sửa 2 dòng.
+   Dùng OKLCH vì độ sáng cảm nhận đồng đều — chuyển light/dark không bị lệch.
+   ========================================================================== */
+
+:root {
+  color-scheme: light;
+
+  --bg: oklch(99% 0.002 250);
+  --surface: oklch(96.8% 0.004 250);
+  --border: oklch(90% 0.006 250);
+  --fg: oklch(24% 0.012 250);
+  --muted: oklch(47% 0.014 250);
+  --accent: oklch(48% 0.17 258);
+  --accent-hover: oklch(40% 0.17 258);
+  --accent-soft: oklch(95% 0.03 258);
+  /* Màu chữ đặt TRÊN nền accent. Không dùng trắng cứng: ở dark mode màu nhấn
+     sáng hơn nền nên chữ trắng chỉ đạt ~2:1, không đủ chuẩn WCAG. */
+  --on-accent: oklch(99% 0 0);
+
+  --shadow-sm: 0 1px 2px oklch(24% 0.012 250 / 0.06);
+  --shadow-md: 0 4px 16px oklch(24% 0.012 250 / 0.08);
+}
+
+.dark {
+  color-scheme: dark;
+
+  --bg: oklch(17.5% 0.008 255);
+  --surface: oklch(21.5% 0.011 255);
+  --border: oklch(31% 0.014 255);
+  --fg: oklch(93% 0.005 255);
+  --muted: oklch(72% 0.014 255);
+  --accent: oklch(78% 0.13 250);
+  --accent-hover: oklch(87% 0.1 250);
+  --accent-soft: oklch(28% 0.05 255);
+  --on-accent: oklch(17% 0.02 255);
+
+  --shadow-sm: 0 1px 2px oklch(0% 0 0 / 0.3);
+  --shadow-md: 0 4px 16px oklch(0% 0 0 / 0.4);
+}
+
+/* `inline` để Tailwind trỏ thẳng vào biến ở trên — nhờ vậy utility tự đổi màu
+   theo light/dark mà không cần sinh thêm class `dark:`. */
+@theme inline {
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-border: var(--border);
+  --color-fg: var(--fg);
+  --color-muted: var(--muted);
+  --color-accent: var(--accent);
+  --color-accent-hover: var(--accent-hover);
+  --color-accent-soft: var(--accent-soft);
+  --color-on-accent: var(--on-accent);
+
+  --font-sans: 'Be Vietnam Pro', ui-sans-serif, system-ui, sans-serif;
+  --font-display: 'Playfair Display', 'Be Vietnam Pro', ui-serif, Georgia, serif;
+  --font-mono:
+    ui-monospace, 'SF Mono', 'Cascadia Code', 'Segoe UI Mono', Menlo, Consolas, monospace;
+
+  /* Thang chữ fluid: co giãn mượt theo viewport, không nhảy bậc ở breakpoint. */
+  --text-xs: 0.8rem;
+  --text-sm: 0.875rem;
+  --text-base: clamp(1rem, 0.97rem + 0.15vw, 1.0625rem);
+  --text-lg: clamp(1.125rem, 1.08rem + 0.22vw, 1.2rem);
+  --text-xl: clamp(1.3rem, 1.2rem + 0.5vw, 1.5rem);
+  --text-2xl: clamp(1.55rem, 1.35rem + 1vw, 2rem);
+  --text-3xl: clamp(1.9rem, 1.5rem + 2vw, 2.6rem);
+  --text-4xl: clamp(2.3rem, 1.7rem + 3vw, 3.4rem);
+
+  /*
+    90rem (1440px), tăng từ 80rem.
+
+    80rem là con số tối thiểu mà bố cục trang bài viết cần: cột chữ 44rem nằm
+    đúng tâm, hai bên đối xứng — 44 + 2×(gap 2.5 + cột phải 14) = 77rem. Nhưng
+    lấy đúng mức tối thiểu đó làm khung cho CẢ SITE thì trên màn 1920 nội dung
+    chỉ chiếm 68% bề ngang, chừa 305px trống mỗi bên. Trang trông như bị bó vào
+    giữa màn hình.
+
+    90rem giảm khoảng trống đó xuống 225px mỗi bên (76% bề ngang) mà không đụng
+    tới bề rộng cột chữ — `--container-prose` vẫn 44rem, vì đó là độ dài dòng
+    dễ đọc (~75 ký tự) và nó KHÔNG được nới theo màn hình.
+
+    Header, chân trang, trang chủ và trang bài dùng CHUNG khung này. Trước đây
+    trang bài dùng khung riêng 88rem, nên mép trái của header và của nội dung
+    lệch nhau — mắt nhận ra ngay dù không chỉ được ra chỗ nào sai.
+  */
+  --container-wrap: 90rem;
+  --container-prose: 44rem;
+
+  --radius-card: 0.75rem;
+}
+
+/* ==========================================================================
+   2. NỀN TẢNG
+   ========================================================================== */
+
+html {
+  /* Giữ chỗ thanh cuộn để trang không nhích ngang khi chuyển trang ngắn/dài. */
+  scrollbar-gutter: stable;
+  scroll-behavior: smooth;
+  -webkit-text-size-adjust: 100%;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+body {
+  background-color: var(--bg);
+  color: var(--fg);
+  font-family: var(--font-sans);
+  font-size: var(--text-base);
+  line-height: 1.7;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  /* Lưới an toàn: một từ dài (URL, tên công nghệ, slug) không bao giờ được đẩy
+     trang tràn ngang. Chỉ có tác dụng khi từ đó dài hơn cả dòng, nên văn bản
+     thường không bị ảnh hưởng. */
+  overflow-wrap: break-word;
+}
+
+/* Focus ring hiện rõ ở mọi nơi — điều kiện bắt buộc để duyệt site bằng bàn phím. */
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+::selection {
+  background-color: var(--accent-soft);
+  color: var(--fg);
+}
+
+/* Heading có neo #id: chừa chỗ để tiêu đề không bị header dính che mất. */
+:target {
+  scroll-margin-top: 5rem;
+}
+
+/* ==========================================================================
+   3. TIỆN ÍCH BỐ CỤC
+   ========================================================================== */
+
+.wrap {
+  width: 100%;
+  max-width: var(--container-wrap);
+  margin-inline: auto;
+  padding-inline: 1.25rem;
+}
+
+.wrap-prose {
+  width: 100%;
+  max-width: var(--container-prose);
+  margin-inline: auto;
+  padding-inline: 1.25rem;
+}
+
+/* WCAG 2.5.8 (AA): mọi vùng bấm độc lập phải cao và rộng tối thiểu 24px.
+   Chữ nhỏ như nhãn chủ đề trên ảnh bìa hay link ở chân trang chỉ cao 17–20px,
+   nên phải nới VÙNG CHẠM bằng padding dọc — không đổi cỡ chữ.
+   Link nằm trong dòng văn được WCAG miễn trừ nên không áp dụng ở đây. */
+.tap {
+  display: inline-flex;
+  align-items: center;
+  min-height: 1.5rem;
+}
+
+a.eyebrow,
+a.cover-label {
+  display: inline-flex;
+  align-items: center;
+  min-height: 1.5rem;
+}
+
+/* Link "Bỏ qua điều hướng" cho người dùng bàn phím và screen reader. */
+.skip-link {
+  position: absolute;
+  left: 0.5rem;
+  top: -3rem;
+  z-index: 100;
+  padding: 0.5rem 1rem;
+  border-radius: 0.5rem;
+  background-color: var(--accent);
+  color: var(--on-accent);
+  transition: top 150ms ease;
+}
+.skip-link:focus {
+  top: 0.5rem;
+}
+
+/* ==========================================================================
+   3b. NGÔN NGỮ EDITORIAL
+   Ba thành phần lặp lại khắp site: dòng nhãn nhỏ, tiêu đề serif, thẻ có bìa.
+   ========================================================================== */
+
+/* Dòng nhãn nhỏ phía trên tiêu đề — thứ làm layout "ra chất tạp chí" nhanh nhất. */
+.eyebrow {
+  display: inline-block;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+.display {
+  font-family: var(--font-display);
+  font-weight: 700;
+  line-height: 1.08;
+  /* Playfair là kiểu chữ tương phản cao; ở cỡ lớn các nét đứng trông rời nhau
+     nên kéo khoảng cách chữ âm nhẹ cho tiêu đề chắc lại. */
+  letter-spacing: -0.02em;
+}
+
+/* Dấu tiếng Việt chồng hai tầng, cỡ chữ càng lớn thì càng dễ chạm dòng trên. */
+.display-xl {
+  font-family: var(--font-display);
+  font-weight: 700;
+  line-height: 1.12;
+  letter-spacing: -0.025em;
+}
+
+/* Ảnh bìa: luôn giữ đúng tỷ lệ để lưới không nhấp nhô khi ảnh chưa tải. */
+.cover {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  background-color: var(--surface);
+}
+
+/* Nhãn chủ đề nằm trên ảnh bìa. Lớp tối dần ở đáy ảnh (vẽ trong SVG) bảo đảm nó
+   luôn đủ tương phản, bất kể hoạ tiết bên dưới sáng hay tối. */
+.cover-label {
+  position: absolute;
+  bottom: 0.85rem;
+  left: 1.1rem;
+  font-family: var(--font-display);
+  font-size: clamp(1.05rem, 0.9rem + 0.6vw, 1.45rem);
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  line-height: 1;
+  color: oklch(100% 0 0);
+  text-shadow: 0 1px 14px oklch(0% 0 0 / 0.55);
+  transition: color 150ms ease;
+}
+
+.cover-label:hover {
+  color: oklch(92% 0.06 250);
+}
+
+.card {
+  transition:
+    transform 200ms ease,
+    border-color 200ms ease,
+    box-shadow 200ms ease;
+}
+
+.card:hover {
+  transform: translateY(-3px);
+  border-color: var(--accent);
+  box-shadow: var(--shadow-md);
+}
+
+/* Ảnh bìa phóng nhẹ khi rê chuột lên thẻ. Chỉ dùng `transform` nên trình duyệt
+   xử lý trên GPU, không phải tính lại bố cục. */
+.card .cover {
+  transition: transform 450ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+.card:hover .cover {
+  transform: scale(1.04);
+}
+
+/* Nội dung hiện dần khi cuộn tới — KHÔNG dùng JavaScript.
+   `animation-timeline: view()` để chính trình duyệt chạy animation theo vị trí
+   phần tử trong khung nhìn. Trình duyệt chưa hỗ trợ thì nội dung hiện bình
+   thường ngay từ đầu, không mất gì. */
+@supports (animation-timeline: view()) {
+  @media (prefers-reduced-motion: no-preference) {
+    .reveal {
+      animation: reveal-in linear both;
+      animation-timeline: view();
+      animation-range: entry 0% entry 55%;
+    }
+  }
+}
+
+@keyframes reveal-in {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* Thanh tiến độ đọc — KHÔNG dùng JavaScript.
+   `animation-timeline: scroll()` cho phép CSS chạy animation theo vị trí cuộn,
+   nên không cần listener scroll nào cả. Trình duyệt chưa hỗ trợ thì thanh giữ
+   nguyên `scaleX(0)`, tức là vô hình — suy giảm êm, không vỡ bố cục. */
+.reading-progress {
+  position: fixed;
+  inset-block-start: 0;
+  inset-inline-start: 0;
+  z-index: 60;
+  width: 100%;
+  height: 2px;
+  background-color: var(--accent);
+  transform: scaleX(0);
+  transform-origin: 0 50%;
+}
+
+@supports (animation-timeline: scroll()) {
+  .reading-progress {
+    animation: reading-progress linear both;
+    animation-timeline: scroll(root block);
+  }
+}
+
+@keyframes reading-progress {
+  to {
+    transform: scaleX(1);
+  }
+}
+
+/* ==========================================================================
+   4. NỘI DUNG BÀI VIẾT (.prose)
+   Viết tay thay vì dùng plugin typography để kiểm soát chính xác nhịp dọc
+   và khoảng cách dòng phù hợp với dấu thanh tiếng Việt.
+   ========================================================================== */
+
+.prose {
+  font-size: var(--text-lg);
+  line-height: 1.75;
+}
+
+.prose > * + * {
+  margin-top: 1.4em;
+}
+
+.prose h2,
+.prose h3,
+.prose h4 {
+  font-weight: 700;
+  line-height: 1.25;
+  letter-spacing: -0.015em;
+  scroll-margin-top: 5rem;
+}
+
+/* 2em, không phải 2.6em: `em` ở đây tính theo cỡ chữ của chính h2 (2rem), nên
+   2.6em ra hơn 80px — quá rộng khi đoạn phía trên chỉ có một hai dòng. */
+.prose h2 {
+  margin-top: 2em;
+  font-size: var(--text-2xl);
+}
+
+.prose h3 {
+  margin-top: 2em;
+  font-size: var(--text-xl);
+}
+
+.prose h4 {
+  margin-top: 1.8em;
+  font-size: var(--text-lg);
+}
+
+/* Neo cạnh heading: ẩn cho tới khi rê chuột hoặc focus bằng bàn phím. */
+.prose .heading-anchor {
+  /* WCAG 2.5.8: vùng bấm tối thiểu 24×24px. Cỡ chữ tiêu đề là fluid, nên trên
+     điện thoại dấu `#` co lại chỉ còn 21px ngang — đo được ở khung 390px. Khoá
+     sàn bằng `min-width` + `inline-flex` để canh giữa, không đổi cỡ chữ. */
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 24px;
+  min-height: 24px;
+  margin-left: 0.25em;
+  color: var(--muted);
+  opacity: 0;
+  text-decoration: none;
+  transition: opacity 150ms ease;
+}
+.prose h2:hover .heading-anchor,
+.prose h3:hover .heading-anchor,
+.prose h4:hover .heading-anchor,
+.prose .heading-anchor:focus-visible {
+  opacity: 1;
+}
+
+.prose a {
+  color: var(--accent);
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.2em;
+  transition: color 150ms ease;
+}
+.prose a:hover {
+  color: var(--accent-hover);
+  text-decoration-thickness: 2px;
+}
+
+.prose strong {
+  font-weight: 700;
+  color: var(--fg);
+}
+
+.prose ul,
+.prose ol {
+  padding-left: 1.5rem;
+}
+.prose ul {
+  list-style: disc;
+}
+.prose ol {
+  list-style: decimal;
+}
+.prose li::marker {
+  color: var(--muted);
+}
+.prose li + li {
+  margin-top: 0.5em;
+}
+.prose li > ul,
+.prose li > ol {
+  margin-top: 0.5em;
+}
+
+.prose blockquote {
+  padding-left: 1.25rem;
+  border-left: 3px solid var(--accent);
+  color: var(--muted);
+  font-style: italic;
+}
+
+.prose hr {
+  margin-block: 3em;
+  border: 0;
+  border-top: 1px solid var(--border);
+}
+
+.prose img {
+  border-radius: var(--radius-card);
+  border: 1px solid var(--border);
+}
+
+.prose figure figcaption {
+  margin-top: 0.75rem;
+  color: var(--muted);
+  font-size: var(--text-sm);
+  text-align: center;
+}
+
+/* Bảng: bọc trong khung cuộn ngang riêng để trang không bao giờ cuộn ngang. */
+.prose .table-scroll {
+  overflow-x: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+}
+.prose table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--text-base);
+}
+.prose th,
+.prose td {
+  padding: 0.7rem 1rem;
+  text-align: left;
+  border-bottom: 1px solid var(--border);
+}
+.prose th {
+  background-color: var(--surface);
+  font-weight: 700;
+}
+.prose tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+/* Code inline */
+.prose :not(pre) > code {
+  padding: 0.15em 0.4em;
+  border-radius: 0.35rem;
+  background-color: var(--surface);
+  border: 1px solid var(--border);
+  font-family: var(--font-mono);
+  font-size: 0.875em;
+  word-break: break-word;
+}
+
+/* ==========================================================================
+   4b. THÀNH PHẦN NỘI DUNG
+   Callout, câu trích lớn, hộp điểm chính, các bước. Đây là thứ tách một bài
+   được thiết kế khỏi một bài chỉ đổ chữ ra trang.
+
+   Mọi selector đều bắt đầu bằng `.prose` vì phải thắng specificity của các rule
+   typography ở mục 4 — không có tiền tố đó thì `.prose blockquote` sẽ ghi đè.
+   ========================================================================== */
+
+/* --- Callout --- */
+
+.prose .callout {
+  /* Bốn kiểu chỉ khác nhau ở một biến hue. Nhờ vậy thêm kiểu mới chỉ tốn một
+     dòng, và không có bốn bộ màu rời rạc phải giữ cho đồng bộ. */
+  --callout-hue: 250;
+
+  margin-top: 1.9em;
+  padding: 1rem 1.25rem 1.15rem;
+  border: 1px solid oklch(84% 0.08 var(--callout-hue));
+  border-left-width: 3px;
+  border-radius: var(--radius-card);
+  background-color: oklch(97.5% 0.022 var(--callout-hue));
+  font-size: var(--text-base);
+  line-height: 1.65;
+}
+
+.dark .prose .callout {
+  border-color: oklch(41% 0.07 var(--callout-hue));
+  background-color: oklch(24% 0.035 var(--callout-hue));
+}
+
+.prose .callout--note {
+  --callout-hue: 250;
+}
+.prose .callout--tip {
+  --callout-hue: 158;
+}
+.prose .callout--warning {
+  --callout-hue: 75;
+}
+.prose .callout--danger {
+  --callout-hue: 25;
+}
+
+.prose .callout__label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0;
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: oklch(37% 0.14 var(--callout-hue));
+}
+
+.dark .prose .callout__label {
+  color: oklch(85% 0.11 var(--callout-hue));
+}
+
+.prose .callout__body > * {
+  margin-top: 0.7em;
+}
+.prose .callout__body > *:first-child {
+  margin-top: 0.55rem;
+}
+.prose .callout__body > *:last-child {
+  margin-bottom: 0;
+}
+
+/* --- Câu trích cỡ lớn --- */
+
+.prose .pullquote {
+  position: relative;
+  margin-block: 2.5em;
+  padding: 0 0 0 3.5rem;
+}
+
+/* Trên màn hình rộng, câu trích tràn ra ngoài cột chữ. Chính cú phá khổ này tạo
+   nhịp cho bài dài — mắt có một mốc để nghỉ.
+
+   Ngưỡng 80rem (1280px), KHÔNG phải 60rem: từ 1024px trang bài đã chuyển sang
+   lưới hai cột, cột chữ nằm sát mép trái và không còn chỗ để tràn ra. Đặt ngưỡng
+   ở 60rem thì trong khoảng 960–1279px câu trích chạy ra ngoài khung nhìn.
+   Đo lại: ở 1280px cột chữ bắt đầu ở 84px, tràn 2,5rem (40px) vẫn còn thừa 44px. */
+@media (min-width: 80rem) {
+  .prose .pullquote {
+    margin-inline: -2.5rem;
+    padding-left: 6rem;
+  }
+}
+
+.prose .pullquote__mark {
+  position: absolute;
+  left: 0;
+  top: 0.3rem;
+  color: var(--accent);
+  opacity: 0.45;
+}
+
+@media (min-width: 80rem) {
+  .prose .pullquote__mark {
+    left: 2.5rem;
+  }
+}
+
+.prose .pullquote__text {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  font-family: var(--font-display);
+  font-size: clamp(1.35rem, 1.05rem + 1.3vw, 1.95rem);
+  font-style: normal;
+  line-height: 1.32;
+  letter-spacing: -0.015em;
+  color: var(--fg);
+}
+
+.prose .pullquote__text > p {
+  margin: 0;
+}
+
+/* Nhấn mạnh trong câu trích dùng MÀU, không dùng chữ nghiêng.
+   Lý do: site chỉ nạp Playfair kiểu đứng (nạp thêm kiểu nghiêng là ba file font
+   nữa). Không có face nghiêng thật, trình duyệt tự làm nghiêng giả — nét đổ
+   nghiêng đè sang chữ kế tiếp và trông như mất dấu cách. */
+.prose .pullquote__text em,
+.prose .pullquote__text i {
+  font-style: normal;
+  color: var(--accent);
+}
+
+.prose .pullquote__cite {
+  margin-top: 0.95rem;
+  font-size: var(--text-sm);
+  color: var(--muted);
+  text-align: left;
+}
+
+.prose .pullquote__cite::before {
+  content: '— ';
+}
+
+/* --- Hộp điểm chính --- */
+
+.prose .takeaways {
+  margin-top: 0;
+  margin-bottom: 2.4em;
+  padding: 1.3rem 1.45rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  background-color: var(--surface);
+}
+
+.prose .takeaways__title {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.prose .takeaways__list {
+  display: grid;
+  gap: 0.65rem;
+  margin-top: 1rem;
+  padding-left: 0;
+  list-style: none;
+}
+
+.prose .takeaways__list li {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: start;
+  gap: 0.6rem;
+  margin-top: 0;
+  font-size: var(--text-base);
+  line-height: 1.6;
+}
+
+.prose .takeaways__check {
+  margin-top: 0.3em;
+  color: var(--accent);
+}
+
+/* --- Các bước --- */
+
+.prose .steps {
+  margin-top: 1.9em;
+}
+
+.prose .steps ol {
+  counter-reset: step;
+  padding-left: 0;
+  list-style: none;
+}
+
+.prose .steps ol > li {
+  position: relative;
+  counter-increment: step;
+  margin-top: 0;
+  padding-left: 3.5rem;
+  padding-bottom: 1.5rem;
+}
+
+.prose .steps ol > li::before {
+  content: counter(step);
+  position: absolute;
+  left: 0;
+  top: -0.1em;
+  display: grid;
+  place-items: center;
+  width: 2.15rem;
+  height: 2.15rem;
+  border-radius: 999px;
+  background-color: var(--accent);
+  color: var(--on-accent);
+  font-size: 0.85rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Đường nối dọc giữa các bước — làm rõ đây là một chuỗi, không phải danh sách rời. */
+.prose .steps ol > li::after {
+  content: '';
+  position: absolute;
+  left: calc(1.075rem - 1px);
+  top: 2.35rem;
+  bottom: 0.35rem;
+  width: 2px;
+  background-color: var(--border);
+}
+
+.prose .steps ol > li:last-child {
+  padding-bottom: 0;
+}
+
+.prose .steps ol > li:last-child::after {
+  display: none;
+}
+
+/* --- Ảnh kèm chú thích --- */
+
+.prose .figure {
+  margin-top: 1.9em;
+}
+
+.prose .figure img {
+  width: 100%;
+}
+
+.prose .figure figcaption {
+  margin-top: 0.75rem;
+  font-size: var(--text-sm);
+  color: var(--muted);
+  text-align: center;
+}
+
+/* ==========================================================================
+   5. CODE BLOCK (Shiki)
+   ========================================================================== */
+
+.prose pre {
+  overflow-x: auto;
+  padding: 1.1rem 1.2rem;
+  border-radius: var(--radius-card);
+  border: 1px solid var(--border);
+  font-size: var(--text-sm);
+  line-height: 1.65;
+  tab-size: 2;
+}
+
+.prose pre code {
+  font-family: var(--font-mono);
+  background: none;
+  border: 0;
+  padding: 0;
+}
+
+/* Shiki xuất sẵn biến `--shiki-dark` cho theme thứ hai; đổi theme = đổi biến,
+   không cần chạy JS và không nhấp nháy khi tải trang. */
+.dark .astro-code,
+.dark .astro-code span {
+  color: var(--shiki-dark) !important;
+  background-color: var(--shiki-dark-bg) !important;
+  font-style: var(--shiki-dark-font-style) !important;
+  font-weight: var(--shiki-dark-font-weight) !important;
+  text-decoration: var(--shiki-dark-text-decoration) !important;
+}
+
+.code-block {
+  position: relative;
+  margin-top: 1.4em;
+}
+
+.code-block__copy {
+  position: absolute;
+  top: 0.55rem;
+  right: 0.55rem;
+  display: grid;
+  place-items: center;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 0.4rem;
+  border: 1px solid var(--border);
+  background-color: var(--bg);
+  color: var(--muted);
+  opacity: 0;
+  transition:
+    opacity 150ms ease,
+    color 150ms ease;
+}
+.code-block:hover .code-block__copy,
+.code-block__copy:focus-visible {
+  opacity: 1;
+}
+.code-block__copy:hover {
+  color: var(--fg);
+}
+.code-block__copy[data-copied='true'] {
+  color: var(--accent);
+  opacity: 1;
+}
+
+/* Trên thiết bị cảm ứng không có hover — luôn hiện nút copy. */
+@media (hover: none) {
+  .code-block__copy {
+    opacity: 1;
+  }
+}

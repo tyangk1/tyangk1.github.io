@@ -1,0 +1,157 @@
+﻿---
+import { SITE, AUTHOR } from '~/site.config';
+import { absoluteUrl, canonicalPath } from '~/utils/format';
+import '~/styles/global.css';
+
+/**
+ * Preload font.
+ *
+ * Vì sao cần: mỗi `@font-face` chỉ được tải khi trình duyệt gặp ký tự thuộc
+ * `unicode-range` của nó, tức là trong lúc tính bố cục lần đầu. Với
+ * `font-display: swap`, mỗi file tải xong lại kéo theo MỘT lần tính lại bố cục
+ * toàn trang. Chín file là chín lần — đo trên trang bài viết dài, riêng phần
+ * Style & Layout đã hơn một giây.
+ *
+ * Preload đưa các request đó lên ngay đầu, chạy song song với lúc phân tích HTML,
+ * nên font về trước khung hình đầu tiên và hết hẳn reflow (CLS về 0).
+ *
+ * `?url` để Vite trả về đường dẫn đã băm sau khi build — không hard-code tên file.
+ */
+import bvp400Latin from '@fontsource/be-vietnam-pro/files/be-vietnam-pro-latin-400-normal.woff2?url';
+import bvp400LatinExt from '@fontsource/be-vietnam-pro/files/be-vietnam-pro-latin-ext-400-normal.woff2?url';
+import bvp400Viet from '@fontsource/be-vietnam-pro/files/be-vietnam-pro-vietnamese-400-normal.woff2?url';
+import pf700Latin from '@fontsource/playfair-display/files/playfair-display-latin-700-normal.woff2?url';
+import pf700LatinExt from '@fontsource/playfair-display/files/playfair-display-latin-ext-700-normal.woff2?url';
+import pf700Viet from '@fontsource/playfair-display/files/playfair-display-vietnamese-700-normal.woff2?url';
+
+/**
+ * CHỈ preload font cần cho khung hình đầu tiên: thân bài (Be Vietnam Pro 400) và
+ * tiêu đề lớn (Playfair 700). Ba subset mỗi họ, vì tiếng Việt cần cả ba: `latin`
+ * cho ASCII, `latin-ext` cho ơ/ư, `vietnamese` cho chữ mang dấu thanh.
+ *
+ * Be Vietnam Pro 700 KHÔNG preload. Nó chỉ dùng cho chữ in đậm và các tiêu đề
+ * mục nằm dưới màn hình đầu, nên để nó tải theo thứ tự thường. Preload cả chín
+ * file làm 150KB font tranh băng thông với ảnh LCP và kéo LCP chậm lại.
+ */
+const FONT_PRELOADS = [
+  bvp400Viet,
+  bvp400Latin,
+  bvp400LatinExt,
+  pf700Viet,
+  pf700Latin,
+  pf700LatinExt,
+];
+
+interface Props {
+  title: string;
+  description?: string;
+  /** 'article' cho bài viết, 'website' cho các trang còn lại. */
+  type?: 'website' | 'article';
+  /** Đường dẫn ảnh OG. Mặc định dùng ảnh sinh sẵn cho trang chủ. */
+  ogImage?: string;
+  publishedAt?: Date;
+  updatedAt?: Date;
+  /** Chặn Google index trang này (dùng cho trang tìm kiếm, trang 404). */
+  noindex?: boolean;
+  /** Dữ liệu có cấu trúc, chèn dưới dạng JSON-LD. */
+  schema?: Record<string, unknown> | Record<string, unknown>[];
+}
+
+const {
+  title,
+  description = SITE.description,
+  type = 'website',
+  ogImage = '/og/trang-chu.png',
+  publishedAt,
+  updatedAt,
+  noindex = false,
+  schema,
+} = Astro.props;
+
+// Trang chủ dùng đúng tên site; các trang khác thêm hậu tố để hiện tốt trên tab
+// trình duyệt và trên kết quả tìm kiếm.
+const pathname = canonicalPath(Astro.url.pathname);
+const isHome = pathname === '/';
+const fullTitle = isHome ? `${SITE.title} — ${SITE.tagline}` : `${title} — ${SITE.title}`;
+
+const canonical = absoluteUrl(pathname);
+const ogImageUrl = absoluteUrl(ogImage);
+---
+
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="generator" content={Astro.generator} />
+
+<title>{fullTitle}</title>
+<meta name="description" content={description} />
+<link rel="canonical" href={canonical} />
+{noindex && <meta name="robots" content="noindex, follow" />}
+
+{/* Open Graph */}
+<meta property="og:type" content={type} />
+<meta property="og:site_name" content={SITE.title} />
+<meta property="og:locale" content="vi_VN" />
+<meta property="og:title" content={isHome ? SITE.title : title} />
+<meta property="og:description" content={description} />
+<meta property="og:url" content={canonical} />
+<meta property="og:image" content={ogImageUrl} />
+<meta property="og:image:width" content="1200" />
+<meta property="og:image:height" content="630" />
+<meta property="og:image:alt" content={title} />
+{publishedAt && <meta property="article:published_time" content={publishedAt.toISOString()} />}
+{updatedAt && <meta property="article:modified_time" content={updatedAt.toISOString()} />}
+
+{/* Twitter / X */}
+<meta name="twitter:card" content="summary_large_image" />
+<meta name="twitter:title" content={isHome ? SITE.title : title} />
+<meta name="twitter:description" content={description} />
+<meta name="twitter:image" content={ogImageUrl} />
+{AUTHOR.twitterHandle && <meta name="twitter:creator" content={AUTHOR.twitterHandle} />}
+
+{
+  FONT_PRELOADS.map((href) => (
+    <link rel="preload" href={href} as="font" type="font/woff2" crossorigin="anonymous" />
+  ))
+}
+
+{/* Icon & feed */}
+<link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+<link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+<link rel="manifest" href="/site.webmanifest" />
+<link rel="sitemap" href="/sitemap-index.xml" />
+<link
+  rel="alternate"
+  type="application/rss+xml"
+  title={`RSS — ${SITE.title}`}
+  href={absoluteUrl('/rss.xml')}
+/>
+
+<meta name="theme-color" content="#fcfcfd" media="(prefers-color-scheme: light)" />
+<meta name="theme-color" content="#16181c" media="(prefers-color-scheme: dark)" />
+
+{
+  schema && (
+    <script type="application/ld+json" is:inline set:html={JSON.stringify(schema, null, 0)} />
+  )
+}
+
+{
+  /*
+  Script chống nháy: phải chạy ĐỒNG BỘ trong head, trước khi trình duyệt vẽ
+  khung hình đầu tiên. Nếu để xuống cuối body hoặc dùng defer thì người dùng
+  chọn dark mode sẽ thấy một khung trắng loé lên mỗi lần tải trang.
+*/
+}
+<script is:inline>
+  (() => {
+    try {
+      const stored = localStorage.getItem('theme');
+      const isDark = stored
+        ? stored === 'dark'
+        : window.matchMedia('(prefers-color-scheme: dark)').matches;
+      document.documentElement.classList.toggle('dark', isDark);
+    } catch {
+      /* localStorage bị chặn (chế độ riêng tư) — cứ dùng mặc định của hệ thống. */
+    }
+  })();
+</script>

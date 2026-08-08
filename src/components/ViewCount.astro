@@ -1,0 +1,111 @@
+---
+import { ENV, luotXemBat } from '~/env';
+import Icon from '~/components/Icon.astro';
+
+/**
+ * Số lượt xem của một bài, lấy trực tiếp từ database phía trình duyệt.
+ *
+ * Vì sao không lấy lúc build: số lúc build là số của lần deploy trước, có thể cũ
+ * hàng tuần. Người đọc nhìn "12 lượt" trên bài thực ra đã có 3.000 lượt thì tệ
+ * hơn là không hiện gì.
+ *
+ * Site vẫn tĩnh 100%: đây là một `fetch` chạy SAU khi trang đã vẽ xong, không
+ * chặn render và không ảnh hưởng LCP. Chưa cấu hình khoá công khai thì component
+ * không render gì cả.
+ */
+interface Props {
+  slug: string;
+}
+
+const { slug } = Astro.props;
+---
+
+{
+  luotXemBat && (
+    <span
+      class="inline-flex items-center gap-1.5"
+      data-luot-xem={slug}
+      data-supabase-url={ENV.publicSupabaseUrl}
+      data-supabase-key={ENV.publicSupabaseAnonKey}
+      hidden
+    >
+      <Icon name="eye" size={14} />
+      <span data-luot-xem-so>—</span>
+      <span>lượt đọc</span>
+    </span>
+  )
+}
+
+<script>
+  const el = document.querySelector<HTMLElement>('[data-luot-xem]');
+
+  if (el) {
+    const slug = el.dataset['luotXem'] ?? '';
+    const url = el.dataset['supabaseUrl'] ?? '';
+    const key = el.dataset['supabaseKey'] ?? '';
+    const so = el.querySelector<HTMLElement>('[data-luot-xem-so]');
+
+    // Chỉ cộng một lần cho mỗi tab. Tải lại trang không làm số nhảy thêm —
+    // không chống được bot, nhưng chặn được cái sai thường gặp nhất là chính
+    // tác giả F5 hai chục lần.
+    const khoa = `da-xem:${slug}`;
+    const daXemTrongTab = (() => {
+      try {
+        return sessionStorage.getItem(khoa) === '1';
+      } catch {
+        return false;
+      }
+    })();
+
+    const chung = { apikey: key, Authorization: `Bearer ${key}` };
+
+    async function layVaHien() {
+      // Chưa xem trong tab này thì gọi hàm cộng (nó trả về tổng mới).
+      // Đã xem rồi thì chỉ đọc số hiện tại.
+      const res = daXemTrongTab
+        ? await fetch(
+            `${url}/rest/v1/post_views?select=views&slug=eq.${encodeURIComponent(slug)}`,
+            {
+              headers: chung,
+            },
+          )
+        : await fetch(`${url}/rest/v1/rpc/tang_luot_xem`, {
+            method: 'POST',
+            headers: { ...chung, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ bai_slug: slug }),
+          });
+
+      if (!res.ok) return null;
+
+      const data: unknown = await res.json();
+      if (typeof data === 'number') return data;
+      if (Array.isArray(data) && data[0] && typeof data[0] === 'object') {
+        const row = data[0] as { views?: number };
+        return typeof row.views === 'number' ? row.views : null;
+      }
+      return null;
+    }
+
+    void (async () => {
+      try {
+        const tong = await layVaHien();
+
+        // Bài mới chưa ai đọc thì để ẩn — "1 lượt đọc" trông tệ hơn là không có gì.
+        if (tong === null || tong < 5) return;
+
+        if (so) so.textContent = new Intl.NumberFormat('vi-VN').format(tong);
+        el.hidden = false;
+
+        if (!daXemTrongTab) {
+          try {
+            sessionStorage.setItem(khoa, '1');
+          } catch {
+            /* chế độ riêng tư chặn sessionStorage — chỉ mất phần chống F5 */
+          }
+        }
+      } catch {
+        // Mạng lỗi hoặc database không với tới được: cứ để ẩn, không làm gì cả.
+      }
+    })();
+  }
+</script>

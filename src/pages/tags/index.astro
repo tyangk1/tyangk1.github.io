@@ -1,0 +1,109 @@
+---
+import { getPublishedPosts, collectTags, postsByTag } from '~/utils/posts';
+import { formatDate, toISODate } from '~/utils/format';
+import { postHref, tagHref } from '~/lib/routes';
+import { hueForTag } from '~/lib/cover-image';
+import BaseLayout from '~/layouts/BaseLayout.astro';
+import TagPill from '~/components/TagPill.astro';
+
+const posts = await getPublishedPosts();
+const tags = collectTags(posts);
+
+/**
+ * Trang này trước đây chỉ có một hàng thẻ tròn rồi hết — người đọc phải đoán
+ * đằng sau mỗi chủ đề là gì trước khi dám bấm. Giờ mỗi chủ đề là một khối có
+ * kèm vài tiêu đề mới nhất, nên bấm là vì đã thấy nội dung, không phải vì tò mò.
+ */
+const SO_BAI_XEM_TRUOC = 3;
+
+const nhomChuDe = tags.map((tag) => ({
+  ...tag,
+  hue: hueForTag(tag.name),
+  baiMoi: postsByTag(posts, tag.slug).slice(0, SO_BAI_XEM_TRUOC),
+}));
+---
+
+<BaseLayout
+  title="Chủ đề"
+  description="Toàn bộ chủ đề đã viết trên blog, kèm số bài và vài tiêu đề mới nhất của từng chủ đề. Bấm vào một chủ đề để xem danh sách đầy đủ các bài thuộc chủ đề đó."
+>
+  <div class="wrap py-12">
+    <p class="eyebrow">Mục lục chủ đề</p>
+    <h1 class="display-xl mt-3 text-4xl">Chủ đề</h1>
+    <p class="mt-4 max-w-2xl text-lg text-muted">
+      {tags.length} chủ đề trên {posts.length} bài viết. Mỗi khối bên dưới cho xem trước những bài mới
+      nhất của chủ đề đó.
+    </p>
+
+    {/* Hàng thẻ tròn vẫn giữ, nhưng đổi vai: nó là thanh nhảy nhanh xuống dưới. */}
+    <ul class="mt-7 flex flex-wrap gap-2">
+      {
+        tags.map((tag) => (
+          <li>
+            <TagPill name={tag.name} count={tag.count} />
+          </li>
+        ))
+      }
+    </ul>
+  </div>
+
+  <div class="wrap border-t border-border py-12">
+    <div class="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+      {
+        nhomChuDe.map((tag) => (
+          <section
+            class="card reveal flex h-full flex-col rounded-card border border-border bg-bg p-5"
+            aria-labelledby={`chu-de-${tag.slug}`}
+          >
+            {/* Vạch màu trên đỉnh khối dùng đúng hue của ảnh bìa các bài trong
+                chủ đề, nên nhìn là nhận ra ngay cùng một họ. */}
+            <span
+              class="-mx-5 -mt-5 mb-5 h-1 rounded-t-card"
+              style={`background-color: hsl(${tag.hue} 64% 52%)`}
+              aria-hidden="true"
+            />
+
+            <div class="flex items-baseline justify-between gap-3">
+              <h2 id={`chu-de-${tag.slug}`} class="display text-xl">
+                <a href={tagHref(tag.slug)} class="transition-colors hover:text-accent">
+                  {tag.name}
+                </a>
+              </h2>
+              <span class="shrink-0 text-xs text-muted tabular-nums">{tag.count} bài</span>
+            </div>
+
+            <ul class="mt-4 flex-1 space-y-3 border-t border-border pt-4">
+              {tag.baiMoi.map((post) => (
+                <li class="text-sm">
+                  {/* `.tap` giữ chiều cao vùng bấm ≥ 24px (WCAG 2.5.8) — dòng
+                      tiêu đề một hàng chỉ cao 18px nếu để mặc định. */}
+                  <a
+                    href={postHref(post.id)}
+                    class="tap font-medium transition-colors hover:text-accent"
+                  >
+                    {post.data.title}
+                  </a>
+                  <time
+                    datetime={toISODate(post.data.publishedAt)}
+                    class="mt-0.5 block text-xs text-muted"
+                  >
+                    {formatDate(post.data.publishedAt)}
+                  </time>
+                </li>
+              ))}
+            </ul>
+
+            {tag.count > SO_BAI_XEM_TRUOC && (
+              <a
+                href={tagHref(tag.slug)}
+                class="tap mt-4 inline-block py-1 text-sm text-accent transition-colors hover:text-accent-hover"
+              >
+                Xem cả {tag.count} bài →
+              </a>
+            )}
+          </section>
+        ))
+      }
+    </div>
+  </div>
+</BaseLayout>
