@@ -565,6 +565,36 @@ lấy trung vị:
 
 Core Web Vitals (mobile): LCP 1,9–2,1s · TBT 0–8ms · **CLS 0** ở cả ba trang.
 
+#### Nếu Lighthouse báo CLS ≈ 0,30 trên site đã deploy — đó là artifact
+
+Đo trên <https://tyangk1.github.io> cho ra hai kết quả trái ngược nhau, và đã
+truy tới cùng:
+
+| Cách đo                                                     | Perf  | CLS       |
+| ----------------------------------------------------------- | ----- | --------- |
+| Lighthouse mobile, **có** screen emulation (mặc định)       | 71–83 | **0,301** |
+| Lighthouse mobile, **tắt** screen emulation                 | 100   | 0,034     |
+| Lighthouse desktop preset                                   | 100   | 0,0045    |
+| Chrome thật, đúng 412×823 DPR 1,75, 4G + CPU ×4, cache lạnh | —     | **0**     |
+
+Thủ phạm là bước **resize viewport khi Lighthouse emulate mobile**, không phải
+trang. Bằng chứng: `layout-shift-elements` trả selector **rỗng** (Lighthouse
+không gán được cú dịch cho phần tử nào), giá trị lặp lại y hệt
+`0.3010101055563954` ở hai trang khác nhau, và PerformanceObserver trong Chrome
+thật không ghi nhận **một entry layout-shift nào** — kể cả khi cuộn hết trang,
+kể cả với `Network.setCacheDisabled`.
+
+Nguyên nhân gần nhất: `.reveal` và thanh tiến độ đọc dùng CSS scroll-driven
+animation (`animation-timeline: view()` / `scroll(root)`). Resize viewport giữa
+lúc tải làm các timeline đó được tính lại.
+
+**Không sửa.** Người đọc thật đo được 0; hạ chất lượng site để làm đẹp một con số
+tổng hợp là đi ngược hướng. Core Web Vitals của Chrome UX Report lấy từ người
+dùng thật, nên nó sẽ khớp với cột cuối bảng trên.
+
+Muốn đo lại cho đúng: `--preset=desktop`, hoặc `--screenEmulation.disabled` kèm
+`--chrome-flags="--window-size=412,823"`.
+
 ### Responsive — đã đo, không phải đoán
 
 Quét bằng script Playwright: **452 phép đo** trên 11 trang.
