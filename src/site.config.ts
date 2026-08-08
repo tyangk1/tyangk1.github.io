@@ -6,11 +6,16 @@
  */
 
 export const SITE = {
-  /** URL production. BẮT BUỘC đổi trước khi deploy — dùng cho canonical, sitemap, RSS, ảnh OG. */
-  url: 'https://tenban.com',
+  /**
+   * URL production. Dùng cho canonical, sitemap, RSS và ảnh OG.
+   *
+   * Đang trỏ tới GitHub Pages của repo `tyangk1.github.io`. Mua tên miền riêng
+   * thì đổi đúng một dòng này, rồi thêm file `public/CNAME` chứa tên miền đó.
+   */
+  url: 'https://tyangk1.github.io',
 
   /** Tên hiển thị trên header và thẻ title. */
-  title: 'Tên Của Bạn',
+  title: 'Thân Trọng Trường Giang',
 
   /** Câu định vị ngắn, hiện ở hero trang chủ và thẻ meta mặc định. */
   tagline: 'Kỹ sư phần mềm. Viết về code, hệ thống và cách làm việc hiệu quả.',
@@ -36,22 +41,31 @@ export const SITE = {
 } as const;
 
 export const AUTHOR = {
-  name: 'Tên Của Bạn',
-  /** 1–2 câu, hiện ở cuối mỗi bài viết. */
+  name: 'Thân Trọng Trường Giang',
+  /** 1–2 câu, hiện ở cuối mỗi bài viết. CÒN LÀ CHỮ MẪU — sửa lại cho đúng. */
   bio: 'Tôi là kỹ sư phần mềm ở TP.HCM, làm việc chủ yếu với TypeScript và hạ tầng web. Ở đây tôi viết lại những thứ mình phải tự mò ra.',
   /** Ảnh đại diện đặt trong `src/assets/`, hoặc để null nếu chưa có. */
   avatar: null as string | null,
-  email: 'xinchao@tenban.com',
+  /**
+   * Để rỗng thì email bị bỏ khỏi RSS và khỏi khối dữ liệu Person — site vẫn hợp
+   * lệ. Cố tình không điền sẵn: site này public, đăng địa chỉ email lên đó là
+   * mời spam bot, nên đây phải là quyết định của chủ blog chứ không phải mặc định.
+   */
+  email: '',
   /** Dùng cho thẻ Twitter Card, bỏ trống nếu không có. */
   twitterHandle: '',
 } as const;
 
-/** Liên kết mạng xã hội. Xoá dòng nào không dùng — footer tự ẩn. */
+/**
+ * Liên kết mạng xã hội. Xoá dòng nào không dùng — footer tự ẩn.
+ *
+ * Chỉ còn GitHub vì đó là link duy nhất xác minh được. Ba dòng mẫu trước đây
+ * (x.com/tenban, linkedin.com/in/tenban, mailto:xinchao@tenban.com) đều trỏ vào
+ * hư không — trên một site đã công khai thì đó là ba link gãy thật, không phải
+ * chỗ trống chờ điền. Có tài khoản thật thì thêm lại theo đúng mẫu dưới.
+ */
 export const SOCIALS = [
-  { label: 'GitHub', href: 'https://github.com/tenban', icon: 'github' },
-  { label: 'X', href: 'https://x.com/tenban', icon: 'x' },
-  { label: 'LinkedIn', href: 'https://linkedin.com/in/tenban', icon: 'linkedin' },
-  { label: 'Email', href: 'mailto:xinchao@tenban.com', icon: 'mail' },
+  { label: 'GitHub', href: 'https://github.com/tyangk1', icon: 'github' },
 ] as const;
 
 /** Menu điều hướng chính. */

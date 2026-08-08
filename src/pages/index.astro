@@ -47,7 +47,10 @@ const schema = {
   name: AUTHOR.name,
   description: AUTHOR.bio,
   url: SITE.url,
-  email: AUTHOR.email,
+  // Bỏ hẳn khoá `email` khi chưa điền. Để `email: ''` thì khối dữ liệu có một
+  // trường rỗng — Google đọc được nhưng đó là dữ liệu rác, và rss.xml.ts đã theo
+  // đúng quy ước "rỗng thì bỏ" nên chỗ này phải giống.
+  ...(AUTHOR.email ? { email: AUTHOR.email } : {}),
   sameAs: SOCIALS.filter((s) => !s.href.startsWith('mailto:')).map((s) => s.href),
 };
 ---

@@ -1,0 +1,76 @@
+name: Deploy
+
+# Chỉ deploy khi CI đã xanh.
+#
+# `workflow_run` thay vì gộp deploy vào chính workflow CI: gộp thì mỗi pull
+# request cũng chạy qua các bước deploy (dù bị `if` chặn lại), còn tách ra thì
+# quan hệ rõ ràng — CI xanh trên main mới có deploy, ngoài ra thì không.
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+  # Cho phép bấm chạy tay, tiện khi cần deploy lại mà không sửa gì.
+  workflow_dispatch:
+
+# Quyền tối thiểu để publish lên Pages. `id-token` là bắt buộc:
+# actions/deploy-pages xác thực với Pages bằng OIDC, không dùng token cá nhân.
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Không cho hai lần deploy chồng nhau. `cancel-in-progress: false` vì huỷ giữa
+# lúc đang publish có thể để Pages ở trạng thái nửa vời.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    # Bỏ qua khi CI đỏ. Không có dòng này thì `workflow_run` vẫn nổ khi CI thất
+    # bại, và site hỏng vẫn được đẩy lên.
+    if: github.event.workflow_run.conclusion == 'success' || github.event_name == 'workflow_dispatch'
+
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+
+    steps:
+      # Build lại từ đầu chứ không tải artifact của CI.
+      #
+      # Cân nhắc ở đây: tải artifact thì nhanh hơn ~1 phút, nhưng `workflow_run`
+      # chạy trong ngữ cảnh khác nên phải gọi API để tìm artifact đúng lần chạy —
+      # thêm một chỗ có thể sai âm thầm và đẩy lên bản build của commit cũ. Build
+      # lại mất một phút và không bao giờ đẩy sai commit.
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.ref }}
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Cài dependency
+        run: pnpm install --frozen-lockfile
+
+      # `build:ci`, không phải `build` — xem chú thích trong ci.yml.
+      - name: Build
+        run: pnpm build:ci
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v4
+        with:
+          path: dist
+
+      - id: deploy
+        uses: actions/deploy-pages@v4
