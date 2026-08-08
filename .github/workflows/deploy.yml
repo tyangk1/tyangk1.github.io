@@ -63,7 +63,27 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       # `build:ci`, không phải `build` — xem chú thích trong ci.yml.
+      #
+      # Các biến PUBLIC_* được đọc lúc BUILD (import.meta.env trong src/env.ts),
+      # không phải lúc chạy. `.env` thì nằm trong .gitignore, nên nếu không truyền
+      # ở đây thì bản deploy sẽ thiếu hết và ba tính năng tự tắt ÂM THẦM: bình
+      # luận, đếm lượt xem, newsletter. Site vẫn xanh, vẫn build, chỉ là mất tính
+      # năng mà không có lỗi nào để lần ra.
+      #
+      # Dùng `vars` chứ không phải `secrets`: đây là giá trị công khai, giscus in
+      # thẳng chúng vào HTML. Đặt vào secrets chỉ tạo cảm giác an toàn giả, và
+      # GitHub sẽ che chúng trong log làm việc debug khó hơn.
       - name: Build
+        env:
+          PUBLIC_GISCUS_REPO: ${{ vars.PUBLIC_GISCUS_REPO }}
+          PUBLIC_GISCUS_REPO_ID: ${{ vars.PUBLIC_GISCUS_REPO_ID }}
+          PUBLIC_GISCUS_CATEGORY: ${{ vars.PUBLIC_GISCUS_CATEGORY }}
+          PUBLIC_GISCUS_CATEGORY_ID: ${{ vars.PUBLIC_GISCUS_CATEGORY_ID }}
+          PUBLIC_SUPABASE_URL: ${{ vars.PUBLIC_SUPABASE_URL }}
+          PUBLIC_SUPABASE_ANON_KEY: ${{ vars.PUBLIC_SUPABASE_ANON_KEY }}
+          PUBLIC_UMAMI_SRC: ${{ vars.PUBLIC_UMAMI_SRC }}
+          PUBLIC_UMAMI_WEBSITE_ID: ${{ vars.PUBLIC_UMAMI_WEBSITE_ID }}
+          PUBLIC_NEWSLETTER_ACTION: ${{ vars.PUBLIC_NEWSLETTER_ACTION }}
         run: pnpm build:ci
 
       - uses: actions/configure-pages@v5

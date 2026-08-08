@@ -47,7 +47,22 @@ jobs:
       # tới; đặt `pnpm build` ở đây thì CI đỏ vĩnh viễn.
       #
       # Nội dung đã được commit (xem .gitignore), nên CI build thẳng từ file.
+      #
+      # Truyền y hệt bộ biến của deploy.yml. Không phải để CI cần chúng, mà để CI
+      # build ĐÚNG thứ mà deploy sẽ build: thiếu ở đây thì check:html chạy trên một
+      # bản HTML khác với bản lên production, và những lỗi chỉ xuất hiện khi bật
+      # giscus hoặc newsletter sẽ lọt qua CI rồi mới vỡ ở site thật.
       - name: Build
+        env:
+          PUBLIC_GISCUS_REPO: ${{ vars.PUBLIC_GISCUS_REPO }}
+          PUBLIC_GISCUS_REPO_ID: ${{ vars.PUBLIC_GISCUS_REPO_ID }}
+          PUBLIC_GISCUS_CATEGORY: ${{ vars.PUBLIC_GISCUS_CATEGORY }}
+          PUBLIC_GISCUS_CATEGORY_ID: ${{ vars.PUBLIC_GISCUS_CATEGORY_ID }}
+          PUBLIC_SUPABASE_URL: ${{ vars.PUBLIC_SUPABASE_URL }}
+          PUBLIC_SUPABASE_ANON_KEY: ${{ vars.PUBLIC_SUPABASE_ANON_KEY }}
+          PUBLIC_UMAMI_SRC: ${{ vars.PUBLIC_UMAMI_SRC }}
+          PUBLIC_UMAMI_WEBSITE_ID: ${{ vars.PUBLIC_UMAMI_WEBSITE_ID }}
+          PUBLIC_NEWSLETTER_ACTION: ${{ vars.PUBLIC_NEWSLETTER_ACTION }}
         run: pnpm build:ci
 
       - name: Kiểm frontmatter mọi bài viết

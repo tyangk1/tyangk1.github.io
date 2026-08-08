@@ -34,9 +34,10 @@ pnpm db:push        # CHẠY MỘT LẦN: nạp nội dung mẫu vào database
 pnpm dev            # http://localhost:4321
 ```
 
-Nội dung nằm trong **database**, không phải trong git — xem phần
-[Database](#database--nơi-nội-dung-thật-sự-nằm). Chưa cấu hình database thì
-`pnpm dev` vẫn chạy, chỉ in cảnh báo và dùng nội dung đang có trong `src/content/`.
+Nội dung được **soạn trong database** rồi `pnpm sync` ra file MDX, và **file đó
+được commit** — xem phần [Database](#database--nơi-nội-dung-thật-sự-nằm). Chưa
+cấu hình database thì `pnpm dev` vẫn chạy, chỉ in cảnh báo và dùng nội dung đang
+có trong `src/content/`.
 
 Ở chế độ dev bạn sẽ thấy cả bài `draft: true` — ở production chúng bị loại hoàn toàn.
 
@@ -59,10 +60,12 @@ pnpm build && pnpm preview
 | `pnpm db:reset`       | Dựng lại database từ migration (xoá sạch dữ liệu)                       |
 | `pnpm db:subscribers` | Xem danh sách đăng ký newsletter (`--csv` để xuất file)                 |
 | `pnpm giscus:setup`   | Lấy tự động 4 giá trị cấu hình giscus: `pnpm giscus:setup owner/repo`   |
+| `pnpm format:check`   | Prettier ở chế độ chỉ kiểm — CI chạy lệnh này, đỏ là chặn merge         |
 | `pnpm sync`           | Database → file, chỉ bài đã đăng                                        |
 | `pnpm sync:drafts`    | Database → file, kể cả bài nháp                                         |
 | `pnpm dev`            | `sync:drafts` rồi chạy máy chủ dev                                      |
-| `pnpm build`          | `sync` → `astro build` → dựng chỉ mục Pagefind                          |
+| `pnpm build`          | `sync` → `astro build` → Pagefind. **Vỡ nếu không nối được database**   |
+| `pnpm build:ci`       | Như trên nhưng **bỏ** bước `sync` — dùng trong CI, build thẳng từ file  |
 | `pnpm preview`        | Phục vụ `dist/` — **luôn đo hiệu năng trên bản này**, không đo trên dev |
 | `pnpm typecheck`      | `astro check` — phải sạch 0 lỗi, 0 cảnh báo                             |
 | `pnpm check:content`  | Kiểm độ dài `title`/`description` của mọi bài cùng lúc                  |
@@ -80,8 +83,8 @@ Gần như mọi thứ nằm trong **một file**: `src/site.config.ts`.
 
 ```ts
 export const SITE = {
-  url: 'https://tenban.com',   // ĐỔI TRƯỚC KHI DEPLOY — dùng cho canonical, sitemap, RSS, ảnh OG
-  title: 'Tên Của Bạn',
+  url: 'https://tyangk1.github.io', // dùng cho canonical, sitemap, RSS, ảnh OG
+  title: 'Thân Trọng Trường Giang',
   tagline: '...',
   description: '...',          // 120–160 ký tự
 };
@@ -166,9 +169,15 @@ Nếu đổi font, nhớ chép file `.woff` tương ứng vào `src/assets/fonts
 
 ## Database — nơi nội dung thật sự nằm
 
-Bài viết và dự án nằm trong **Supabase (Postgres)**. Đó là nguồn sự thật duy nhất.
-Các file trong `src/content/` là bản sao tạm do `pnpm sync` sinh ra và đã bị
-gitignore — sửa chúng là vô nghĩa, lần sync sau sẽ ghi đè.
+Bài viết và dự án được **soạn** trong **Supabase (Postgres)**. Đó là nguồn sự thật
+lúc soạn: sửa file trong `src/content/` bằng tay là vô nghĩa, lần `pnpm sync` sau
+sẽ ghi đè.
+
+Nhưng những file đó **được commit**, không gitignore. Lý do: database chạy cục bộ
+nên CI và máy build không với tới được; checkout mới mà không có file nội dung thì
+`db-sync.mjs` thoát mã 1 và build vỡ mọi lần. Quan hệ giống `pnpm-lock.yaml` —
+sinh bằng máy nhưng vẫn commit để build ở đâu cũng ra một kết quả. Xem mục
+[Deploy](#deploy).
 
 ### Luồng hoạt động
 
@@ -286,12 +295,52 @@ Supabase Edge Function hoặc dùng Umami làm con số chính thức.
 Chạy một lệnh, nó in ra đúng bốn dòng để dán vào `.env`:
 
 ```bash
-pnpm giscus:setup tenban/blog
+pnpm giscus:setup tyangk1/tyangk1.github.io
 ```
 
 Repo phải đủ ba điều kiện: **public**, đã bật **Discussions**
 (Settings → Features), và đã cài app [giscus](https://github.com/apps/giscus).
 Thiếu cái nào script cũng nói rõ và chỉ đúng chỗ bật.
+
+#### Trạng thái hiện tại: còn thiếu đúng một bước
+
+Repo `tyangk1/tyangk1.github.io` đã **public** ✓ và đã bật **Discussions** ✓.
+Còn thiếu: **cài app giscus**. Việc đó cần chính chủ tài khoản bấm đồng ý trên
+GitHub, personal access token không làm thay được.
+
+Bốn giá trị đã tra sẵn (lấy qua GraphQL của GitHub, không cần app):
+
+```
+PUBLIC_GISCUS_REPO=tyangk1/tyangk1.github.io
+PUBLIC_GISCUS_REPO_ID=R_kgDOTyd65w
+PUBLIC_GISCUS_CATEGORY=Announcements
+PUBLIC_GISCUS_CATEGORY_ID=DIC_kwDOTyd6584DC80O
+```
+
+Chúng đang bị **comment trong `.env` có chủ ý**. Đã thử ở máy: bật bốn giá trị
+này khi app chưa cài thì mỗi trang bài hiện một hộp lỗi
+`giscus is not installed on this repository` — tệ hơn hẳn so với không có khối
+bình luận, vì `commentsEnabled` để trống thì khối tự ẩn sạch sẽ.
+
+**Bật bình luận** — sau khi cài app tại <https://github.com/apps/giscus> (chọn
+repo `tyangk1.github.io`), làm hai việc:
+
+1. Bỏ dấu `#` ở bốn dòng giscus trong `.env` (cho bản chạy ở máy).
+2. Đặt cùng bốn giá trị đó thành **Actions variables** cho bản deploy:
+
+```bash
+gh variable set PUBLIC_GISCUS_REPO        -b tyangk1/tyangk1.github.io
+gh variable set PUBLIC_GISCUS_REPO_ID     -b R_kgDOTyd65w
+gh variable set PUBLIC_GISCUS_CATEGORY    -b Announcements
+gh variable set PUBLIC_GISCUS_CATEGORY_ID -b DIC_kwDOTyd6584DC80O
+gh workflow run Deploy
+```
+
+Vì sao phải làm bước 2: `src/env.ts` đọc `import.meta.env` lúc **build**, và
+`.env` nằm trong `.gitignore` — nên bản build trên CI không thấy `.env` của máy
+bạn. Thiếu bước này thì bình luận chạy ở máy mà **im lặng tắt** trên site thật.
+Dùng `variables` chứ không phải `secrets`: đây là giá trị công khai, giscus in
+thẳng chúng vào HTML.
 
 Script tự chọn category **Announcements** nếu có — chỉ chủ repo mở được thread
 mới ở đó, nên khách không tạo được discussion rác.
@@ -410,29 +459,87 @@ Chép `.env.example` thành `.env`. Thiếu biến nào thì tính năng đó t�
 
 ## Deploy
 
-### Cloudflare Pages (khuyến nghị — băng thông không giới hạn)
+**Đang chạy: GitHub Pages** — <https://tyangk1.github.io>
 
-1. Push code lên GitHub.
-2. Cloudflare Dashboard → Workers & Pages → Create → Pages → kết nối repo.
-3. Build command: `pnpm build` · Output directory: `dist`
-4. Thêm biến môi trường (nếu dùng) trong Settings → Environment variables.
-5. Custom domain → trỏ về tên miền của bạn.
+Tự động, không cần bấm gì: push lên `main` → CI chạy → CI xanh thì Deploy chạy →
+site cập nhật. Khoảng 1–2 phút.
 
-File `public/_headers` đã cấu hình sẵn cache và header bảo mật.
+### Hai workflow, và vì sao tách ra
 
-### Vercel
+| File                           | Khi nào chạy                        | Làm gì                                                                     |
+| ------------------------------ | ----------------------------------- | -------------------------------------------------------------------------- |
+| `.github/workflows/ci.yml`     | mọi push và pull request lên `main` | `format:check` → `typecheck` → `build:ci` → `check:content` → `check:html` |
+| `.github/workflows/deploy.yml` | sau khi CI **xanh** trên `main`     | build lại rồi publish lên Pages bằng OIDC                                  |
 
-Import repo, Vercel tự nhận Astro. `vercel.json` đã có sẵn cấu hình cache.
+Tách ra chứ không gộp: gộp thì mỗi pull request cũng đi qua các bước deploy (dù
+bị `if` chặn), còn tách thì quan hệ rõ ràng — CI xanh trên `main` mới có deploy.
+
+`deploy.yml` **build lại từ đầu** thay vì tải artifact của CI. Tải artifact
+nhanh hơn khoảng một phút, nhưng `workflow_run` chạy ở ngữ cảnh khác nên phải gọi
+API tìm artifact của đúng lần chạy — thêm một chỗ sai âm thầm và đẩy lên bản build
+của commit cũ. Build lại thì không bao giờ đẩy sai commit.
+
+### `build:ci`, không phải `build`
+
+`pnpm build` chạy `db-sync` trước và **cố tình vỡ** khi không nối được database.
+Đúng cho máy người viết: deploy âm thầm bằng nội dung cũ là loại lỗi tệ nhất.
+
+Nhưng database chạy cục bộ (`127.0.0.1:55321`) nên CI không bao giờ với tới. Đặt
+`pnpm build` trong CI thì CI **đỏ vĩnh viễn**. Vì vậy nội dung sinh từ `pnpm sync`
+được **commit** (xem `.gitignore`), và CI dùng `build:ci` — bỏ bước sync, build
+thẳng từ file.
+
+Quan hệ giống `pnpm-lock.yaml`: sinh bằng máy nhưng vẫn commit, để build ở đâu
+cũng cho ra đúng một kết quả. Database vẫn là nguồn sự thật lúc **soạn**.
+
+### Quy trình đăng bài
+
+```bash
+pnpm db:start                 # bật Supabase cục bộ
+# sửa nội dung trong Supabase Studio
+pnpm sync                     # DB → src/content/**
+git add -A && git commit -m "Bài mới: ..." && git push
+```
+
+Bước `pnpm sync` + commit là bắt buộc. Quên thì site vẫn deploy nhưng bằng nội
+dung của lần commit trước — đó là cái giá của việc commit file sinh tự động.
+Kiểm nhanh trước khi push: `git status --short src/content/`.
+
+### Ba tính năng đang TẮT trên site thật
+
+Không phải lỗi — chúng phụ thuộc thứ chưa có:
+
+| Tính năng    | Vì sao tắt                                                                                 |
+| ------------ | ------------------------------------------------------------------------------------------ |
+| Bình luận    | App giscus chưa cài. Xem mục [Bình luận (giscus)](#bình-luận-giscus) — còn đúng một bước   |
+| Đếm lượt xem | Cần Supabase mà **trình duyệt khách** gọi được. `127.0.0.1:55321` chỉ tồn tại trên máy bạn |
+| Newsletter   | Cũng vậy — và phần **gửi** thư vẫn cần một nhà cung cấp (Resend/Buttondown)                |
+
+Hai cái sau cần một project Supabase **hosted** (bậc free đủ dùng). Có rồi thì
+đặt `PUBLIC_SUPABASE_URL` + `PUBLIC_SUPABASE_ANON_KEY` thành Actions variables —
+`ci.yml` và `deploy.yml` đã sẵn sàng đọc chúng.
+
+### Đổi sang tên miền riêng
+
+1. Sửa `SITE.url` trong `src/site.config.ts`.
+2. Thêm file `public/CNAME` chứa đúng tên miền, một dòng.
+3. Trỏ DNS theo [hướng dẫn của GitHub Pages](https://docs.github.com/pages/configuring-a-custom-domain-for-your-github-pages-site).
+
+### Muốn đổi sang Cloudflare Pages hoặc Vercel
+
+`public/_headers` (Cloudflare) và `vercel.json` đã có sẵn cấu hình cache. Import
+repo, đặt build command là `pnpm build:ci`, output là `dist`. Cloudflare cho băng
+thông không giới hạn, đáng đổi nếu site đông.
 
 ### Sau khi deploy — làm ngay
 
-1. Sửa `SITE.url` trong `src/site.config.ts` thành domain thật rồi build lại.
-2. Thêm site vào [Google Search Console](https://search.google.com/search-console),
-   nộp `https://tenban.com/sitemap-index.xml`.
-3. Thêm vào [Bing Webmaster Tools](https://www.bing.com/webmasters).
-4. Dán một link bài viết vào [opengraph.xyz](https://www.opengraph.xyz) xem ảnh OG
+1. Nộp `https://tyangk1.github.io/sitemap-index.xml` vào
+   [Google Search Console](https://search.google.com/search-console).
+2. Thêm vào [Bing Webmaster Tools](https://www.bing.com/webmasters).
+3. Dán một link bài viết vào [opengraph.xyz](https://www.opengraph.xyz) xem ảnh OG
    có hiện đúng không.
-5. Kiểm JSON-LD bằng [Rich Results Test](https://search.google.com/test/rich-results).
+4. Kiểm JSON-LD bằng [Rich Results Test](https://search.google.com/test/rich-results).
+5. Sửa `AUTHOR.bio` trong `src/site.config.ts` — vẫn đang là chữ mẫu.
 
 ---
 
