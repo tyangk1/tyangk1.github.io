@@ -15,6 +15,45 @@ import { ENV, commentsEnabled } from '~/env';
       <div class="mt-6" id="giscus-container" />
 
       {/*
+        Script đồng bộ giao diện phải nằm TRONG khối này.
+
+        Trước đây nó ở ngoài, nên Astro đóng gói nó vào mọi trang bài kể cả khi
+        chưa cấu hình giscus — khoảng 250 byte JS không bao giờ làm được gì, và
+        chuỗi "giscus" vẫn xuất hiện trong HTML của một site không có bình luận.
+
+        Dùng `is:inline` vì Astro nâng mọi `<script>` thường lên đầu trang bất kể
+        nó nằm trong nhánh điều kiện nào — nâng thì lại quay về đúng lỗi cũ. Đổi
+        lại, `is:inline` không qua bước biên dịch nên phải viết JS thuần, không
+        chú thích kiểu.
+      */}
+      <script is:inline>
+        // giscus nằm trong iframe nên không nhận được class `dark` của trang chủ.
+        // Cách duy nhất để đổi giao diện của nó là gửi message vào iframe.
+        (() => {
+          const FRAME_ORIGIN = 'https://giscus.app';
+
+          function sendTheme() {
+            const iframe = document.querySelector('iframe.giscus-frame');
+            if (!iframe || !iframe.contentWindow) return;
+
+            const theme = document.documentElement.classList.contains('dark') ? 'dark' : 'light';
+            iframe.contentWindow.postMessage({ giscus: { setConfig: { theme } } }, FRAME_ORIGIN);
+          }
+
+          // Theo dõi class trên <html> để bắt lúc người dùng bấm nút đổi giao diện.
+          new MutationObserver(sendTheme).observe(document.documentElement, {
+            attributes: true,
+            attributeFilter: ['class'],
+          });
+
+          // iframe được chèn vào sau, nên phải đợi giscus báo đã sẵn sàng rồi mới gửi.
+          window.addEventListener('message', (event) => {
+            if (event.origin === FRAME_ORIGIN) sendTheme();
+          });
+        })();
+      </script>
+
+      {/*
         `is:inline` để Astro không gói script này vào bundle: giscus cần đúng thẻ
         script gốc với đầy đủ data-* thì mới tự khởi tạo được.
         `data-loading="lazy"` giữ cho iframe chưa tải tới khi người đọc cuộn
@@ -41,30 +80,3 @@ import { ENV, commentsEnabled } from '~/env';
     </section>
   )
 }
-
-<script>
-  // giscus nằm trong iframe nên không nhận được class `dark` của trang chủ.
-  // Cách duy nhất để đổi giao diện của nó là gửi message vào iframe.
-  const FRAME_ORIGIN = 'https://giscus.app';
-
-  function sendTheme() {
-    const iframe = document.querySelector<HTMLIFrameElement>('iframe.giscus-frame');
-    if (!iframe?.contentWindow) return;
-
-    const theme = document.documentElement.classList.contains('dark') ? 'dark' : 'light';
-    iframe.contentWindow.postMessage({ giscus: { setConfig: { theme } } }, FRAME_ORIGIN);
-  }
-
-  if (document.getElementById('giscus-container')) {
-    // Theo dõi class trên <html> để bắt lúc người dùng bấm nút đổi giao diện.
-    new MutationObserver(sendTheme).observe(document.documentElement, {
-      attributes: true,
-      attributeFilter: ['class'],
-    });
-
-    // iframe được chèn vào sau, nên phải đợi giscus báo đã sẵn sàng rồi mới gửi.
-    window.addEventListener('message', (event) => {
-      if (event.origin === FRAME_ORIGIN) sendTheme();
-    });
-  }
-</script>
