@@ -60,6 +60,7 @@ pnpm build && pnpm preview
 | `pnpm db:reset`       | Dựng lại database từ migration (xoá sạch dữ liệu)                       |
 | `pnpm db:subscribers` | Xem danh sách đăng ký newsletter (`--csv` để xuất file)                 |
 | `pnpm giscus:setup`   | Lấy tự động 4 giá trị cấu hình giscus: `pnpm giscus:setup owner/repo`   |
+| `pnpm anh:upload`     | Ảnh ở máy → Supabase Storage, in ra URL để dán vào bài                  |
 | `pnpm format:check`   | Prettier ở chế độ chỉ kiểm — CI chạy lệnh này, đỏ là chặn merge         |
 | `pnpm sync`           | Database → file, chỉ bài đã đăng                                        |
 | `pnpm sync:drafts`    | Database → file, kể cả bài nháp                                         |
@@ -135,6 +136,50 @@ Mỗi bài tự có một ảnh bìa sinh bằng code (`src/lib/cover-image.ts`)
   vào frontmatter, bài đó sẽ dùng ảnh của bạn.
 
 Đổi phong cách bìa thì sửa `coverSvg()` — nó chỉ là một hàm trả về chuỗi SVG.
+
+### Ảnh trong bài — Supabase Storage
+
+Ảnh nằm trong bucket **`anh-blog`** (public, giới hạn 5MB, chỉ nhận png/jpeg/webp/avif/gif/svg).
+
+```bash
+pnpm anh:upload ./anh/so-do.png
+pnpm anh:upload ./anh/*.jpg --thu-muc=cache-http --rong=1600
+```
+
+Script làm bốn việc trước khi tải lên:
+
+| Việc                                | Vì sao                                                                                       |
+| ----------------------------------- | -------------------------------------------------------------------------------------------- |
+| Bỏ dấu tên file                     | `Sơ đồ Cache.png` → `so-do-cache.webp`. Tên có dấu và khoảng trắng thành URL khó đọc, dễ lỗi |
+| Thu nhỏ về `--rong` (mặc định 1600) | Ảnh điện thoại 4000px là vô nghĩa khi cột chữ chỉ 704px                                      |
+| Chuyển WebP q82                     | Chỉ nhận nếu **nhỏ hơn** bản gốc — ảnh đã tối ưu sẵn thì WebP đôi khi phình ra               |
+| `cacheControl: 31536000`            | Supabase mặc định trả `cache-control: no-cache`, tức mỗi người đọc tải lại ảnh từ đầu. Đã đo |
+
+Nó in ra URL công khai kèm dòng để dán thẳng vào bài:
+
+```yaml
+coverImage: https://<ref>.supabase.co/storage/v1/object/public/anh-blog/2026/so-do.webp
+coverAlt: mô tả ảnh bằng một câu
+```
+
+```mdx
+<Figure src="https://<ref>.supabase.co/..." alt="..." caption="..." />
+```
+
+**Ảnh được tải về và tối ưu lúc BUILD, không phải lúc chạy.** `astro.config.ts`
+suy ra host Supabase từ `PUBLIC_SUPABASE_URL` và đưa vào `image.domains`, nên
+Astro tải ảnh gốc về, sinh AVIF/WebP nhiều kích thước kèm `srcset`, rồi phục vụ
+từ chính GitHub Pages. Đã kiểm: một ảnh 35KB ra bốn biến thể 8,8–17KB và thẻ
+`srcset` đủ 640w/960w/1280w.
+
+Nghĩa là Supabase Storage chỉ là **chỗ chứa ảnh gốc**. Site vẫn tĩnh 100%, không
+tốn băng thông Supabase mỗi lần có người đọc, và Storage sập cũng không ảnh hưởng
+người đang đọc.
+
+Vì vậy `Figure` phân nhánh theo kiểu `src`: URL tuyệt đối đi qua `<Image inferSize>`,
+đường dẫn trong `public/` giữ `<img>` thường. Bản trước dùng `<img>` cho mọi thứ
+với `width`/`height` **tuỳ chọn** — quên điền là ảnh đẩy chữ xuống khi tải xong,
+và người viết sẽ quên.
 
 ### Đổi font
 
@@ -217,14 +262,59 @@ pnpm dev           # tự sync (kể cả bài nháp) rồi chạy dev server
 Cổng cục bộ đặt ở dải **55321–55329** chứ không phải 54321 mặc định, để không
 đụng stack Supabase của project khác trên cùng máy. Xem `supabase/config.toml`.
 
-**Hosted** (app.supabase.com, free tier 500MB):
+**Hosted** (supabase.com/dashboard, free tier 500MB):
 
 ```bash
-# Project Settings → API: lấy URL và service_role key, điền vào .env
+# Project Settings → API keys: lấy URL + secret key + publishable key, điền .env
 npx supabase link --project-ref <ref>
 npx supabase db push          # áp dụng migration lên project thật
 pnpm db:push                  # đẩy nội dung lên
 ```
+
+#### Trạng thái hiện tại — còn một bước phải chạy bằng tay
+
+`.env` đã trỏ sang project hosted **`aglhmdrxpiwvnafctbxy`**. Đã làm xong:
+
+| Việc                                                            | Trạng thái                                    |
+| --------------------------------------------------------------- | --------------------------------------------- |
+| Bucket `anh-blog` + script `pnpm anh:upload`                    | ✅ chạy được, đã kiểm upload/đọc/cache/tối ưu |
+| `astro.config.ts` cho phép host Storage                         | ✅                                            |
+| **Bảng** posts / projects / post_views / newsletter_subscribers | ❌ **chưa có**                                |
+
+Bốn bảng đó trả 404 — project trắng, chưa chạy migration lần nào. Tạo bảng là
+lệnh **DDL**, mà DDL không đi qua REST API được: nó cần mật khẩu database, thứ
+không nằm trong bộ khoá API. Nên bước này phải do chủ project chạy:
+
+```bash
+npx supabase link --project-ref aglhmdrxpiwvnafctbxy
+npx supabase db push
+pnpm db:push        # nạp 8 bài + 4 dự án lên project mới
+pnpm sync           # kéo về lại thành file, rồi commit
+```
+
+Mật khẩu database lấy ở **Project Settings → Database → Database password**
+(quên thì Reset ở đó luôn). `supabase link` sẽ hỏi mật khẩu đó.
+
+Cho tới khi chạy xong, `pnpm sync` / `pnpm dev` / `pnpm build` đều dừng với
+thông báo chỉ đúng hai lệnh trên — `db-sync.mjs` phân biệt được "database không
+kết nối được" và "kết nối được nhưng chưa có bảng", nên nó không dẫn bạn đi sai.
+`pnpm build:ci` thì vẫn chạy vì nó không cần database.
+
+Xong bước đó thì bật hai tính năng đang tắt trên site thật:
+
+```bash
+gh variable set PUBLIC_SUPABASE_URL      -b https://aglhmdrxpiwvnafctbxy.supabase.co
+gh variable set PUBLIC_SUPABASE_ANON_KEY -b sb_publishable_pp4Q9Aip0P6G01lCkoQjLg_AW5LAqTu
+gh workflow run Deploy
+```
+
+Đặt hai biến này **trước** khi có bảng thì tệ hơn là không đặt: đếm lượt xem và
+form newsletter sẽ gọi API rồi lỗi ngay trước mặt người đọc. Để trống thì chúng
+tự ẩn sạch sẽ.
+
+> **Không bao giờ** đặt `SUPABASE_SERVICE_ROLE_KEY` vào GitHub Actions. CI dùng
+> `build:ci` nên không cần database — bí mật không tồn tại ở đó là bí mật không
+> thể rò rỉ ở đó.
 
 ### Sửa nội dung ở đâu
 

@@ -6,18 +6,54 @@
  * Chú thích là thứ mọi người đọc; alt là thứ dành riêng cho người dùng screen
  * reader, và hai nội dung đó thường phải khác nhau.
  */
+import { Image } from 'astro:assets';
+
 interface Props {
+  /**
+   * URL tuyệt đối (ảnh trong Supabase Storage, xem `pnpm anh:upload`) hoặc đường
+   * dẫn tới file trong `public/`.
+   */
   src: string;
   alt: string;
   caption?: string;
+  /** Chỉ cần cho ảnh trong `public/` — ảnh remote tự đo được lúc build. */
   width?: number;
   height?: number;
 }
 
 const { src, alt, caption, width, height } = Astro.props;
+
+/**
+ * Ảnh remote đi qua `<Image>`, ảnh trong `public/` thì không.
+ *
+ * Với URL tuyệt đối, `<Image inferSize>` TẢI ảnh về lúc build, đo kích thước, tối
+ * ưu ra AVIF/WebP kèm srcset, rồi phục vụ từ chính site. Hai thứ được cùng lúc:
+ *
+ *  - Không CLS. Bản trước dùng `<img>` với `width`/`height` tuỳ chọn, nên quên
+ *    điền là ảnh đẩy chữ xuống lúc tải xong — và người viết sẽ quên.
+ *  - Không phụ thuộc lúc chạy. Ảnh không còn được tải từ Supabase mỗi lần có
+ *    người đọc, nên không tốn băng thông Supabase và không chết nếu Storage lỗi.
+ *
+ * Ảnh trong `public/` thì Astro không xử lý được qua `<Image>` — giữ `<img>`.
+ */
+const laRemote = /^https?:\/\//.test(src);
 ---
 
 <figure class="figure">
-  <img src={src} alt={alt} width={width} height={height} loading="lazy" decoding="async" />
+  {
+    laRemote ? (
+      <Image
+        src={src}
+        alt={alt}
+        inferSize
+        widths={[640, 960, 1280]}
+        sizes="(min-width: 44rem) 44rem, 100vw"
+        loading="lazy"
+        decoding="async"
+      />
+    ) : (
+      <img src={src} alt={alt} width={width} height={height} loading="lazy" decoding="async" />
+    )
+  }
   {caption && <figcaption>{caption}</figcaption>}
 </figure>

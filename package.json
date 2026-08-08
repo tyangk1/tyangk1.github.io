@@ -16,6 +16,7 @@
     "db:reset": "supabase db reset",
     "db:subscribers": "node scripts/db-subscribers.mjs",
     "giscus:setup": "node scripts/giscus-setup.mjs",
+    "anh:upload": "node scripts/upload-anh.mjs",
     "typecheck": "astro check",
     "check:content": "node scripts/check-frontmatter.mjs",
     "check:html": "node scripts/check-html.mjs",

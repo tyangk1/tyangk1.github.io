@@ -72,6 +72,21 @@ const phoBienTrongCot = baiDocNhieuNhat(
 
 const url = absoluteUrl(postHref(post.id));
 
+/**
+ * Ảnh bìa tách thành HAI biến đã thu hẹp kiểu sẵn.
+ *
+ * `coverImage` là union `string | ImageMetadata`: chuỗi là URL remote (Supabase
+ * Storage), object là asset cục bộ trong `src/assets/`. Hai dạng cần hai cách gọi
+ * `<Image>` khác nhau vì `inferSize` chỉ hợp lệ với chuỗi.
+ *
+ * Không thu hẹp bằng `typeof` ngay trong template được: Astro không áp dụng
+ * control-flow narrowing qua các nhánh ternary của JSX, nên `astro check` vẫn
+ * thấy cả union và báo ts(2322). Thu hẹp ở đây thì mỗi nhánh nhận đúng một kiểu.
+ */
+const coverAlt = post.data.coverAlt;
+const coverRemote = typeof post.data.coverImage === 'string' ? post.data.coverImage : undefined;
+const coverLocal = typeof post.data.coverImage === 'string' ? undefined : post.data.coverImage;
+
 // Hai khối dữ liệu có cấu trúc: một mô tả bài viết, một mô tả đường dẫn phân cấp.
 // BreadcrumbList làm Google hiện "Blog › Tên bài" thay vì URL trần.
 const schema = [
@@ -208,10 +223,33 @@ const schema = [
           */
         }
         {
-          post.data.coverImage && post.data.coverAlt ? (
+          /*
+            Ba nhánh, và phải là ba nhánh RIÊNG chứ không phải một `<Image>` với
+            `inferSize` tính toán.
+
+            `inferSize` bắt buộc cho ảnh remote — với URL thì Astro không biết
+            kích thước, thiếu nó là build ném "Missing width and height". Nhưng
+            props của `<Image>` là union phân biệt: `inferSize` chỉ hợp lệ khi
+            `src` là chuỗi. Truyền `inferSize={typeof src === 'string'}` thì
+            TypeScript không thu hẹp được kiểu và `astro check` báo ts(2322).
+          */
+        }
+        {
+          coverAlt && coverRemote ? (
             <Image
-              src={post.data.coverImage}
-              alt={post.data.coverAlt}
+              src={coverRemote}
+              alt={coverAlt}
+              inferSize
+              widths={[640, 960, 1280]}
+              sizes="(min-width: 44rem) 44rem, 100vw"
+              class="mt-8 w-full rounded-card border border-border"
+              loading="eager"
+              fetchpriority="high"
+            />
+          ) : coverAlt && coverLocal ? (
+            <Image
+              src={coverLocal}
+              alt={coverAlt}
               widths={[640, 960, 1280]}
               sizes="(min-width: 44rem) 44rem, 100vw"
               class="mt-8 w-full rounded-card border border-border"

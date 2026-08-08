@@ -44,8 +44,19 @@ const blog = defineCollection({
          * mất tác dụng níu người đọc.
          */
         takeaways: optionalField(z.array(z.string().min(1)).min(2).max(4)),
-        /** Ảnh bìa đặt trong `src/assets/covers/`. Bỏ trống thì hệ thống tự sinh. */
-        coverImage: optionalField(image()),
+        /**
+         * Ảnh bìa. Bỏ trống thì hệ thống tự sinh bìa bằng code.
+         *
+         * Nhận HAI dạng:
+         *  - `image()`  — file cục bộ trong `src/assets/`. Astro tối ưu lúc build.
+         *  - `z.url()`  — URL tuyệt đối, ví dụ ảnh trong Supabase Storage
+         *                 (`pnpm anh:upload` in ra URL này).
+         *
+         * Thứ tự trong union quan trọng: `image()` phải đứng trước. Nó chỉ khớp
+         * đường dẫn cục bộ giải được, nên một URL `https://…` sẽ rơi xuống nhánh
+         * `z.url()`. Đảo lại thì mọi thứ đều là chuỗi và ảnh cục bộ mất tối ưu.
+         */
+        coverImage: optionalField(z.union([image(), z.url()])),
         /** Ảnh bìa bắt buộc có mô tả — thiếu là lỗi accessibility. */
         coverAlt: optionalField(z.string().min(1)),
         /** Bài nháp không được build ở production. */

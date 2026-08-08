@@ -18,7 +18,7 @@
  */
 import { mkdir, readdir, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { daCauHinh, taoClient } from './lib/supabase.mjs';
+import { daCauHinh, taoClient, SUPABASE_URL } from './lib/supabase.mjs';
 
 const THU_MUC_BLOG = 'src/content/blog';
 const THU_MUC_PROJECTS = 'src/content/projects';
@@ -180,42 +180,96 @@ async function coNoiDungSan() {
 
 function boQua(lyDo) {
   console.warn(`⚠ ${lyDo}\n  Bỏ qua bước đồng bộ, dùng nội dung đang có trong src/content/.`);
-  process.exit(0);
 }
 
-if (!daCauHinh) {
-  if (choPhepOffline || (await coNoiDungSan())) {
-    boQua('Chưa cấu hình Supabase (thiếu SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY).');
+/** Project trên supabase.co, không phải stack chạy bằng Docker ở máy. */
+function laHosted() {
+  return /^https:\/\/[a-z0-9-]+\.supabase\./i.test(SUPABASE_URL);
+}
+
+/**
+ * Gợi ý cách sửa, chọn theo ĐÚNG nguyên nhân.
+ *
+ * Bản trước luôn in "Database cục bộ chưa bật? → pnpm db:start". Với project
+ * hosted mà chưa chạy migration, câu đó dẫn người đọc đi sai hoàn toàn: database
+ * vẫn sống, chỉ là không có bảng nào. Đã mất một lượt debug vì nó.
+ */
+function goiYSua(thongDiep) {
+  const thieuBang = /Could not find the table|does not exist|schema cache/i.test(thongDiep);
+
+  if (thieuBang && laHosted()) {
+    return [
+      '  Database kết nối được nhưng CHƯA CÓ BẢNG — chưa chạy migration lần nào.',
+      '',
+      '  Chạy hai lệnh này (cần mật khẩu database ở Supabase Dashboard →',
+      '  Project Settings → Database → Database password):',
+      '',
+      `      npx supabase link --project-ref ${SUPABASE_URL.replace(/^https:\/\/([^.]+).*$/, '$1')}`,
+      '      npx supabase db push',
+      '',
+      '  Sau đó nạp nội dung mẫu: pnpm db:push',
+    ].join('\n');
   }
-  console.error(
-    '✗ Chưa cấu hình Supabase và cũng không có nội dung nào trong src/content/.\n' +
-      '  Chép .env.example thành .env rồi điền SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY.\n' +
-      '  Bật database cục bộ: pnpm db:start',
-  );
-  process.exit(1);
-}
 
-try {
-  const supabase = taoClient();
-  const soBai = await dongBoBaiViet(supabase, layCaNhap);
-  const soDuAn = await dongBoDuAn(supabase);
-  const soLuotXem = await dongBoLuotXem(supabase);
-
-  console.log(
-    `✓ Đồng bộ từ Supabase: ${soBai} bài viết${layCaNhap ? ' (kể cả nháp)' : ''}, ` +
-      `${soDuAn} dự án, lượt xem của ${soLuotXem} bài.`,
-  );
-} catch (error) {
-  const thongDiep = error instanceof Error ? error.message : String(error);
-
-  if (choPhepOffline && (await coNoiDungSan())) {
-    boQua(`Không kết nối được database (${thongDiep}).`);
+  if (thieuBang) {
+    return '  Database chưa có bảng. Dựng lại từ migration: pnpm db:reset';
   }
 
-  console.error(
-    `✗ Không đồng bộ được nội dung từ database.\n  ${thongDiep}\n\n` +
-      '  Database cục bộ chưa bật?  →  pnpm db:start\n' +
-      '  Đang chạy `pnpm dev`?      →  lệnh dev đã tự cho phép chạy offline.',
-  );
-  process.exit(1);
+  if (laHosted()) {
+    return [
+      '  Kiểm SUPABASE_URL và SUPABASE_SERVICE_ROLE_KEY trong .env.',
+      '  Khoá secret bị chặn nếu request trông như đến từ trình duyệt.',
+    ].join('\n');
+  }
+
+  return [
+    '  Database cục bộ chưa bật?  →  pnpm db:start',
+    '  Đang chạy `pnpm dev`?      →  lệnh dev đã tự cho phép chạy offline.',
+  ].join('\n');
 }
+
+/**
+ * Bọc vào hàm để `return` dừng được luồng, và KHÔNG dùng `process.exit()`.
+ *
+ * Trên Windows, `process.exit()` ngay sau nhiều dòng `console.error` làm libuv vỡ
+ * assertion (`src\win\async.c`), process bị bắn về mã -1073740791 và dòng
+ * assertion in chồng lên đúng phần hướng dẫn cần đọc.
+ */
+async function main() {
+  if (!daCauHinh) {
+    if (choPhepOffline || (await coNoiDungSan())) {
+      return boQua('Chưa cấu hình Supabase (thiếu SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY).');
+    }
+    console.error(
+      '✗ Chưa cấu hình Supabase và cũng không có nội dung nào trong src/content/.\n' +
+        '  Chép .env.example thành .env rồi điền SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY.\n' +
+        '  Bật database cục bộ: pnpm db:start',
+    );
+    process.exitCode = 1;
+    return;
+  }
+
+  try {
+    const supabase = taoClient();
+    const soBai = await dongBoBaiViet(supabase, layCaNhap);
+    const soDuAn = await dongBoDuAn(supabase);
+    const soLuotXem = await dongBoLuotXem(supabase);
+
+    console.log(
+      `✓ Đồng bộ từ Supabase: ${soBai} bài viết${layCaNhap ? ' (kể cả nháp)' : ''}, ` +
+        `${soDuAn} dự án, lượt xem của ${soLuotXem} bài.`,
+    );
+  } catch (error) {
+    const thongDiep = error instanceof Error ? error.message : String(error);
+
+    if (choPhepOffline && (await coNoiDungSan())) {
+      return boQua(`Không đọc được database (${thongDiep}).`);
+    }
+
+    console.error(`✗ Không đồng bộ được nội dung từ database.\n  ${thongDiep}\n`);
+    console.error(goiYSua(thongDiep));
+    process.exitCode = 1;
+  }
+}
+
+await main();

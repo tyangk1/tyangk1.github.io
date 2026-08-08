@@ -2,10 +2,61 @@ import { defineConfig } from 'astro/config';
 import mdx from '@astrojs/mdx';
 import sitemap from '@astrojs/sitemap';
 import tailwindcss from '@tailwindcss/vite';
+import { readFileSync } from 'node:fs';
 import { unified, rehypeHeadingIds } from '@astrojs/markdown-remark';
 
 import { SITE } from './src/site.config';
 import { rehypeContent } from './src/lib/rehype-content';
+
+/**
+ * Đọc một biến môi trường ở giai đoạn CONFIG.
+ *
+ * File này được Node đánh giá TRƯỚC khi Vite nạp `.env`, nên `process.env` chưa
+ * có giá trị nào từ `.env` — đã trả giá để biết: build ném `RemoteImageNotAllowed`
+ * dù `.env` có đúng giá trị.
+ *
+ * Không dùng `loadEnv` của Vite vì `vite` không phải dependency trực tiếp; pnpm
+ * dựng node_modules chặt nên `import { loadEnv } from 'vite'` ném "Cannot find
+ * module". Thêm `vite` vào package.json chỉ để đọc một biến là không đáng, và còn
+ * tạo nguy cơ lệch phiên bản với bản Astro đang dùng.
+ *
+ * Ưu tiên `process.env` để CI vẫn đúng: ở đó biến đến từ Actions variables, không
+ * có file `.env` nào.
+ */
+function docBien(ten: string): string {
+  const tuMoiTruong = process.env[ten];
+  if (tuMoiTruong) return tuMoiTruong;
+
+  for (const file of ['.env.local', '.env']) {
+    try {
+      for (const line of readFileSync(file, 'utf8').split(/\r?\n/)) {
+        const m = line.match(/^\s*([A-Z0-9_]+)\s*=\s*(.*)$/);
+        if (m && m[1] === ten) return (m[2] ?? '').trim().replace(/^['"]|['"]$/g, '');
+      }
+    } catch {
+      // Không có file thì thử file kế tiếp.
+    }
+  }
+
+  return '';
+}
+
+/**
+ * Host của Supabase Storage, suy ra từ `PUBLIC_SUPABASE_URL` chứ không viết cứng.
+ *
+ * Viết cứng thì đổi project Supabase là ảnh bìa lặng lẽ hết được tối ưu — Astro
+ * chỉ bỏ qua ảnh ngoài danh sách chứ không báo lỗi. Suy ra từ biến môi trường thì
+ * hai thứ không thể lệch nhau.
+ */
+const supabaseHost = (() => {
+  const raw = docBien('PUBLIC_SUPABASE_URL');
+  if (!raw) return [];
+  try {
+    return [new URL(raw).hostname];
+  } catch {
+    return [];
+  }
+})();
 
 export default defineConfig({
   site: SITE.url,
@@ -45,8 +96,15 @@ export default defineConfig({
   },
 
   image: {
-    // Chặn tối ưu ảnh từ domain lạ; thêm domain vào đây nếu cần dùng ảnh ngoài.
-    domains: [],
+    /*
+      Chỉ cho phép đúng host Supabase Storage của project này. Danh sách trắng,
+      không phải `remotePatterns` mở — ảnh từ domain lạ thì không tối ưu.
+
+      Ảnh được TẢI VỀ và tối ưu lúc build, rồi phục vụ từ GitHub Pages. Nghĩa là:
+      site vẫn tĩnh 100%, có srcset + AVIF/WebP, và không tốn băng thông Supabase
+      mỗi lần có người đọc. Supabase Storage chỉ là chỗ chứa ảnh gốc.
+    */
+    domains: supabaseHost,
   },
 
   build: {
