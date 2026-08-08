@@ -1,5 +1,47 @@
 ---
 import { ENV, commentsEnabled } from '~/env';
+
+/**
+ * Script đồng bộ sáng/tối cho iframe giscus, để dưới dạng CHUỖI rồi phát bằng
+ * `set:html`. Ba ràng buộc gặp nhau ở đây, và mỗi cách khác đều vỡ một cái:
+ *
+ *  1. Phải chỉ xuất hiện khi giscus được bật. Để `<script>` ở cấp cao nhất của
+ *     component thì Astro nâng nó lên và đóng gói vào MỌI trang bài — khoảng 250
+ *     byte JS không bao giờ làm được gì, và chuỗi "giscus" vẫn nằm trong HTML của
+ *     một site không có bình luận.
+ *
+ *  2. Không đặt được `<script>` CÓ THÂN trong biểu thức `{cond && (...)}`:
+ *     prettier-plugin-astro không parse nổi và ném `SyntaxError: Unexpected
+ *     token`. Đã làm CI đỏ một lần vì đúng chỗ này. Thẻ tự đóng như
+ *     `<script src=… />` thì không sao — nó không có thân để parse.
+ *
+ *  3. `is:inline` là bắt buộc, nếu không Astro lại nâng script lên như ở (1).
+ *
+ * Chuỗi + `set:html` thoả cả ba: prettier chỉ thấy một template literal trong
+ * frontmatter, còn thẻ trong template là thẻ tự đóng.
+ */
+const JS_DONG_BO_GIAO_DIEN = `
+(() => {
+  const FRAME_ORIGIN = 'https://giscus.app';
+
+  function sendTheme() {
+    const iframe = document.querySelector('iframe.giscus-frame');
+    if (!iframe || !iframe.contentWindow) return;
+
+    const theme = document.documentElement.classList.contains('dark') ? 'dark' : 'light';
+    iframe.contentWindow.postMessage({ giscus: { setConfig: { theme } } }, FRAME_ORIGIN);
+  }
+
+  new MutationObserver(sendTheme).observe(document.documentElement, {
+    attributes: true,
+    attributeFilter: ['class'],
+  });
+
+  window.addEventListener('message', (event) => {
+    if (event.origin === FRAME_ORIGIN) sendTheme();
+  });
+})();
+`;
 ---
 
 {
@@ -14,44 +56,10 @@ import { ENV, commentsEnabled } from '~/env';
 
       <div class="mt-6" id="giscus-container" />
 
-      {/*
-        Script đồng bộ giao diện phải nằm TRONG khối này.
-
-        Trước đây nó ở ngoài, nên Astro đóng gói nó vào mọi trang bài kể cả khi
-        chưa cấu hình giscus — khoảng 250 byte JS không bao giờ làm được gì, và
-        chuỗi "giscus" vẫn xuất hiện trong HTML của một site không có bình luận.
-
-        Dùng `is:inline` vì Astro nâng mọi `<script>` thường lên đầu trang bất kể
-        nó nằm trong nhánh điều kiện nào — nâng thì lại quay về đúng lỗi cũ. Đổi
-        lại, `is:inline` không qua bước biên dịch nên phải viết JS thuần, không
-        chú thích kiểu.
-      */}
-      <script is:inline>
-        // giscus nằm trong iframe nên không nhận được class `dark` của trang chủ.
-        // Cách duy nhất để đổi giao diện của nó là gửi message vào iframe.
-        (() => {
-          const FRAME_ORIGIN = 'https://giscus.app';
-
-          function sendTheme() {
-            const iframe = document.querySelector('iframe.giscus-frame');
-            if (!iframe || !iframe.contentWindow) return;
-
-            const theme = document.documentElement.classList.contains('dark') ? 'dark' : 'light';
-            iframe.contentWindow.postMessage({ giscus: { setConfig: { theme } } }, FRAME_ORIGIN);
-          }
-
-          // Theo dõi class trên <html> để bắt lúc người dùng bấm nút đổi giao diện.
-          new MutationObserver(sendTheme).observe(document.documentElement, {
-            attributes: true,
-            attributeFilter: ['class'],
-          });
-
-          // iframe được chèn vào sau, nên phải đợi giscus báo đã sẵn sàng rồi mới gửi.
-          window.addEventListener('message', (event) => {
-            if (event.origin === FRAME_ORIGIN) sendTheme();
-          });
-        })();
-      </script>
+      {/* giscus nằm trong iframe nên không nhận class `dark` của trang chủ. Cách
+          duy nhất để đổi giao diện của nó là gửi message vào iframe. Xem chú thích
+          ở `JS_DONG_BO_GIAO_DIEN` để biết vì sao nó là chuỗi. */}
+      <script is:inline set:html={JS_DONG_BO_GIAO_DIEN} />
 
       {/*
         `is:inline` để Astro không gói script này vào bundle: giscus cần đúng thẻ
