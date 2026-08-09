@@ -26,7 +26,23 @@ const THU_MUC_BLOG = 'src/content/blog';
 /** Đọc từ .env: `lib/supabase.mjs` đã nạp file vào process.env khi import. */
 const RESEND_API_KEY = process.env['RESEND_API_KEY'] ?? '';
 const NEWSLETTER_FROM = process.env['NEWSLETTER_FROM'] ?? '';
-const SITE_URL = (process.env['PUBLIC_SITE_URL'] ?? 'https://tyangk1.github.io').replace(/\/$/, '');
+
+/**
+ * URL site đọc từ `src/site.config.ts` — nguồn sự thật duy nhất.
+ *
+ * Viết cứng ở đây thì ngày đổi sang tên miền riêng, mọi link xác nhận và huỷ đăng
+ * ký trong thư vẫn trỏ về github.io. Thư đã gửi thì không sửa được, nên đây là
+ * loại lỗi chỉ phát hiện khi có người phàn nàn.
+ *
+ * Đọc bằng regex thay vì import vì file kia là TypeScript, còn script này chạy
+ * bằng `node` thuần.
+ */
+async function docUrlSite() {
+  const raw = await readFile('src/site.config.ts', 'utf8');
+  const m = raw.match(/url:\s*['"]([^'"]+)['"]/);
+  if (!m) throw new Error('Không đọc được SITE.url trong src/site.config.ts');
+  return m[1].replace(/\/$/, '');
+}
 
 const guiThat = process.argv.includes('--that');
 const cheDoXacNhan = process.argv.includes('--xac-nhan');
@@ -77,8 +93,8 @@ async function docBai(slug) {
 }
 
 /** Email thư xác nhận. Text + HTML, vì nhiều hộp thư vẫn chặn HTML. */
-function thuXacNhan(nguoiNhan) {
-  const link = `${SITE_URL}/newsletter/xac-nhan?token=${nguoiNhan.confirm_token}`;
+function thuXacNhan(nguoiNhan, urlSite) {
+  const link = `${urlSite}/newsletter/xac-nhan?token=${nguoiNhan.confirm_token}`;
 
   return {
     subject: 'Xác nhận đăng ký nhận bài mới',
@@ -103,9 +119,9 @@ function thuXacNhan(nguoiNhan) {
 }
 
 /** Email thông báo bài mới. */
-function thuBaiMoi(nguoiNhan, bai) {
-  const linkBai = `${SITE_URL}/blog/${bai.slug}`;
-  const linkHuy = `${SITE_URL}/newsletter/huy?token=${nguoiNhan.unsubscribe_token}`;
+function thuBaiMoi(nguoiNhan, bai, urlSite) {
+  const linkBai = `${urlSite}/blog/${bai.slug}`;
+  const linkHuy = `${urlSite}/newsletter/huy?token=${nguoiNhan.unsubscribe_token}`;
 
   return {
     subject: bai.title,
@@ -179,6 +195,25 @@ async function main() {
     );
   }
 
+  // Kiểm khoá Resend TRƯỚC khi làm gì khác.
+  //
+  // Bản trước kiểm sau khi đã in "GỬI THẬT — N người nhận…", nên người dùng đọc
+  // được dòng đó rồi mới thấy lỗi thiếu khoá — một giây tưởng thư đã bay đi.
+  if (guiThat && (!RESEND_API_KEY || !NEWSLETTER_FROM)) {
+    return thoatLoi(
+      '✗ Thiếu RESEND_API_KEY hoặc NEWSLETTER_FROM trong .env.',
+      '  Chưa gửi gì cả.',
+      '',
+      '  1. Tạo tài khoản ở https://resend.com (bậc free: 3.000 thư/tháng)',
+      '  2. Xác minh tên miền gửi, hoặc dùng onboarding@resend.dev để thử',
+      '  3. API Keys → tạo khoá, dán vào .env:',
+      '',
+      '     RESEND_API_KEY=re_...',
+      '     NEWSLETTER_FROM=Tên Của Bạn <bai-moi@ten-mien-cua-ban.com>',
+    );
+  }
+
+  const urlSite = await docUrlSite();
   const supabase = taoClient();
 
   // Chọn người nhận theo loại thư.
@@ -231,7 +266,9 @@ async function main() {
   // lại. Đọc được nội dung thật trước khi gửi là thứ duy nhất chặn được lỗi kiểu
   // "link xác nhận trỏ về localhost".
   if (!guiThat) {
-    const mau = cheDoXacNhan ? thuXacNhan(nguoiNhan[0]) : thuBaiMoi(nguoiNhan[0], bai);
+    const mau = cheDoXacNhan
+      ? thuXacNhan(nguoiNhan[0], urlSite)
+      : thuBaiMoi(nguoiNhan[0], bai, urlSite);
     console.log(`  From:    ${NEWSLETTER_FROM || '(chưa đặt NEWSLETTER_FROM)'}`);
     console.log(`  To:      ${nguoiNhan[0].email}`);
     console.log(`  Subject: ${mau.subject}`);
@@ -255,24 +292,11 @@ async function main() {
     return;
   }
 
-  if (!RESEND_API_KEY || !NEWSLETTER_FROM) {
-    return thoatLoi(
-      '✗ Thiếu RESEND_API_KEY hoặc NEWSLETTER_FROM trong .env.',
-      '',
-      '  1. Tạo tài khoản ở https://resend.com (bậc free: 3.000 thư/tháng)',
-      '  2. Xác minh tên miền gửi, hoặc dùng onboarding@resend.dev để thử',
-      '  3. API Keys → tạo khoá, dán vào .env:',
-      '',
-      '     RESEND_API_KEY=re_...',
-      '     NEWSLETTER_FROM=Tên Của Bạn <bai-moi@ten-mien-cua-ban.com>',
-    );
-  }
-
   let xong = 0;
   const loi = [];
 
   for (const n of nguoiNhan) {
-    const thu = cheDoXacNhan ? thuXacNhan(n) : thuBaiMoi(n, bai);
+    const thu = cheDoXacNhan ? thuXacNhan(n, urlSite) : thuBaiMoi(n, bai, urlSite);
     try {
       await guiQuaResend(n.email, thu);
       xong += 1;

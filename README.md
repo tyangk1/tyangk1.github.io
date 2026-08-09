@@ -52,30 +52,32 @@ pnpm build && pnpm preview
 
 ## Lệnh
 
-| Lệnh                  | Việc                                                                    |
-| --------------------- | ----------------------------------------------------------------------- |
-| `pnpm db:start`       | Bật Supabase cục bộ (cần Docker). In ra URL và khoá để dán vào `.env`   |
-| `pnpm db:stop`        | Tắt Supabase cục bộ                                                     |
-| `pnpm db:push`        | **Một lần**: đẩy nội dung dạng file hiện có vào database                |
-| `pnpm db:reset`       | Dựng lại database từ migration (xoá sạch dữ liệu)                       |
-| `pnpm db:gop`         | Gộp migration thành 1 file dán được vào SQL Editor, chạy lại được       |
-| `pnpm db:subscribers` | Xem danh sách đăng ký newsletter (`--csv` để xuất file)                 |
-| `pnpm giscus:setup`   | Lấy tự động 4 giá trị cấu hình giscus: `pnpm giscus:setup owner/repo`   |
-| `pnpm anh:upload`     | Ảnh ở máy → Supabase Storage, in ra URL để dán vào bài                  |
-| `pnpm format:check`   | Prettier ở chế độ chỉ kiểm — CI chạy lệnh này, đỏ là chặn merge         |
-| `pnpm sync`           | Database → file, chỉ bài đã đăng                                        |
-| `pnpm sync:drafts`    | Database → file, kể cả bài nháp                                         |
-| `pnpm dev`            | `sync:drafts` rồi chạy máy chủ dev                                      |
-| `pnpm build`          | `sync` → `astro build` → Pagefind. **Vỡ nếu không nối được database**   |
-| `pnpm build:ci`       | Như trên nhưng **bỏ** bước `sync` — dùng trong CI, build thẳng từ file  |
-| `pnpm preview`        | Phục vụ `dist/` — **luôn đo hiệu năng trên bản này**, không đo trên dev |
-| `pnpm typecheck`      | `astro check` — phải sạch 0 lỗi, 0 cảnh báo                             |
-| `pnpm check:content`  | Kiểm độ dài `title`/`description` của mọi bài cùng lúc                  |
-| `pnpm check:html`     | Quét `dist/`: id trùng, ảnh thiếu alt, link gãy, thẻ meta thiếu         |
-| `pnpm check:all`      | Chạy tuần tự cả bốn lệnh trên — dùng trước khi deploy                   |
-| `pnpm lighthouse`     | Sinh `lighthouse-report.html` (cần `pnpm preview` chạy ở cửa sổ khác)   |
-| `pnpm format`         | Prettier                                                                |
-| `pnpm icons`          | Sinh lại PNG icon từ `public/favicon.svg`                               |
+| Lệnh                       | Việc                                                                    |
+| -------------------------- | ----------------------------------------------------------------------- |
+| `pnpm db:start`            | Bật Supabase cục bộ (cần Docker). In ra URL và khoá để dán vào `.env`   |
+| `pnpm db:stop`             | Tắt Supabase cục bộ                                                     |
+| `pnpm db:push`             | **Một lần**: đẩy nội dung dạng file hiện có vào database                |
+| `pnpm db:reset`            | Dựng lại database từ migration (xoá sạch dữ liệu)                       |
+| `pnpm db:gop`              | Gộp migration thành 1 file dán được vào SQL Editor, chạy lại được       |
+| `pnpm db:subscribers`      | Xem danh sách đăng ký newsletter (`--csv` để xuất file)                 |
+| `pnpm newsletter:xac-nhan` | Gửi thư xác nhận cho người mới đăng ký. **Mặc định chạy thử**           |
+| `pnpm newsletter:gui`      | Gửi thông báo bài mới: `--bai=<slug>`. **Mặc định chạy thử**            |
+| `pnpm giscus:setup`        | Lấy tự động 4 giá trị cấu hình giscus: `pnpm giscus:setup owner/repo`   |
+| `pnpm anh:upload`          | Ảnh ở máy → Supabase Storage, in ra URL để dán vào bài                  |
+| `pnpm format:check`        | Prettier ở chế độ chỉ kiểm — CI chạy lệnh này, đỏ là chặn merge         |
+| `pnpm sync`                | Database → file, chỉ bài đã đăng                                        |
+| `pnpm sync:drafts`         | Database → file, kể cả bài nháp                                         |
+| `pnpm dev`                 | `sync:drafts` rồi chạy máy chủ dev                                      |
+| `pnpm build`               | `sync` → `astro build` → Pagefind. **Vỡ nếu không nối được database**   |
+| `pnpm build:ci`            | Như trên nhưng **bỏ** bước `sync` — dùng trong CI, build thẳng từ file  |
+| `pnpm preview`             | Phục vụ `dist/` — **luôn đo hiệu năng trên bản này**, không đo trên dev |
+| `pnpm typecheck`           | `astro check` — phải sạch 0 lỗi, 0 cảnh báo                             |
+| `pnpm check:content`       | Kiểm độ dài `title`/`description` của mọi bài cùng lúc                  |
+| `pnpm check:html`          | Quét `dist/`: id trùng, ảnh thiếu alt, link gãy, thẻ meta thiếu         |
+| `pnpm check:all`           | Chạy tuần tự cả bốn lệnh trên — dùng trước khi deploy                   |
+| `pnpm lighthouse`          | Sinh `lighthouse-report.html` (cần `pnpm preview` chạy ở cửa sổ khác)   |
+| `pnpm format`              | Prettier                                                                |
+| `pnpm icons`               | Sinh lại PNG icon từ `public/favicon.svg`                               |
 
 ---
 
@@ -424,8 +426,14 @@ Thiếu cái nào script cũng nói rõ và chỉ đúng chỗ bật.
 #### Trạng thái hiện tại: còn thiếu đúng một bước
 
 Repo `tyangk1/tyangk1.github.io` đã **public** ✓ và đã bật **Discussions** ✓.
-Còn thiếu: **cài app giscus**. Việc đó cần chính chủ tài khoản bấm đồng ý trên
-GitHub, personal access token không làm thay được.
+Còn thiếu: **cài app giscus**.
+
+Bước này **không thể tự động hoá**. Cài một GitHub App là hành động _cấp quyền_,
+và GitHub cố tình không có API để làm thay — chỉ chủ tài khoản bấm đồng ý trên
+trình duyệt. Đã thử: `/user/installations` trả **403** với personal access token
+(endpoint đó chỉ nhận token user-to-server của OAuth app), và không có endpoint
+`POST` nào để tạo installation. Đây là giới hạn theo thiết kế, không phải thiếu
+quyền.
 
 Bốn giá trị đã tra sẵn (lấy qua GraphQL của GitHub, không cần app):
 
@@ -505,16 +513,68 @@ pnpm db:subscribers              # xem trên màn hình
 pnpm db:subscribers --csv        # xuất CSV để nạp vào nhà cung cấp mail
 ```
 
-#### ⚠ Phần chưa làm: gửi thư
+#### Gửi thư
 
-Chế độ `supabase` **thu** được email nhưng **chưa gửi** được. Bảng đã có sẵn
-`confirm_token` và `unsubscribe_token`, hai hàm xác nhận/huỷ cũng đã có — chỉ
-thiếu phần gửi.
+```bash
+pnpm newsletter:xac-nhan                    # thư xác nhận cho người mới đăng ký
+pnpm newsletter:gui --bai=<slug>            # thông báo bài mới
+```
 
-Tôi cố ý không tự dựng phần gửi: nó cần một nhà cung cấp (Resend free 3.000
-mail/tháng), template email, cấu hình DNS cho SPF/DKIM, và xử lý bounce. Làm nửa
-vời thì thư vào thẳng thư mục spam, và một danh sách email không gửi được còn tệ
-hơn là không có.
+**Mặc định là CHẠY THỬ** — in đúng nội dung sẽ gửi rồi dừng. Thêm `--that` mới
+gửi thật. Gửi thư không thu hồi được, nên mặc định phải là không gửi.
+
+Chạy **ở máy**, không trên CI: gửi thư cần đọc danh sách email, tức cần
+`SUPABASE_SERVICE_ROLE_KEY`. Đặt khoá đó vào GitHub Actions là mở rộng chỗ nó có
+thể rò rỉ mà chẳng được gì — bản tin gửi tay khi có bài mới, không phải việc chạy
+theo mỗi commit.
+
+Cần `RESEND_API_KEY` + `NEWSLETTER_FROM` trong `.env` — xem `.env.example`. Thiếu
+thì script báo ngay **trước khi** làm gì cả, kèm ba bước lấy khoá.
+
+Script tự chặn bốn cách gửi sai:
+
+| Chặn gì                                 | Vì sao                                                |
+| --------------------------------------- | ----------------------------------------------------- |
+| Gửi bài `draft: true`                   | Thư dẫn tới trang 404 còn tệ hơn không gửi            |
+| Slug không tồn tại                      | Liệt kê luôn các slug đang có                         |
+| Gửi bản tin cho người **chưa** xác nhận | Họ chưa chứng minh hộp thư đó là của họ — gửi là spam |
+| Gửi cho người đã huỷ                    | Lọc `unsubscribed_at is null` ở cả hai loại thư       |
+
+URL trong thư đọc từ `SITE.url` trong `src/site.config.ts`, không viết cứng. Đổi
+sang tên miền riêng là link trong thư đổi theo — thư đã gửi thì không sửa lại được.
+
+Thư bài mới có header `List-Unsubscribe` + `List-Unsubscribe-Post`, để Gmail và
+Outlook hiện nút **Huỷ đăng ký** ngay cạnh tên người gửi. Thiếu nó thì người muốn
+thoát sẽ bấm "Báo cáo spam" — thứ phá uy tín tên miền gửi nhanh nhất. Giữa hai lần
+gửi nghỉ 600ms vì bậc free của Resend giới hạn 2 thư/giây.
+
+#### Hai trang xử lý link trong thư
+
+| Trang                  | Hành vi                                              |
+| ---------------------- | ---------------------------------------------------- |
+| `/newsletter/xac-nhan` | **Tự chạy** khi tải — người đọc đã chủ động bấm link |
+| `/newsletter/huy`      | **Bắt bấm nút**, không tự chạy                       |
+
+Trang huỷ bắt bấm nút là có lý do cụ thể: hộp thư và công cụ bảo mật thường tự mở
+trước mọi link trong email để quét. Nếu huỷ chạy ngay lúc tải thì một cú quét tự
+động huỷ đăng ký của người ta mà họ không bấm gì — và họ chỉ phát hiện khi không
+còn nhận được thư. Cùng lý do mà RFC 8058 dùng POST chứ không dùng GET.
+
+Đã kiểm bằng thao tác thật trên site production:
+
+| Trường hợp                               | Kết quả                                             |
+| ---------------------------------------- | --------------------------------------------------- |
+| Token không phải UUID                    | Báo link không hợp lệ, **0** lần gọi API            |
+| Token thật                               | Xác nhận xong, hiện nút "Đọc bài viết"              |
+| Chỉ **mở** trang huỷ                     | **0** lần gọi API — không huỷ oan                   |
+| Bấm nút huỷ                              | `huy_newsletter` 200, hiện lời xác nhận             |
+| Phát lại link xác nhận cũ sau khi đã huỷ | "Trước đó bạn đã huỷ đăng ký…" — **không** hồi sinh |
+
+Trường hợp cuối từng là **lỗi thật**, tìm ra bằng chính phép thử này:
+`xac_nhan_newsletter` có `unsubscribed_at = null` trong câu UPDATE, nên phát lại
+link xác nhận cũ là bật lại đăng ký của người đã huỷ — mà link đó nằm trong hộp
+thư của họ vĩnh viễn. Sửa ở migration `20260809010000_khong_hoi_sinh_da_huy.sql`:
+chỉ xác nhận dòng chưa huỷ, và trả thêm mã `da_huy` để trang nói rõ chuyện gì.
 
 Thiết kế hai bước bảo vệ bạn trong lúc chờ: chỉ gửi cho người `confirmed = true`,
 nên nếu ai đó bơm hàng nghìn email bịa vào bảng thì họ vẫn **không** làm bạn gửi
