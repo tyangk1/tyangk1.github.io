@@ -499,11 +499,30 @@ Site tĩnh nên sửa DB xong phải build lại mới thấy. Việc đó do wo
 [`tu-dong-publish.yml`](.github/workflows/tu-dong-publish.yml) làm, **mỗi 20 phút**:
 
 ```
-sync từ DB  →  có gì đổi thì commit  →  CI  →  Deploy
+sync từ DB  →  check:content  →  có gì đổi thì commit  →  build  →  deploy
 ```
 
-Không đổi gì thì nó thoát sớm, không tốn phút CI. Muốn lên ngay thì vào tab
-Actions bấm "Run workflow".
+Không đổi gì thì nó thoát sau bước thứ ba, không build và không deploy. Muốn lên
+ngay thì vào tab Actions bấm "Run workflow".
+
+Nó **tự deploy** thay vì trông vào CI, và đó không phải lựa chọn thẩm mỹ: GitHub
+cố ý không chạy workflow cho push tạo bởi `GITHUB_TOKEN` — nếu không thì một
+workflow commit rồi tự kích hoạt lại chính nó sẽ thành vòng lặp vô hạn. Nên
+`push → CI → Deploy` **không xảy ra** với commit của bot. Tôi phát hiện điều này
+bằng cách chạy thật đến cuối: bài đầu tiên đi qua đường cron nằm trong repo mà
+404 trên site, và commit đó không có workflow run nào.
+
+Cách sửa là tách các bước build + đẩy lên Pages ra
+[`dung-va-deploy.yml`](.github/workflows/dung-va-deploy.yml), một workflow
+`workflow_call`. Cả `Deploy` và `Tự động publish` đều gọi nó, nên hai đường dùng
+**cùng một** bộ bước chứ không phải hai bản copy sẽ trôi lệch. Hai cách sửa đã
+loại: đẩy bằng PAT (thêm một credential phải giữ và phải xoay, chỉ để lách một cơ
+chế an toàn) và cho Deploy chạy sau mọi nhịp cron (72 lần deploy mỗi ngày đẩy đi
+cùng một nội dung).
+
+Vì đường này không đi qua CI, `check:content` được chạy **trước khi commit**. Kiểm
+sau thì nội dung sai đã nằm trên main và mọi lần deploy tiếp theo đều đỏ cho tới
+khi có người vào sửa tay.
 
 Nó dùng **khoá công khai**, không phải `service_role`: đồng bộ chỉ cần đọc bài đã
 đăng, dự án và lượt xem — khoá công khai đọc được cả ba. Đặt `service_role` vào

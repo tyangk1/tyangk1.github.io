@@ -6,8 +6,14 @@ name: Tự động publish
 # HTML thì không — phải chạy `pnpm sync` rồi build lại. Từ trình duyệt không chạy
 # được lệnh, nên việc đó phải do CI làm.
 #
-# Commit ở đây sẽ kích hoạt workflow CI, và CI xanh thì Deploy chạy. Không cần
-# thêm bước build nào trong file này.
+# Commit ở đây KHÔNG kích hoạt được CI. GitHub cố ý không chạy workflow cho push
+# tạo bởi `GITHUB_TOKEN`, để một workflow commit rồi tự kích hoạt lại chính nó
+# không thành vòng lặp vô hạn. Đã trả giá để biết: bài đầu tiên đi qua đường này
+# nằm trong repo mà 404 trên site, và không có workflow run nào cho commit đó.
+#
+# Nên job `deploy` bên dưới gọi thẳng `dung-va-deploy.yml` — cùng đúng các bước mà
+# workflow Deploy dùng, không phải bản copy. Nó chỉ chạy khi bước trên thật sự
+# commit, nên nhịp cron 20 phút không sinh ra lần deploy vô ích nào.
 #
 # ĐÂY CŨNG LÀ THỨ LÀM ĐẶT LỊCH HOẠT ĐỘNG.
 #
@@ -30,10 +36,6 @@ on:
   # Bấm chạy ngay, dùng khi vừa sửa bài và không muốn chờ tới nhịp kế tiếp.
   workflow_dispatch:
 
-# `contents: write` để commit được. Không xin thêm quyền nào.
-permissions:
-  contents: write
-
 concurrency:
   group: tu-dong-publish
   cancel-in-progress: false
@@ -42,6 +44,18 @@ jobs:
   dong-bo:
     runs-on: ubuntu-latest
     timeout-minutes: 8
+
+    # `contents: write` để commit được. Không xin thêm quyền nào — job deploy bên
+    # dưới tự khai quyền riêng của nó.
+    permissions:
+      contents: write
+
+    # Job deploy cần biết CÓ commit hay không, và commit nào. Không có `sha` thì nó
+    # phải checkout `main` và sẽ đẩy lên bất cứ thứ gì đang ở đó lúc đó — kể cả
+    # commit của người khác vừa đẩy lên xen vào giữa.
+    outputs:
+      da-commit: ${{ steps.commit.outputs.da-commit }}
+      sha: ${{ steps.commit.outputs.sha }}
 
     steps:
       - uses: actions/checkout@v5
@@ -69,10 +83,20 @@ jobs:
           PUBLIC_SUPABASE_ANON_KEY: ${{ vars.PUBLIC_SUPABASE_ANON_KEY }}
         run: pnpm sync
 
+      # Kiểm TRƯỚC khi commit, không phải sau.
+      #
+      # Đường này không đi qua CI, nên nếu không kiểm ở đây thì nội dung sai sẽ nằm
+      # trên main rồi mới vỡ ở bước build — và lúc đó mọi lần deploy sau đều đỏ cho
+      # tới khi có người vào sửa tay. Chặn ở đây thì main luôn build được.
+      - name: Kiểm nội dung
+        run: pnpm check:content
+
       - name: Commit nếu nội dung đổi
+        id: commit
         run: |
           if [ -z "$(git status --porcelain src/content src/data)" ]; then
             echo "Không có gì đổi. Thoát."
+            echo "da-commit=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
 
@@ -82,4 +106,21 @@ jobs:
           git commit -m "Đồng bộ nội dung từ database (tự động)"
           git push
 
-          echo "Đã commit. CI và Deploy sẽ tự chạy."
+          echo "da-commit=true" >> "$GITHUB_OUTPUT"
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+          echo "Đã commit $(git rev-parse --short HEAD). Job deploy sẽ đẩy đúng commit này."
+
+  # Chỉ chạy khi bước trên thật sự commit. Nhờ `if` này mà nhịp cron 20 phút không
+  # sinh ra lần deploy nào khi không có gì đổi.
+  deploy:
+    needs: dong-bo
+    if: needs.dong-bo.outputs.da-commit == 'true'
+
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+
+    uses: ./.github/workflows/dung-va-deploy.yml
+    with:
+      ref: ${{ needs.dong-bo.outputs.sha }}
