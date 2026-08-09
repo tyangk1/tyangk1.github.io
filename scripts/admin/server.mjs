@@ -132,6 +132,29 @@ const server = createServer(async (req, res) => {
       return res.end(html);
     }
 
+    /**
+     * Phục vụ các module dùng chung trong `scripts/lib/`.
+     *
+     * Nhờ vậy `trang.html` `import` được đúng bộ tô màu mà admin đã deploy dùng,
+     * thay vì giữ một bản copy — hai bản sẽ trôi lệch, và lúc đó người viết thấy
+     * `<Callout>` được tô ở chỗ này mà không tô ở chỗ kia rồi tưởng mình gõ sai.
+     *
+     * Chỉ nhận đúng tên file dạng `[a-z-]+.mjs`, không cho đi lên thư mục cha.
+     */
+    if (req.method === 'GET' && duong.startsWith('/lib/')) {
+      const ten = duong.slice('/lib/'.length);
+      if (!/^[a-z0-9-]+\.mjs$/.test(ten)) {
+        res.writeHead(400).end('Tên file không hợp lệ');
+        return;
+      }
+      const js = await readFile(join(THU_MUC, '..', 'lib', ten), 'utf8');
+      res.writeHead(200, {
+        'Content-Type': 'text/javascript; charset=utf-8',
+        'Cache-Control': 'no-store',
+      });
+      return res.end(js);
+    }
+
     if (req.method === 'GET' && duong === '/api/cau-hinh') {
       return json(res, 200, {
         gioiHan: GIOI_HAN,

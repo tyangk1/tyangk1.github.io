@@ -31,22 +31,40 @@ async function napEnv() {
 
 await napEnv();
 
-export const SUPABASE_URL = process.env['SUPABASE_URL'] ?? '';
+export const SUPABASE_URL = process.env['SUPABASE_URL'] ?? process.env['PUBLIC_SUPABASE_URL'] ?? '';
 export const SUPABASE_SERVICE_KEY = process.env['SUPABASE_SERVICE_ROLE_KEY'] ?? '';
 
+/**
+ * Khoá công khai, dùng làm phương án dự phòng khi KHÔNG có khoá secret.
+ *
+ * Vì sao có: workflow tự động publish chỉ cần ĐỌC bài đã đăng, dự án và lượt xem —
+ * và khoá công khai đọc được cả ba (đã kiểm: 8 bài kèm `content` đầy đủ, 4 dự án).
+ * Nhờ vậy không phải đặt `SUPABASE_SERVICE_ROLE_KEY` vào GitHub Actions. Bí mật
+ * không tồn tại ở đó là bí mật không thể rò rỉ ở đó.
+ *
+ * Giới hạn phải biết: với khoá công khai thì RLS lọc hết bài nháp, nên
+ * `--drafts` sẽ KHÔNG thấy bài nháp. Đó là đúng cho CI (production không đăng bài
+ * nháp) nhưng sai cho `pnpm dev` ở máy — nên script cảnh báo rõ.
+ */
+export const SUPABASE_ANON_KEY = process.env['PUBLIC_SUPABASE_ANON_KEY'] ?? '';
+
+/** Khoá thực sự đang dùng, và nó là loại nào. */
+export const KHOA = SUPABASE_SERVICE_KEY || SUPABASE_ANON_KEY;
+export const laKhoaCongKhai = !SUPABASE_SERVICE_KEY && Boolean(SUPABASE_ANON_KEY);
+
 /** Đã cấu hình đủ để nói chuyện với database chưa. */
-export const daCauHinh = Boolean(SUPABASE_URL && SUPABASE_SERVICE_KEY);
+export const daCauHinh = Boolean(SUPABASE_URL && KHOA);
 
 export function taoClient() {
   if (!daCauHinh) {
     throw new Error(
-      'Thiếu SUPABASE_URL hoặc SUPABASE_SERVICE_ROLE_KEY.\n' +
-        'Chép .env.example thành .env rồi điền hai giá trị đó.\n' +
+      'Thiếu SUPABASE_URL, và cả SUPABASE_SERVICE_ROLE_KEY lẫn PUBLIC_SUPABASE_ANON_KEY.\n' +
+        'Chép .env.example thành .env rồi điền.\n' +
         'Chạy Supabase cục bộ: npx supabase start (nó in ra URL và khoá).',
     );
   }
 
-  return createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY, {
+  return createClient(SUPABASE_URL, KHOA, {
     auth: { persistSession: false, autoRefreshToken: false },
   });
 }

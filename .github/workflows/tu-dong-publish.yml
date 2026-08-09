@@ -1,0 +1,74 @@
+name: Tự động publish
+
+# Kéo nội dung từ database ra file, và commit nếu có gì đổi.
+#
+# VÌ SAO CẦN: site là tĩnh. Sửa bài ở trang admin đã deploy thì database đổi nhưng
+# HTML thì không — phải chạy `pnpm sync` rồi build lại. Từ trình duyệt không chạy
+# được lệnh, nên việc đó phải do CI làm.
+#
+# Commit ở đây sẽ kích hoạt workflow CI, và CI xanh thì Deploy chạy. Không cần
+# thêm bước build nào trong file này.
+on:
+  schedule:
+    # Mỗi 20 phút. Đủ nhanh để không phải chờ lâu sau khi sửa bài, đủ chậm để
+    # không tốn phút CI vô ích — phần lớn lần chạy sẽ không có gì đổi và thoát sớm.
+    #
+    # GitHub cron chạy theo UTC và thường trễ vài phút khi máy bận. Không có cách
+    # nào đảm bảo đúng phút, nên đừng trông vào độ chính xác của nó.
+    - cron: '*/20 * * * *'
+  # Bấm chạy ngay, dùng khi vừa sửa bài và không muốn chờ tới nhịp kế tiếp.
+  workflow_dispatch:
+
+# `contents: write` để commit được. Không xin thêm quyền nào.
+permissions:
+  contents: write
+
+concurrency:
+  group: tu-dong-publish
+  cancel-in-progress: false
+
+jobs:
+  dong-bo:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Cài dependency
+        run: pnpm install --frozen-lockfile
+
+      # Dùng KHOÁ CÔNG KHAI, không phải service_role.
+      #
+      # Đồng bộ chỉ cần đọc bài đã đăng, dự án và lượt xem — khoá công khai đọc
+      # được cả ba (đã kiểm: 8 bài kèm content đầy đủ, 4 dự án). Đặt khoá
+      # service_role vào Actions là mở rộng chỗ nó có thể rò rỉ mà chẳng được gì.
+      - name: Đồng bộ từ database
+        env:
+          SUPABASE_URL: ${{ vars.PUBLIC_SUPABASE_URL }}
+          PUBLIC_SUPABASE_ANON_KEY: ${{ vars.PUBLIC_SUPABASE_ANON_KEY }}
+        run: pnpm sync
+
+      - name: Commit nếu nội dung đổi
+        run: |
+          if [ -z "$(git status --porcelain src/content src/data)" ]; then
+            echo "Không có gì đổi. Thoát."
+            exit 0
+          fi
+
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/content src/data
+          git commit -m "Đồng bộ nội dung từ database (tự động)"
+          git push
+
+          echo "Đã commit. CI và Deploy sẽ tự chạy."

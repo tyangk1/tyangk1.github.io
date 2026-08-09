@@ -18,7 +18,7 @@
  */
 import { mkdir, readdir, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { daCauHinh, taoClient, SUPABASE_URL } from './lib/supabase.mjs';
+import { daCauHinh, taoClient, SUPABASE_URL, laKhoaCongKhai } from './lib/supabase.mjs';
 
 const THU_MUC_BLOG = 'src/content/blog';
 const THU_MUC_PROJECTS = 'src/content/projects';
@@ -247,6 +247,15 @@ async function main() {
     );
     process.exitCode = 1;
     return;
+  }
+
+  // Khoá công khai không thấy bài nháp vì RLS lọc. Với CI thì đúng; với `pnpm dev`
+  // ở máy thì người viết sẽ tưởng bài nháp bị mất, nên phải nói rõ.
+  if (laKhoaCongKhai && layCaNhap) {
+    console.warn(
+      '⚠ Đang dùng khoá CÔNG KHAI, nên `--drafts` không lấy được bài nháp (RLS lọc).\n' +
+        '  Muốn xem bài nháp ở máy thì điền SUPABASE_SERVICE_ROLE_KEY vào .env.',
+    );
   }
 
   try {
