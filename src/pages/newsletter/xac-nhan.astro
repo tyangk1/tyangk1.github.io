@@ -1,0 +1,117 @@
+---
+import { ENV, cheDoNewsletter } from '~/env';
+import BaseLayout from '~/layouts/BaseLayout.astro';
+
+/**
+ * Đích của link xác nhận trong email: /newsletter/xac-nhan?token=<uuid>
+ *
+ * Trang này TỰ chạy khi tải xong, không cần bấm gì. Xác nhận là hành động người
+ * đọc đã chủ động yêu cầu bằng cách bấm link, nên tự chạy là đúng ý họ.
+ *
+ * Ngược lại với trang huỷ đăng ký — ở đó bắt buộc phải bấm nút, xem chú thích
+ * trong `huy.astro`.
+ *
+ * Gọi RPC bằng `fetch` phía trình duyệt với khoá công khai, giống ViewCount. Nhờ
+ * vậy site vẫn tĩnh 100%, không cần máy chủ nào để xử lý link xác nhận.
+ */
+---
+
+<BaseLayout
+  title="Xác nhận đăng ký"
+  description="Xác nhận địa chỉ email của bạn để bắt đầu nhận thông báo khi có bài viết mới trên blog. Trang này xử lý link xác nhận được gửi tới hộp thư của bạn."
+  noindex
+>
+  <div class="wrap-prose py-16">
+    <p class="eyebrow">Newsletter</p>
+    <h1 class="display-xl mt-3 text-4xl">Xác nhận đăng ký</h1>
+
+    {
+      cheDoNewsletter === 'supabase' ? (
+        <div
+          class="mt-8"
+          data-xac-nhan
+          data-supabase-url={ENV.publicSupabaseUrl}
+          data-supabase-key={ENV.publicSupabaseAnonKey}
+        >
+          <p class="text-lg text-muted" data-trang-thai role="status" aria-live="polite">
+            Đang xác nhận…
+          </p>
+
+          <div class="mt-8 hidden" data-xong>
+            <a
+              href="/blog"
+              class="inline-block rounded-lg bg-accent px-5 py-2.5 font-bold text-on-accent transition-colors hover:bg-accent-hover"
+            >
+              Đọc bài viết
+            </a>
+          </div>
+        </div>
+      ) : (
+        <p class="mt-8 text-lg text-muted">
+          Newsletter chưa được cấu hình trên bản build này, nên không có gì để xác nhận.
+        </p>
+      )
+    }
+  </div>
+</BaseLayout>
+
+<script>
+  const el = document.querySelector<HTMLElement>('[data-xac-nhan]');
+
+  if (el) {
+    const url = el.dataset['supabaseUrl'] ?? '';
+    const key = el.dataset['supabaseKey'] ?? '';
+    const oTrangThai = el.querySelector<HTMLElement>('[data-trang-thai]');
+    const khoiXong = el.querySelector<HTMLElement>('[data-xong]');
+
+    function hien(thongDiep: string, xong = false) {
+      if (oTrangThai) oTrangThai.textContent = thongDiep;
+      if (xong && khoiXong) khoiXong.classList.remove('hidden');
+    }
+
+    const token = new URLSearchParams(window.location.search).get('token') ?? '';
+
+    // Kiểm hình dạng UUID trước khi gọi. Không phải để bảo mật — hàm RPC đã nhận
+    // kiểu `uuid` nên chuỗi rác bị Postgres từ chối — mà để người đọc nhận được
+    // câu tiếng Việt thay vì một lỗi 400 khó hiểu.
+    const laUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(token);
+
+    if (!laUuid) {
+      hien('Link xác nhận không hợp lệ. Kiểm lại xem bạn đã copy đủ cả đường dẫn chưa.');
+    } else {
+      void (async () => {
+        try {
+          const res = await fetch(`${url}/rest/v1/rpc/xac_nhan_newsletter`, {
+            method: 'POST',
+            headers: {
+              apikey: key,
+              Authorization: `Bearer ${key}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ token }),
+          });
+
+          if (!res.ok) {
+            hien('Không kết nối được lúc này. Thử tải lại trang sau một phút.');
+            return;
+          }
+
+          const ketQua: unknown = await res.json();
+
+          if (ketQua === 'xong') {
+            hien('Xong. Từ giờ mỗi khi có bài mới bạn sẽ nhận được một email.', true);
+          } else {
+            // `khong_thay`: token sai, hoặc đã dùng rồi ở lần bấm trước.
+            hien(
+              'Link này không còn dùng được. Có thể bạn đã xác nhận xong ở lần bấm trước — ' +
+                'nếu vậy thì không cần làm gì thêm.',
+              true,
+            );
+          }
+        } catch {
+          hien('Không kết nối được lúc này. Thử tải lại trang sau một phút.');
+        }
+      })();
+    }
+  }
+</script>

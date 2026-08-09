@@ -1,0 +1,131 @@
+---
+import { ENV, cheDoNewsletter } from '~/env';
+import BaseLayout from '~/layouts/BaseLayout.astro';
+
+/**
+ * Đích của link huỷ đăng ký trong email: /newsletter/huy?token=<uuid>
+ *
+ * Khác trang xác nhận ở một điểm quan trọng: trang này KHÔNG tự chạy khi tải, mà
+ * bắt bấm một nút.
+ *
+ * Lý do: hộp thư và công cụ bảo mật thường tự MỞ TRƯỚC mọi link trong email để
+ * quét hoặc để hiện xem trước. Nếu huỷ đăng ký chạy ngay lúc tải trang thì một cú
+ * quét tự động sẽ huỷ đăng ký của người ta mà họ không hề bấm gì — và họ chỉ phát
+ * hiện khi không còn nhận được thư nữa. Đó là kiểu lỗi không ai báo, chỉ âm thầm
+ * mất người đọc.
+ *
+ * Cùng lý do mà RFC 8058 yêu cầu `List-Unsubscribe-Post` dùng POST chứ không dùng
+ * GET. Một cú bấm thêm đổi lấy việc không bao giờ huỷ oan.
+ */
+---
+
+<BaseLayout
+  title="Huỷ đăng ký"
+  description="Huỷ nhận email thông báo bài viết mới. Bấm nút xác nhận trên trang để hoàn tất, và bạn có thể đăng ký lại bất cứ lúc nào ở cuối mỗi bài viết."
+  noindex
+>
+  <div class="wrap-prose py-16">
+    <p class="eyebrow">Newsletter</p>
+    <h1 class="display-xl mt-3 text-4xl">Huỷ đăng ký</h1>
+
+    {
+      cheDoNewsletter === 'supabase' ? (
+        <div
+          class="mt-8"
+          data-huy
+          data-supabase-url={ENV.publicSupabaseUrl}
+          data-supabase-key={ENV.publicSupabaseAnonKey}
+        >
+          <p class="text-lg text-muted" data-trang-thai role="status" aria-live="polite">
+            Bấm nút bên dưới để ngừng nhận email. Bạn sẽ không nhận thêm thư nào từ blog này.
+          </p>
+
+          <div class="mt-8 flex flex-wrap items-center gap-3" data-hanh-dong>
+            <button
+              type="button"
+              data-nut-huy
+              class="rounded-lg bg-accent px-5 py-2.5 font-bold text-on-accent transition-colors hover:bg-accent-hover disabled:opacity-60"
+            >
+              Huỷ đăng ký
+            </button>
+            <a
+              href="/blog"
+              class="tap rounded-lg border border-border px-5 py-2.5 transition-colors hover:bg-surface"
+            >
+              Thôi, giữ đăng ký
+            </a>
+          </div>
+        </div>
+      ) : (
+        <p class="mt-8 text-lg text-muted">
+          Newsletter chưa được cấu hình trên bản build này, nên không có đăng ký nào để huỷ.
+        </p>
+      )
+    }
+  </div>
+</BaseLayout>
+
+<script>
+  const el = document.querySelector<HTMLElement>('[data-huy]');
+
+  if (el) {
+    const url = el.dataset['supabaseUrl'] ?? '';
+    const key = el.dataset['supabaseKey'] ?? '';
+    const oTrangThai = el.querySelector<HTMLElement>('[data-trang-thai]');
+    const khoiHanhDong = el.querySelector<HTMLElement>('[data-hanh-dong]');
+    const nut = el.querySelector<HTMLButtonElement>('[data-nut-huy]');
+
+    const token = new URLSearchParams(window.location.search).get('token') ?? '';
+    const laUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(token);
+
+    function hien(thongDiep: string, anNut = false) {
+      if (oTrangThai) oTrangThai.textContent = thongDiep;
+      if (anNut && khoiHanhDong) khoiHanhDong.remove();
+    }
+
+    if (!laUuid) {
+      hien('Link huỷ đăng ký không hợp lệ. Kiểm lại xem bạn đã copy đủ cả đường dẫn chưa.', true);
+    } else if (nut) {
+      nut.addEventListener('click', () => {
+        nut.disabled = true;
+        nut.textContent = 'Đang xử lý…';
+
+        void (async () => {
+          try {
+            const res = await fetch(`${url}/rest/v1/rpc/huy_newsletter`, {
+              method: 'POST',
+              headers: {
+                apikey: key,
+                Authorization: `Bearer ${key}`,
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({ token }),
+            });
+
+            if (!res.ok) {
+              nut.disabled = false;
+              nut.textContent = 'Huỷ đăng ký';
+              hien('Không kết nối được lúc này. Thử lại sau một phút.');
+              return;
+            }
+
+            const ketQua: unknown = await res.json();
+
+            if (ketQua === 'xong') {
+              hien(
+                'Đã huỷ. Bạn sẽ không nhận thêm email nào. Muốn quay lại thì đăng ký lại ở cuối bài viết bất kỳ.',
+                true,
+              );
+            } else {
+              hien('Link này không còn dùng được — có thể bạn đã huỷ ở lần bấm trước.', true);
+            }
+          } catch {
+            nut.disabled = false;
+            nut.textContent = 'Huỷ đăng ký';
+            hien('Không kết nối được lúc này. Thử lại sau một phút.');
+          }
+        })();
+      });
+    }
+  }
+</script>

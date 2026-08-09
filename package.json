@@ -16,6 +16,8 @@
     "db:reset": "supabase db reset",
     "db:gop": "node scripts/gop-migration.mjs",
     "db:subscribers": "node scripts/db-subscribers.mjs",
+    "newsletter:xac-nhan": "node scripts/newsletter-send.mjs --xac-nhan",
+    "newsletter:gui": "node scripts/newsletter-send.mjs",
     "giscus:setup": "node scripts/giscus-setup.mjs",
     "anh:upload": "node scripts/upload-anh.mjs",
     "typecheck": "astro check",
