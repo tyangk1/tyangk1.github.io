@@ -531,6 +531,30 @@ theo mỗi commit.
 Cần `RESEND_API_KEY` + `NEWSLETTER_FROM` trong `.env` — xem `.env.example`. Thiếu
 thì script báo ngay **trước khi** làm gì cả, kèm ba bước lấy khoá.
 
+#### ⚠ Trạng thái hiện tại: gửi được, nhưng chỉ tới MỘT địa chỉ
+
+Đã cấu hình Resend và **gửi thật thành công** cả hai loại thư. Nhưng **chưa có tên
+miền nào được xác minh**, nên `NEWSLETTER_FROM` phải dùng địa chỉ thử
+`onboarding@resend.dev` của Resend — và nó chỉ gửi được tới **email của chủ tài
+khoản Resend**. Gửi cho bất kỳ ai khác trả về:
+
+```
+HTTP 403: You can only send testing emails to your own email address.
+```
+
+Nghĩa là luồng đã chạy đúng nhưng **chưa dùng được cho người đọc thật**. Để mở:
+
+1. <https://resend.com/domains> → **Add Domain**
+2. Thêm 3 bản ghi DNS mà Resend hiện ra: **SPF**, **DKIM**, và DMARC nếu muốn
+3. Chờ trạng thái đổi thành `verified` (thường vài phút)
+4. Sửa `.env`:
+   ```
+   NEWSLETTER_FROM=Thân Trọng Trường Giang <bai-moi@ten-mien-cua-ban.com>
+   ```
+
+Bước 2 quyết định thư vào inbox hay vào spam, và nó phụ thuộc tên miền bạn sở
+hữu — không ai làm thay được.
+
 Script tự chặn bốn cách gửi sai:
 
 | Chặn gì                                 | Vì sao                                                |
@@ -562,13 +586,16 @@ còn nhận được thư. Cùng lý do mà RFC 8058 dùng POST chứ không dù
 
 Đã kiểm bằng thao tác thật trên site production:
 
-| Trường hợp                               | Kết quả                                             |
-| ---------------------------------------- | --------------------------------------------------- |
-| Token không phải UUID                    | Báo link không hợp lệ, **0** lần gọi API            |
-| Token thật                               | Xác nhận xong, hiện nút "Đọc bài viết"              |
-| Chỉ **mở** trang huỷ                     | **0** lần gọi API — không huỷ oan                   |
-| Bấm nút huỷ                              | `huy_newsletter` 200, hiện lời xác nhận             |
-| Phát lại link xác nhận cũ sau khi đã huỷ | "Trước đó bạn đã huỷ đăng ký…" — **không** hồi sinh |
+| Trường hợp                               | Kết quả                                                                        |
+| ---------------------------------------- | ------------------------------------------------------------------------------ |
+| Token không phải UUID                    | Báo link không hợp lệ, **0** lần gọi API                                       |
+| Token thật                               | Xác nhận xong, hiện nút "Đọc bài viết"                                         |
+| Chỉ **mở** trang huỷ                     | **0** lần gọi API — không huỷ oan                                              |
+| Bấm nút huỷ                              | `huy_newsletter` 200, hiện lời xác nhận                                        |
+| Phát lại link xác nhận cũ sau khi đã huỷ | "Trước đó bạn đã huỷ đăng ký…" — **không** hồi sinh                            |
+| Gửi thư xác nhận **thật** qua Resend     | Nhận **1/1**                                                                   |
+| Gửi thư bài mới **thật** qua Resend      | Nhận **1/1**                                                                   |
+| 2 người: 1 đã xác nhận + 1 chưa          | Thư bài mới chỉ tới người **đã** xác nhận; thư xác nhận chỉ tới người **chưa** |
 
 Trường hợp cuối từng là **lỗi thật**, tìm ra bằng chính phép thử này:
 `xac_nhan_newsletter` có `unsubscribed_at = null` trong câu UPDATE, nên phát lại
