@@ -59,6 +59,7 @@ pnpm build && pnpm preview
 | `pnpm db:push`             | **Một lần**: đẩy nội dung dạng file hiện có vào database                |
 | `pnpm db:reset`            | Dựng lại database từ migration (xoá sạch dữ liệu)                       |
 | `pnpm db:gop`              | Gộp migration thành 1 file dán được vào SQL Editor, chạy lại được       |
+| `pnpm admin`               | **Trang viết và quản lý bài**, chạy cục bộ ở `127.0.0.1:4322`           |
 | `pnpm db:subscribers`      | Xem danh sách đăng ký newsletter (`--csv` để xuất file)                 |
 | `pnpm newsletter:xac-nhan` | Gửi thư xác nhận cho người mới đăng ký. **Mặc định chạy thử**           |
 | `pnpm newsletter:gui`      | Gửi thông báo bài mới: `--bai=<slug>`. **Mặc định chạy thử**            |
@@ -356,9 +357,51 @@ tự ẩn sạch sẽ.
 | `pnpm db:push`                                                              | Bạn thích viết bằng editor: sửa file `.mdx` rồi đẩy lên DB                |
 | SQL trực tiếp                                                               | Sửa hàng loạt, ví dụ đổi tên một tag ở tất cả bài                         |
 
-> **Chưa có admin riêng.** Supabase Studio dùng được nhưng ô textarea không phải
-> chỗ dễ chịu để viết bài dài. Nếu cần, bước tiếp theo là dựng một trang admin
-> riêng nói chuyện với Supabase — công việc riêng, chưa làm trong bản này.
+### Trang admin — `pnpm admin`
+
+```bash
+pnpm admin      # http://127.0.0.1:4322
+```
+
+Danh sách bài bên trái, trình soạn bên phải. Làm được: tạo · sửa · xoá bài, tải
+ảnh lên (chọn file hoặc **kéo thả**), và bấm **Đồng bộ** để chạy `pnpm sync` ngay
+trong trang.
+
+Những chi tiết đáng nói:
+
+| Chi tiết                                               | Vì sao                                                                                                 |
+| ------------------------------------------------------ | ------------------------------------------------------------------------------------------------------ |
+| Đếm ký tự sống cho tiêu đề và mô tả                    | Ràng buộc 70 và 120–160 nằm ở tầng database. Biết mình đang ở 118 ký tự tốt hơn là bị Postgres từ chối |
+| Gõ tiêu đề tự sinh slug, bỏ dấu                        | Cùng công thức `slugify()` của site. **Chỉ cho bài mới** — đổi slug bài đã đăng là làm gãy mọi link cũ |
+| Bài mới mặc định là **nháp**                           | Không ai muốn lỡ tay đăng một bài viết nửa vời                                                         |
+| Ảnh đầu tiên tự thành ảnh bìa, ảnh sau chèn `<Figure>` | Đỡ một bước dán tay, và nhắc điền `alt` ngay                                                           |
+| `Ctrl+S` để lưu                                        | Đây là trình soạn thảo, phản xạ đó là tự nhiên                                                         |
+
+#### Vì sao là server cục bộ, không phải một trang trên site
+
+Site là tĩnh trên GitHub Pages. Một trang `/admin` ở đó là HTML **công khai**, nên
+muốn an toàn phải dựng Supabase Auth **và** siết RLS xuống đúng một user id — vì
+`authenticated` trong Supabase nghĩa là _bất kỳ ai đăng ký được_, không phải "chủ
+blog". Bỏ qua chi tiết đó là mở cửa cho người lạ sửa bài.
+
+Server cục bộ không có bề mặt tấn công nào để siết: nó chỉ nghe trên `127.0.0.1`
+(dòng quan trọng nhất trong `scripts/admin/server.mjs` — mặc định của Node là nghe
+mọi giao diện mạng, tức ai cùng Wi-Fi cũng mở được), và khoá `service_role` không
+bao giờ ra khỏi máy.
+
+**Đánh đổi: không viết bài từ điện thoại được.** Với blog một tác giả, đó là cái
+giá đúng để trả.
+
+Đã kiểm bằng thao tác thật trên trình duyệt:
+
+| Phép thử                               | Kết quả                                                                     |
+| -------------------------------------- | --------------------------------------------------------------------------- |
+| Bấm Lưu khi form rỗng                  | 5 lỗi tiếng Việt, **không** ghi gì vào database                             |
+| Gõ "Vì sao tôi bỏ Redis khỏi hệ thống" | slug → `vi-sao-toi-bo-redis-khoi-he-thong`                                  |
+| Mô tả 8 ký tự → 125 ký tự              | bộ đếm đổi từ đỏ sang xanh đúng ngưỡng 120                                  |
+| Tải ảnh + lưu bài                      | ảnh `10.9KB → 1.3KB`, bài vào database, danh sách lên 9                     |
+| Bấm Đồng bộ                            | chạy `pnpm sync` thật, in output, ra **8 bài** — loại đúng bài nháp vừa tạo |
+| Bấm Xoá                                | hỏi xác nhận, xoá xong danh sách về 8                                       |
 
 ### Đăng bài = build lại
 

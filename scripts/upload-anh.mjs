@@ -11,44 +11,14 @@
  *   --rong=<px>      Thu nhỏ về bề rộng này nếu ảnh lớn hơn. Mặc định 1600.
  *   --giu-goc        Không chuyển sang WebP, giữ đúng định dạng gốc.
  *   --ghi-de         Ghi đè nếu đã có file cùng tên.
+ *
+ * Phần xử lý ảnh nằm ở `lib/anh.mjs` — dùng chung với trang admin, để hai đường
+ * vào không bao giờ cho ra kết quả khác nhau.
  */
 import { readFile, stat } from 'node:fs/promises';
 import { basename, extname } from 'node:path';
-import sharp from 'sharp';
 import { taoClient, daCauHinh } from './lib/supabase.mjs';
-
-const BUCKET = 'anh-blog';
-
-/**
- * Cache một năm.
- *
- * Supabase mặc định trả `cache-control: no-cache`, nghĩa là mỗi người đọc tải lại
- * ảnh từ đầu — đã đo trên bucket này. Một năm là an toàn vì tên file mang nội
- * dung: sửa ảnh thì đổi tên, không ghi đè. Cùng lý do với việc hash tên file
- * trong bản build.
- */
-const CACHE_GIAY = 31_536_000;
-
-const MIME = {
-  '.png': 'image/png',
-  '.jpg': 'image/jpeg',
-  '.jpeg': 'image/jpeg',
-  '.webp': 'image/webp',
-  '.avif': 'image/avif',
-  '.gif': 'image/gif',
-  '.svg': 'image/svg+xml',
-};
-
-/** Bỏ dấu tiếng Việt và mọi ký tự không an toàn cho URL. */
-function slugTenFile(ten) {
-  return ten
-    .normalize('NFD')
-    .replace(/\p{M}/gu, '')
-    .replace(/[đĐ]/g, (c) => (c === 'đ' ? 'd' : 'D'))
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '');
-}
+import { BUCKET, MIME, taiAnhLen } from './lib/anh.mjs';
 
 function docCo(ten, macDinh) {
   const found = process.argv.find((a) => a.startsWith(`--${ten}=`));
@@ -59,7 +29,7 @@ const duongDan = process.argv.slice(2).filter((a) => !a.startsWith('--'));
 const giuGoc = process.argv.includes('--giu-goc');
 const ghiDe = process.argv.includes('--ghi-de');
 const rongToiDa = Number(docCo('rong', '1600'));
-const thuMuc = slugTenFile(docCo('thu-muc', String(new Date().getFullYear())));
+const thuMuc = docCo('thu-muc', String(new Date().getFullYear()));
 
 function thoatLoi(...dong) {
   for (const d of dong) console.error(d);
@@ -109,56 +79,26 @@ async function main() {
       continue;
     }
 
-    let noiDung = await readFile(path);
-    const goc = noiDung.length;
-    let duoiCuoi = duoi;
+    try {
+      const r = await taiAnhLen(supabase, {
+        ten: basename(path, duoi),
+        buffer: await readFile(path),
+        duoi,
+        thuMuc,
+        rongToiDa,
+        giuGoc,
+        ghiDe,
+      });
 
-    // SVG là văn bản, sharp không xử lý được như ảnh raster — đẩy nguyên bản.
-    if (!giuGoc && duoi !== '.svg') {
-      const anh = sharp(noiDung);
-      const meta = await anh.metadata();
-
-      // `withoutEnlargement` để ảnh nhỏ hơn ngưỡng không bị kéo giãn thành mờ.
-      const daXuLy = await anh
-        .resize({ width: rongToiDa, withoutEnlargement: true })
-        .rotate() // Áp EXIF orientation rồi bỏ EXIF — ảnh điện thoại hay bị quay.
-        .webp({ quality: 82 })
-        .toBuffer();
-
-      // Chỉ nhận bản WebP nếu nó thật sự nhỏ hơn. Với ảnh đã tối ưu sẵn hoặc
-      // ảnh rất nhỏ, WebP đôi khi lớn hơn bản gốc.
-      if (daXuLy.length < noiDung.length) {
-        noiDung = daXuLy;
-        duoiCuoi = '.webp';
+      if (r.rongGoc && r.rongGoc > rongToiDa) {
+        console.log(`  ${basename(path)}: ${r.rongGoc}px → ${rongToiDa}px`);
       }
 
-      if (meta.width && meta.width > rongToiDa) {
-        console.log(`  ${basename(path)}: ${meta.width}px → ${rongToiDa}px`);
-      }
-    }
-
-    const ten = slugTenFile(basename(path, duoi)) || 'anh';
-    const key = `${thuMuc}/${ten}${duoiCuoi}`;
-
-    const { error } = await supabase.storage.from(BUCKET).upload(key, noiDung, {
-      contentType: MIME[duoiCuoi],
-      cacheControl: String(CACHE_GIAY),
-      upsert: ghiDe,
-    });
-
-    if (error) {
-      const trung = /exists/i.test(error.message);
-      console.error(
-        trung
-          ? `✗ ${key} đã tồn tại. Thêm --ghi-de để ghi đè, hoặc đổi tên file.`
-          : `✗ Lỗi tải lên ${key}: ${error.message}`,
-      );
+      ketQua.push(r);
+    } catch (e) {
+      console.error(`✗ ${e instanceof Error ? e.message : String(e)}`);
       process.exitCode = 1;
-      continue;
     }
-
-    const { data } = supabase.storage.from(BUCKET).getPublicUrl(key);
-    ketQua.push({ key, url: data.publicUrl, goc, cuoi: noiDung.length });
   }
 
   if (ketQua.length === 0) return;
@@ -177,6 +117,7 @@ async function main() {
   console.log('  coverAlt: mô tả ảnh bằng một câu\n');
   console.log('Chèn vào giữa bài:');
   console.log(`  <Figure src="${ketQua[0].url}" alt="..." caption="..." />`);
+  console.log('\nHoặc dùng trang admin để làm mọi thứ trong một chỗ: pnpm admin');
 }
 
 await main();

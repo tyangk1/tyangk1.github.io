@@ -8,8 +8,22 @@ Tài liệu này nói về **nội dung**, không nói về kỹ thuật. Phần
 ## 0. Bốn bước từ lúc gõ chữ tới lúc bài lên site
 
 ```bash
+pnpm admin     # http://127.0.0.1:4322 — viết bài, tải ảnh, bấm Đồng bộ
+pnpm dev       # http://localhost:4321 — xem trước, thấy cả bài nháp
+
+# rồi:
+git add -A && git commit -m "Bài mới: ..." && git push
+```
+
+Trang admin gộp ba bước đầu vào một chỗ: gõ bài, kéo thả ảnh (nó tự nén và chèn
+`<Figure>`), rồi bấm **Đồng bộ** để kéo nội dung ra file MDX. Còn lại đúng một
+việc là commit và push.
+
+<details>
+<summary>Làm bằng dòng lệnh, nếu thích</summary>
+
+```bash
 pnpm db:start          # chỉ khi muốn xem trước ở máy (cần Docker)
-pnpm dev               # http://localhost:4321 — thấy cả bài draft
 
 # 1. Soạn bài trong Supabase Studio (bảng `posts`)
 # 2. Có ảnh thì:
@@ -21,6 +35,8 @@ pnpm sync
 # 4. Commit rồi push — CI tự build và deploy, khoảng 1–2 phút
 git add -A && git commit -m "Bài mới: ..." && git push
 ```
+
+</details>
 
 **Bước 3 là bước dễ quên nhất.** Quên nó thì push vẫn thành công, CI vẫn xanh,
 site vẫn deploy — chỉ là bằng nội dung của lần commit trước. Không có lỗi nào để

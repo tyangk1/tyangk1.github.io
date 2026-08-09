@@ -15,6 +15,7 @@
     "db:push": "node scripts/db-push.mjs",
     "db:reset": "supabase db reset",
     "db:gop": "node scripts/gop-migration.mjs",
+    "admin": "node scripts/admin/server.mjs",
     "db:subscribers": "node scripts/db-subscribers.mjs",
     "newsletter:xac-nhan": "node scripts/newsletter-send.mjs --xac-nhan",
     "newsletter:gui": "node scripts/newsletter-send.mjs",

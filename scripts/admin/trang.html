@@ -1,0 +1,682 @@
+<!doctype html>
+<html lang="vi">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Admin — viết và quản lý bài</title>
+    <style>
+      /* Đây là công cụ, không phải trang cho người đọc: ưu tiên mật độ thông tin
+         và số ký tự đếm được, không ưu tiên đẹp. */
+      :root {
+        --bg: #0d1117;
+        --panel: #161b22;
+        --vien: #30363d;
+        --chu: #e6edf3;
+        --mo: #8b949e;
+        --xanh: #58a6ff;
+        --luc: #3fb950;
+        --do: #f85149;
+        --vang: #d29922;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        font:
+          14px/1.5 ui-sans-serif,
+          system-ui,
+          sans-serif;
+        background: var(--bg);
+        color: var(--chu);
+        height: 100vh;
+        display: grid;
+        grid-template-columns: 300px 1fr;
+      }
+      aside {
+        border-right: 1px solid var(--vien);
+        display: flex;
+        flex-direction: column;
+        min-height: 0;
+      }
+      .dau {
+        padding: 12px;
+        border-bottom: 1px solid var(--vien);
+        display: flex;
+        gap: 8px;
+      }
+      .ds {
+        overflow-y: auto;
+        flex: 1;
+      }
+      .muc {
+        padding: 10px 12px;
+        border-bottom: 1px solid var(--vien);
+        cursor: pointer;
+        display: grid;
+        gap: 3px;
+      }
+      .muc:hover {
+        background: var(--panel);
+      }
+      .muc[aria-current='true'] {
+        background: var(--panel);
+        box-shadow: inset 3px 0 0 var(--xanh);
+      }
+      .muc b {
+        font-weight: 600;
+        font-size: 13px;
+      }
+      .muc small {
+        color: var(--mo);
+        font-size: 11px;
+        display: flex;
+        gap: 6px;
+        align-items: center;
+      }
+      .the {
+        font-size: 10px;
+        padding: 1px 5px;
+        border-radius: 999px;
+        border: 1px solid currentColor;
+      }
+      .nhap {
+        color: var(--vang);
+      }
+      .dang {
+        color: var(--luc);
+      }
+
+      main {
+        overflow-y: auto;
+        padding: 16px 20px 60px;
+        min-height: 0;
+      }
+      h1 {
+        font-size: 17px;
+        margin: 0 0 14px;
+      }
+      label {
+        display: block;
+        margin-bottom: 12px;
+      }
+      .nhan {
+        display: flex;
+        justify-content: space-between;
+        align-items: baseline;
+        margin-bottom: 4px;
+        font-size: 12px;
+        color: var(--mo);
+      }
+      input[type='text'],
+      input[type='date'],
+      input[type='number'],
+      textarea,
+      select {
+        width: 100%;
+        background: var(--bg);
+        color: var(--chu);
+        border: 1px solid var(--vien);
+        border-radius: 6px;
+        padding: 7px 9px;
+        font: inherit;
+      }
+      textarea {
+        resize: vertical;
+      }
+      #content {
+        font:
+          13px/1.65 ui-monospace,
+          'Cascadia Code',
+          Consolas,
+          monospace;
+        min-height: 460px;
+      }
+      input:focus,
+      textarea:focus {
+        outline: 2px solid var(--xanh);
+        outline-offset: -1px;
+      }
+      .hang {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 12px;
+      }
+      .hang3 {
+        display: grid;
+        grid-template-columns: 2fr 1fr 1fr;
+        gap: 12px;
+      }
+      button {
+        background: var(--panel);
+        color: var(--chu);
+        border: 1px solid var(--vien);
+        border-radius: 6px;
+        padding: 7px 12px;
+        font: inherit;
+        cursor: pointer;
+      }
+      button:hover {
+        border-color: var(--xanh);
+      }
+      button.chinh {
+        background: #1f6feb;
+        border-color: #1f6feb;
+        font-weight: 600;
+      }
+      button.nguyhiem:hover {
+        border-color: var(--do);
+        color: var(--do);
+      }
+      button:disabled {
+        opacity: 0.5;
+        cursor: default;
+      }
+      .thanh {
+        position: sticky;
+        top: 0;
+        background: var(--bg);
+        padding: 10px 0 12px;
+        display: flex;
+        gap: 8px;
+        align-items: center;
+        border-bottom: 1px solid var(--vien);
+        margin-bottom: 14px;
+        z-index: 2;
+        flex-wrap: wrap;
+      }
+      .dem.ok {
+        color: var(--luc);
+      }
+      .dem.sai {
+        color: var(--do);
+      }
+      #loi:not(:empty) {
+        border: 1px solid var(--do);
+        background: #f8514915;
+        border-radius: 6px;
+        padding: 10px 12px;
+        margin-bottom: 14px;
+      }
+      #loi ul {
+        margin: 0;
+        padding-left: 18px;
+      }
+      #tt {
+        color: var(--mo);
+        font-size: 12px;
+        margin-left: auto;
+      }
+      #tt.ok {
+        color: var(--luc);
+      }
+      #tt.sai {
+        color: var(--do);
+      }
+      .ghi {
+        color: var(--mo);
+        font-size: 11px;
+        margin-top: 3px;
+      }
+      pre.ketqua {
+        background: var(--panel);
+        border: 1px solid var(--vien);
+        border-radius: 6px;
+        padding: 10px;
+        font-size: 12px;
+        white-space: pre-wrap;
+        max-height: 220px;
+        overflow: auto;
+      }
+      .keo {
+        border: 1px dashed var(--vien);
+        border-radius: 6px;
+        padding: 10px;
+        text-align: center;
+        color: var(--mo);
+        font-size: 12px;
+      }
+      .keo.dangkeo {
+        border-color: var(--xanh);
+        color: var(--xanh);
+      }
+      fieldset {
+        border: 1px solid var(--vien);
+        border-radius: 6px;
+        padding: 12px;
+        margin: 0 0 12px;
+      }
+      legend {
+        font-size: 12px;
+        color: var(--mo);
+        padding: 0 6px;
+      }
+      .cb {
+        display: flex;
+        gap: 16px;
+        align-items: center;
+      }
+      .cb label {
+        display: flex;
+        gap: 6px;
+        align-items: center;
+        margin: 0;
+        font-size: 13px;
+      }
+    </style>
+  </head>
+  <body>
+    <aside>
+      <div class="dau">
+        <button class="chinh" id="nut-moi">+ Bài mới</button>
+        <button id="nut-sync" title="Kéo nội dung từ database ra file MDX">Đồng bộ</button>
+      </div>
+      <div class="ds" id="ds"></div>
+    </aside>
+
+    <main>
+      <div class="thanh">
+        <button class="chinh" id="nut-luu">Lưu</button>
+        <button id="nut-tai-anh">Tải ảnh lên…</button>
+        <button class="nguyhiem" id="nut-xoa">Xoá bài</button>
+        <span id="tt"></span>
+      </div>
+
+      <div id="loi"></div>
+      <h1 id="tieu">Bài mới</h1>
+
+      <fieldset>
+        <legend>Bắt buộc</legend>
+
+        <label>
+          <span class="nhan"><span>Tiêu đề</span><span class="dem" id="dem-title"></span></span>
+          <input type="text" id="title" />
+        </label>
+
+        <label>
+          <span class="nhan"
+            ><span>Slug (chính là URL, không đổi sau khi đã đăng)</span
+            ><span class="dem" id="dem-slug"></span
+          ></span>
+          <input type="text" id="slug" />
+          <span class="ghi" id="ghi-slug"></span>
+        </label>
+
+        <label>
+          <span class="nhan"
+            ><span>Mô tả — đây chính là thẻ meta description trên Google</span
+            ><span class="dem" id="dem-description"></span
+          ></span>
+          <textarea id="description" rows="3"></textarea>
+        </label>
+
+        <div class="hang3">
+          <label>
+            <span class="nhan"
+              ><span>Tag, cách nhau bằng dấu phẩy</span><span class="dem" id="dem-tags"></span
+            ></span>
+            <input type="text" id="tags" />
+          </label>
+          <label>
+            <span class="nhan"><span>Ngày đăng</span></span>
+            <input type="date" id="published_at" />
+          </label>
+          <label>
+            <span class="nhan"><span>Ngày cập nhật nội dung</span></span>
+            <input type="date" id="content_updated_at" />
+          </label>
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend>Tuỳ chọn</legend>
+
+        <label>
+          <span class="nhan"
+            ><span>Điểm chính — mỗi dòng một ý, bỏ trống hẳn hoặc 2–4 dòng</span
+            ><span class="dem" id="dem-takeaways"></span
+          ></span>
+          <textarea id="takeaways" rows="4"></textarea>
+        </label>
+
+        <div class="hang">
+          <label>
+            <span class="nhan"><span>Ảnh bìa (URL)</span></span>
+            <input type="text" id="cover_image" />
+          </label>
+          <label>
+            <span class="nhan"><span>Mô tả ảnh bìa (alt) — bắt buộc nếu có ảnh</span></span>
+            <input type="text" id="cover_alt" />
+          </label>
+        </div>
+
+        <div class="hang">
+          <label>
+            <span class="nhan"><span>Tên series</span></span>
+            <input type="text" id="series_name" />
+          </label>
+          <label>
+            <span class="nhan"><span>Phần thứ</span></span>
+            <input type="number" id="series_part" min="1" />
+          </label>
+        </div>
+
+        <div class="cb">
+          <label><input type="checkbox" id="draft" /> Bài nháp (không lên site)</label>
+          <label><input type="checkbox" id="featured" /> Nổi bật ở trang chủ</label>
+        </div>
+      </fieldset>
+
+      <label>
+        <span class="nhan"
+          ><span>Thân bài (MDX — dùng được Callout, PullQuote, Steps, Figure, và ảnh)</span
+          ><span class="dem" id="dem-content"></span
+        ></span>
+        <textarea id="content" spellcheck="false"></textarea>
+      </label>
+
+      <div class="keo" id="keo">Kéo ảnh vào đây để tải lên và chèn vào bài</div>
+      <pre class="ketqua" id="ketqua" hidden></pre>
+
+      <input type="file" id="chon-file" accept="image/*" multiple hidden />
+    </main>
+
+    <script type="module">
+      const $ = (id) => document.getElementById(id);
+      let cauHinh = { gioiHan: {} };
+      let danhSach = [];
+      let slugDangSua = null; // null = bài mới
+
+      const TRUONG = [
+        'title',
+        'slug',
+        'description',
+        'tags',
+        'published_at',
+        'content_updated_at',
+        'takeaways',
+        'cover_image',
+        'cover_alt',
+        'series_name',
+        'series_part',
+        'content',
+      ];
+
+      function tt(chu, loai = '') {
+        $('tt').textContent = chu;
+        $('tt').className = loai;
+      }
+
+      /** Cùng công thức với `slugify()` trong src/utils/format.ts. */
+      function slugHoa(s) {
+        return s
+          .normalize('NFD')
+          .replace(/\p{M}/gu, '')
+          .replace(/[đĐ]/g, (c) => (c === 'đ' ? 'd' : 'D'))
+          .toLowerCase()
+          .replace(/[^a-z0-9]+/g, '-')
+          .replace(/^-+|-+$/g, '');
+      }
+
+      function demKyTu(id, hienTai, min, max) {
+        const el = $(`dem-${id}`);
+        if (!el) return;
+        const ok = hienTai >= min && hienTai <= max;
+        el.textContent = min === max ? `${hienTai}` : `${hienTai} / ${min}–${max}`;
+        el.className = `dem ${ok ? 'ok' : 'sai'}`;
+      }
+
+      function capNhatDem() {
+        const g = cauHinh.gioiHan;
+        demKyTu('title', $('title').value.trim().length, 1, g.titleToiDa);
+        demKyTu(
+          'description',
+          $('description').value.trim().length,
+          g.descriptionMin,
+          g.descriptionMax,
+        );
+
+        const tags = $('tags')
+          .value.split(',')
+          .map((t) => t.trim())
+          .filter(Boolean);
+        demKyTu('tags', tags.length, g.tagsMin, g.tagsMax);
+
+        const tk = $('takeaways')
+          .value.split('\n')
+          .map((t) => t.trim())
+          .filter(Boolean);
+        const elTk = $('dem-takeaways');
+        const okTk =
+          tk.length === 0 || (tk.length >= g.takeawaysMin && tk.length <= g.takeawaysMax);
+        elTk.textContent = `${tk.length} dòng`;
+        elTk.className = `dem ${okTk ? 'ok' : 'sai'}`;
+
+        const chu = $('content').value.trim().split(/\s+/).filter(Boolean).length;
+        $('dem-content').textContent = `${chu.toLocaleString('vi-VN')} từ`;
+        $('dem-content').className = 'dem';
+
+        const slug = $('slug').value.trim();
+        const hopLe = /^[a-z0-9]+(-[a-z0-9]+)*$/.test(slug);
+        $('dem-slug').textContent = slug ? (hopLe ? 'hợp lệ' : 'sai định dạng') : '';
+        $('dem-slug').className = `dem ${slug && hopLe ? 'ok' : slug ? 'sai' : ''}`;
+        $('ghi-slug').textContent = slug ? `URL: /blog/${slug}` : '';
+      }
+
+      function docForm() {
+        return {
+          slug: $('slug').value,
+          title: $('title').value,
+          description: $('description').value,
+          content: $('content').value,
+          published_at: $('published_at').value || null,
+          content_updated_at: $('content_updated_at').value || null,
+          tags: $('tags')
+            .value.split(',')
+            .map((t) => t.trim())
+            .filter(Boolean),
+          takeaways: $('takeaways')
+            .value.split('\n')
+            .map((t) => t.trim())
+            .filter(Boolean),
+          series_name: $('series_name').value,
+          series_part: $('series_part').value,
+          cover_image: $('cover_image').value,
+          cover_alt: $('cover_alt').value,
+          draft: $('draft').checked,
+          featured: $('featured').checked,
+        };
+      }
+
+      function dienForm(b) {
+        $('title').value = b?.title ?? '';
+        $('slug').value = b?.slug ?? '';
+        $('description').value = b?.description ?? '';
+        $('content').value = b?.content ?? '';
+        $('published_at').value = b?.published_at ?? new Date().toISOString().slice(0, 10);
+        $('content_updated_at').value = b?.content_updated_at ?? '';
+        $('tags').value = (b?.tags ?? []).join(', ');
+        $('takeaways').value = (b?.takeaways ?? []).join('\n');
+        $('series_name').value = b?.series_name ?? '';
+        $('series_part').value = b?.series_part ?? '';
+        $('cover_image').value = b?.cover_image ?? '';
+        $('cover_alt').value = b?.cover_alt ?? '';
+        $('draft').checked = b ? b.draft : true; // bài mới mặc định là nháp
+        $('featured').checked = b?.featured ?? false;
+
+        slugDangSua = b?.slug ?? null;
+        $('tieu').textContent = b ? b.title || b.slug : 'Bài mới';
+        $('nut-xoa').disabled = !b;
+        $('loi').innerHTML = '';
+        capNhatDem();
+        veDanhSach();
+      }
+
+      function veDanhSach() {
+        $('ds').innerHTML = danhSach
+          .map(
+            (
+              b,
+            ) => `<div class="muc" data-slug="${b.slug}" ${b.slug === slugDangSua ? 'aria-current="true"' : ''}>
+              <b>${b.title.replace(/</g, '&lt;')}</b>
+              <small>
+                <span class="the ${b.draft ? 'nhap' : 'dang'}">${b.draft ? 'nháp' : 'đã đăng'}</span>
+                ${b.published_at ?? ''}
+              </small>
+            </div>`,
+          )
+          .join('');
+
+        for (const el of $('ds').querySelectorAll('.muc')) {
+          el.onclick = () => {
+            const b = danhSach.find((x) => x.slug === el.dataset.slug);
+            if (b) dienForm(b);
+            window.scrollTo(0, 0);
+          };
+        }
+      }
+
+      async function taiDanhSach() {
+        danhSach = await (await fetch('/api/bai')).json();
+        veDanhSach();
+      }
+
+      async function luu() {
+        $('nut-luu').disabled = true;
+        tt('Đang lưu…');
+        try {
+          const r = await fetch('/api/bai', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(docForm()),
+          });
+          const kq = await r.json();
+
+          if (kq.loi) {
+            $('loi').innerHTML = `<b>Chưa lưu được:</b><ul>${kq.loi
+              .map((l) => `<li>${l.thongDiep}</li>`)
+              .join('')}</ul>`;
+            tt('Có lỗi cần sửa', 'sai');
+            return;
+          }
+
+          $('loi').innerHTML = '';
+          slugDangSua = kq.slug;
+          await taiDanhSach();
+          $('tieu').textContent = $('title').value;
+          tt('Đã lưu vào database', 'ok');
+        } catch (e) {
+          tt(`Lỗi: ${e.message}`, 'sai');
+        } finally {
+          $('nut-luu').disabled = false;
+        }
+      }
+
+      async function xoa() {
+        if (!slugDangSua) return;
+        if (!confirm(`Xoá hẳn bài "${slugDangSua}" khỏi database?\n\nKhông hoàn lại được.`)) return;
+        await fetch(`/api/bai/${encodeURIComponent(slugDangSua)}`, { method: 'DELETE' });
+        await taiDanhSach();
+        dienForm(null);
+        tt('Đã xoá', 'ok');
+      }
+
+      /** Chèn chuỗi vào ô thân bài tại vị trí con trỏ. */
+      function chenVaoBai(chuoi) {
+        const ta = $('content');
+        const i = ta.selectionStart ?? ta.value.length;
+        ta.value = `${ta.value.slice(0, i)}${chuoi}${ta.value.slice(ta.selectionEnd ?? i)}`;
+        ta.focus();
+        ta.selectionStart = ta.selectionEnd = i + chuoi.length;
+        capNhatDem();
+      }
+
+      async function taiAnh(files) {
+        for (const f of files) {
+          tt(`Đang tải ${f.name}…`);
+          const r = await fetch(
+            `/api/anh?ten=${encodeURIComponent(f.name)}&thu-muc=${new Date().getFullYear()}`,
+            { method: 'POST', body: await f.arrayBuffer() },
+          );
+          const kq = await r.json();
+
+          if (kq.loi) {
+            tt(kq.loi, 'sai');
+            continue;
+          }
+
+          const kb = (n) => `${(n / 1024).toFixed(1)}KB`;
+          // Chưa có ảnh bìa thì ảnh đầu tiên dùng luôn làm bìa — đỡ một bước dán.
+          if (!$('cover_image').value) {
+            $('cover_image').value = kq.url;
+            tt(`Đặt làm ảnh bìa · ${kb(kq.goc)} → ${kb(kq.cuoi)}. Nhớ điền alt.`, 'ok');
+            $('cover_alt').focus();
+          } else {
+            chenVaoBai(`\n<Figure\n  src="${kq.url}"\n  alt=""\n  caption=""\n/>\n`);
+            tt(`Đã chèn <Figure> · ${kb(kq.goc)} → ${kb(kq.cuoi)}. Nhớ điền alt.`, 'ok');
+          }
+        }
+      }
+
+      // --- Gắn sự kiện ---
+      $('nut-luu').onclick = luu;
+      $('nut-xoa').onclick = xoa;
+      $('nut-moi').onclick = () => {
+        dienForm(null);
+        $('title').focus();
+      };
+
+      $('nut-sync').onclick = async () => {
+        $('nut-sync').disabled = true;
+        tt('Đang đồng bộ ra file…');
+        const kq = await (await fetch('/api/sync', { method: 'POST' })).json();
+        $('ketqua').hidden = false;
+        $('ketqua').textContent = kq.ra;
+        tt(
+          kq.ma === 0 ? 'Đồng bộ xong — giờ commit và push' : 'Đồng bộ lỗi',
+          kq.ma === 0 ? 'ok' : 'sai',
+        );
+        $('nut-sync').disabled = false;
+      };
+
+      $('nut-tai-anh').onclick = () => $('chon-file').click();
+      $('chon-file').onchange = (e) => taiAnh([...e.target.files]);
+
+      const keo = $('keo');
+      for (const su of ['dragenter', 'dragover']) {
+        keo.addEventListener(su, (e) => {
+          e.preventDefault();
+          keo.classList.add('dangkeo');
+        });
+      }
+      for (const su of ['dragleave', 'drop']) {
+        keo.addEventListener(su, () => keo.classList.remove('dangkeo'));
+      }
+      keo.addEventListener('drop', (e) => {
+        e.preventDefault();
+        taiAnh([...e.dataTransfer.files].filter((f) => f.type.startsWith('image/')));
+      });
+
+      for (const id of TRUONG) $(id).addEventListener('input', capNhatDem);
+
+      // Gõ tiêu đề thì tự sinh slug — CHỈ cho bài mới. Bài đã đăng mà đổi slug là
+      // đổi URL, tức là mọi link cũ tới bài đó gãy.
+      $('title').addEventListener('input', () => {
+        if (!slugDangSua) $('slug').value = slugHoa($('title').value);
+        capNhatDem();
+      });
+
+      // Ctrl+S để lưu — đây là trình soạn thảo, phản xạ đó là tự nhiên.
+      document.addEventListener('keydown', (e) => {
+        if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
+          e.preventDefault();
+          luu();
+        }
+      });
+
+      cauHinh = await (await fetch('/api/cau-hinh')).json();
+      await taiDanhSach();
+      dienForm(null);
+    </script>
+  </body>
+</html>
