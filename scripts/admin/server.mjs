@@ -24,6 +24,7 @@ import { fileURLToPath } from 'node:url';
 import { createSupabaseClient, isConfigured, SUPABASE_URL } from '../lib/supabase.mjs';
 import { MIME, uploadImage } from '../lib/images.mjs';
 import { validatePost, normalizePost, LIMITS } from '../lib/post.mjs';
+import { validateQueueItem, normalizeQueueItem } from '../lib/queue-ui.mjs';
 
 const DIR = dirname(fileURLToPath(import.meta.url));
 const PORT = Number(process.env['ADMIN_PORT'] ?? 4322);
@@ -222,6 +223,67 @@ const server = createServer(async (req, res) => {
       return json(res, 200, { ok: true });
     }
 
+    /*
+      Hàng đợi chủ đề. Giao diện do `lib/queue-ui.mjs` dựng, dùng chung với `/admin`
+      trên site; ba route dưới đây chỉ là cách nói chuyện với database của bản cục bộ.
+
+      Validate ở ĐÂY nữa dù giao diện đã validate: giao diện là thứ dễ bỏ qua nhất —
+      gọi `curl` vào cổng này là đi thẳng qua nó. Cùng lý do với `/api/posts`.
+    */
+    if (req.method === 'GET' && path === '/api/queue') {
+      const { data, error } = await supabase
+        .from('content_queue')
+        .select('*')
+        .order('publish_on', { ascending: true });
+      if (error) throw new Error(error.message);
+      return json(res, 200, data);
+    }
+
+    if (req.method === 'PUT' && path === '/api/queue') {
+      const raw = JSON.parse((await readBody(req)).toString('utf8'));
+      const id = raw.id ?? null;
+
+      // `raw: true` là đường của nút "Thử lại": chỉ gửi status/attempts/last_error,
+      // không phải cả form. Không cho nó đi qua `normalizeQueueItem` vì object đó
+      // KHÔNG có `topic` và sẽ bị validate chặn oan.
+      if (raw.__raw) {
+        if (!id) return json(res, 422, { errors: 'Thiếu id.' });
+        const patch = {
+          status: raw.status,
+          attempts: raw.attempts,
+          last_error: raw.last_error ?? null,
+        };
+        const { data, error } = await supabase
+          .from('content_queue')
+          .update(patch)
+          .eq('id', id)
+          .select('*');
+        if (error) return json(res, 422, { errors: error.message });
+        if (!data?.length) return json(res, 422, { errors: 'Không thấy chủ đề để sửa.' });
+        return json(res, 200, data[0]);
+      }
+
+      const item = normalizeQueueItem(raw);
+      const errors = validateQueueItem(item);
+      if (errors.length > 0) return json(res, 422, { errors });
+
+      const query = id
+        ? supabase.from('content_queue').update(item).eq('id', id).select('*')
+        : supabase.from('content_queue').insert(item).select('*');
+
+      const { data, error } = await query;
+      if (error) return json(res, 422, { errors: error.message });
+      if (id && !data?.length) return json(res, 422, { errors: 'Không thấy chủ đề để sửa.' });
+      return json(res, 200, data[0]);
+    }
+
+    if (req.method === 'DELETE' && path.startsWith('/api/queue/')) {
+      const id = decodeURIComponent(path.slice('/api/queue/'.length));
+      const { error } = await supabase.from('content_queue').delete().eq('id', id);
+      if (error) throw new Error(error.message);
+      return json(res, 200, { ok: true });
+    }
+
     if (req.method === 'POST' && path === '/api/images') {
       const name = url.searchParams.get('name') ?? 'anh';
       const ext = extname(name).toLowerCase();
@@ -263,19 +325,19 @@ const server = createServer(async (req, res) => {
     if (req.method === 'GET' && path === '/api/dev-alive') {
       try {
         const r = await fetch('http://localhost:4321/', { signal: AbortSignal.timeout(3000) });
-        if (!r.ok) return json(res, 200, { song: false, lyDo: `HTTP ${r.status}` });
+        if (!r.ok) return json(res, 200, { alive: false, reason: `HTTP ${r.status}` });
 
         const html = await r.text();
         const isDev = html.includes('/@vite/client');
 
         return json(res, 200, {
-          song: isDev,
-          lyDo: isDev
+          alive: isDev,
+          reason: isDev
             ? ''
             : 'Cổng 4321 đang là `astro preview` (bản build tĩnh), không phải dev server.',
         });
       } catch {
-        return json(res, 200, { song: false, lyDo: 'Không có gì nghe ở cổng 4321.' });
+        return json(res, 200, { alive: false, reason: 'Không có gì nghe ở cổng 4321.' });
       }
     }
 
@@ -291,9 +353,9 @@ const server = createServer(async (req, res) => {
         const r = await fetch(`http://localhost:4321/blog/${encodeURIComponent(slug)}`, {
           signal: AbortSignal.timeout(4000),
         });
-        return json(res, 200, { co: r.ok });
+        return json(res, 200, { exists: r.ok });
       } catch {
-        return json(res, 200, { co: false });
+        return json(res, 200, { exists: false });
       }
     }
 

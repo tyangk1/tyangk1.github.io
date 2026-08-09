@@ -267,16 +267,43 @@ const enabled = Boolean(ENV.publicSupabaseUrl && ENV.publicSupabaseAnonKey);
       #toast.bad {
         color: var(--red);
       }
-      #errors:not(:empty) {
+      .errbox:not(:empty) {
         border: 1px solid var(--red);
         background: #f8514915;
         border-radius: 6px;
         padding: 10px 12px;
         margin-bottom: 12px;
       }
-      #errors ul {
+      .errbox ul {
         margin: 0;
         padding-left: 18px;
+      }
+      /* --- Hàng đợi chủ đề ------------------------------------------------
+         Bốn trạng thái, màu theo VIỆC CẦN LÀM chứ không theo thứ tự thời gian:
+           vàng  đang chờ  — bình thường, chưa tới lượt
+           xanh  đang soạn — máy đang làm, đừng đụng
+           lục   đã soạn   — xong, không còn việc gì
+           đỏ    thất bại  — CẦN người xem, đây là màu duy nhất đòi hành động */
+      .q-queued {
+        color: var(--yellow);
+      }
+      .q-drafting {
+        color: var(--blue);
+      }
+      .q-done {
+        color: var(--green);
+      }
+      .q-failed {
+        color: var(--red);
+      }
+      select {
+        width: 100%;
+        background: var(--bg);
+        color: var(--text);
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        padding: 8px 9px;
+        font: inherit;
       }
       .note {
         color: var(--muted);
@@ -372,7 +399,7 @@ const enabled = Boolean(ENV.publicSupabaseUrl && ENV.publicSupabaseAnonKey);
         font-size: 12px;
         margin-top: 10px;
       }
-      #nut-ds {
+      #btn-list {
         display: none;
       }
 
@@ -386,7 +413,7 @@ const enabled = Boolean(ENV.publicSupabaseUrl && ENV.publicSupabaseAnonKey);
           border-bottom: 1px solid var(--border);
           max-height: 42vh;
         }
-        #nut-ds {
+        #btn-list {
           display: inline-block;
         }
         .row {
@@ -415,8 +442,8 @@ const enabled = Boolean(ENV.publicSupabaseUrl && ENV.publicSupabaseAnonKey);
           <div class="login" id="screen-login">
             <h1>Quản trị nội dung</h1>
             <p>
-              Đăng nhập được không có nghĩa là note được: quyền note do bảng <code>admins</code>{' '}
-              trong database quyết định.
+              Đăng nhập được không có nghĩa là ghi được: quyền ghi do bảng <code>admins</code> trong
+              database quyết định.
             </p>
             <form id="login-form">
               <label>
@@ -429,7 +456,7 @@ const enabled = Boolean(ENV.publicSupabaseUrl && ENV.publicSupabaseAnonKey);
                 <span class="label">
                   <span>Mật khẩu</span>
                 </span>
-                <input type="password" id="matkhau" autocomplete="current-password" required />
+                <input type="password" id="password" autocomplete="current-password" required />
               </label>
               <button class="primary" type="submit" style="width:100%">
                 Đăng nhập
@@ -441,17 +468,18 @@ const enabled = Boolean(ENV.publicSupabaseUrl && ENV.publicSupabaseAnonKey);
           <div class="shell" id="screen-main" hidden>
             <aside>
               <div class="header">
-                <button class="primary" id="nut-moi">
+                <button class="primary" id="btn-new">
                   + Bài mới
                 </button>
+                <button id="btn-queue">Chủ đề</button>
                 <button id="btn-logout">Đăng xuất</button>
               </div>
-              <div class="ds" id="ds" />
+              <div class="list" id="ds" />
             </aside>
 
             <main>
               <div class="bar">
-                <button id="nut-ds" aria-pressed="false">
+                <button id="btn-list" aria-pressed="false">
                   ☰
                 </button>
                 <button class="primary" id="btn-save">
@@ -464,8 +492,8 @@ const enabled = Boolean(ENV.publicSupabaseUrl && ENV.publicSupabaseAnonKey);
                 <span id="toast" />
               </div>
 
-              <div class="cot">
-                <div id="errors" />
+              <div class="col">
+                <div id="errors" class="errbox" />
 
                 <fieldset>
                   <legend>Bắt buộc</legend>
@@ -552,7 +580,7 @@ const enabled = Boolean(ENV.publicSupabaseUrl && ENV.publicSupabaseAnonKey);
                     </span>
                     <input type="date" id="content_updated_at" />
                   </label>
-                  <div class="cb">
+                  <div class="checks">
                     <label>
                       <input type="checkbox" id="draft" /> Bài nháp
                     </label>
@@ -597,13 +625,15 @@ const enabled = Boolean(ENV.publicSupabaseUrl && ENV.publicSupabaseAnonKey);
                   Kéo ảnh vào đây, hoặc bấm “Ảnh…”
                 </div>
                 <p class="note" style="margin-top:14px">
-                  Lưu là xong — nội dung vào database date. Site tĩnh nên bài lên trong vòng 20
-                  phút, do workflow “Tự động publish” chạy. Cần date thì bấm Run workflow ở tab
+                  Lưu là xong — nội dung vào database ngay. Site tĩnh nên bài lên trong vòng 20
+                  phút, do workflow “Auto publish” chạy. Cần lên ngay thì bấm Run workflow ở tab
                   Actions.
                 </p>
               </div>
             </main>
           </div>
+
+          <div class="shell" id="screen-queue" hidden />
 
           <input type="file" id="file-input" accept="image/*" multiple hidden />
         </>
@@ -631,6 +661,7 @@ const enabled = Boolean(ENV.publicSupabaseUrl && ENV.publicSupabaseAnonKey);
         today,
         slugify,
       } from '../../scripts/lib/post.mjs';
+      import { mountQueueUi } from '../../scripts/lib/queue-ui.mjs';
 
       const cfg = (window as unknown as { __ADMIN?: Record<string, unknown> }).__ADMIN;
       const $ = (id: string) => document.getElementById(id) as HTMLElement | null;
@@ -700,7 +731,10 @@ const enabled = Boolean(ENV.publicSupabaseUrl && ENV.publicSupabaseAnonKey);
         function logout() {
           session = null;
           localStorage.removeItem(SESSION_KEY);
+          // Ẩn CẢ HAI màn hình. Thiếu `screen-queue` thì đăng xuất xong vẫn còn thấy
+          // danh sách chủ đề trên màn hình — dữ liệu đã nạp trước đó không tự biến mất.
           $('screen-main')!.hidden = true;
+          $('screen-queue')!.hidden = true;
           $('screen-login')!.hidden = false;
         }
 
@@ -1049,6 +1083,74 @@ const enabled = Boolean(ENV.publicSupabaseUrl && ENV.publicSupabaseAnonKey);
           }
         }
 
+        /* --- Hàng đợi chủ đề ------------------------------------------------
+
+           Màn hình này do `lib/queue-ui.mjs` dựng, dùng CHUNG với `pnpm admin`. Ở đây
+           chỉ tiêm cách nói chuyện với database: gọi thẳng REST bằng JWT.
+
+           `raw: true` cho `save` là đường dành cho nút "Thử lại" — nó gửi đúng những
+           cột cần đổi (status, attempts, last_error) chứ không gửi cả form.
+        */
+        let queueUi: { refresh: () => Promise<void> } | null = null;
+
+        const queueDb = {
+          async list() {
+            const r = await api('/rest/v1/content_queue?select=*&order=publish_on.asc');
+            if (!r.ok) throw new Error(`HTTP ${r.status}`);
+            return r.json();
+          },
+
+          async save(item: Record<string, unknown>, id: string | null, opts?: { raw?: boolean }) {
+            const body = opts?.raw ? item : item;
+            const r = await api(
+              id ? `/rest/v1/content_queue?id=eq.${id}` : '/rest/v1/content_queue',
+              {
+                method: id ? 'PATCH' : 'POST',
+                headers: { Prefer: 'return=representation' },
+                body: JSON.stringify(body),
+              },
+            );
+            const rows = await r.json().catch(() => []);
+            if (!r.ok) throw new Error(String(rows?.message ?? `HTTP ${r.status}`));
+            // 2xx với 0 dòng nghĩa là RLS đã lọc — cùng cái bẫy đã gặp ở bảng posts.
+            if (id && Array.isArray(rows) && rows.length === 0) {
+              throw new Error('Không có dòng nào được sửa — chủ đề có thể đã bị xoá.');
+            }
+            return Array.isArray(rows) ? rows[0] : rows;
+          },
+
+          async remove(id: string) {
+            const r = await api(`/rest/v1/content_queue?id=eq.${id}`, { method: 'DELETE' });
+            if (!r.ok) throw new Error(`HTTP ${r.status}`);
+          },
+        };
+
+        function showQueue(show: boolean) {
+          $('screen-main')!.hidden = show;
+          $('screen-queue')!.hidden = !show;
+
+          // Quay về thì TẢI LẠI danh sách bài. Lý do cụ thể: thứ hay xảy ra giữa hai
+          // lần mở màn hình này là trình soạn bài tự động vừa sinh ra một bài nháp mới.
+          // Không tải lại thì nó không xuất hiện, và người dùng tưởng chưa soạn được.
+          if (!show) {
+            void loadPosts();
+            return;
+          }
+
+          // Gắn một lần rồi giữ lại: dựng lại mỗi lần mở là mất chủ đề đang sửa.
+          if (!queueUi) {
+            queueUi = mountQueueUi($('screen-queue')!, {
+              db: queueDb,
+              toast,
+              today: today(),
+              onExit: () => showQueue(false),
+            });
+          }
+          void queueUi.refresh();
+        }
+
+        $('btn-queue')!.onclick = () => showQueue(true);
+
         // --- Đăng nhập ------------------------------------------------------
         async function restoreSession() {
           $('screen-login')!.hidden = true;
@@ -1065,7 +1167,7 @@ const enabled = Boolean(ENV.publicSupabaseUrl && ENV.publicSupabaseAnonKey);
           const r = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=password`, {
             method: 'POST',
             headers: { apikey: KEY, 'Content-Type': 'application/json' },
-            body: JSON.stringify({ email: val('email'), password: val('matkhau') }),
+            body: JSON.stringify({ email: val('email'), password: val('password') }),
           });
 
           if (!r.ok) {
@@ -1082,7 +1184,7 @@ const enabled = Boolean(ENV.publicSupabaseUrl && ENV.publicSupabaseAnonKey);
 
         $('btn-logout')!.onclick = logout;
         $('btn-save')!.onclick = save;
-        $('nut-moi')!.onclick = () => {
+        $('btn-new')!.onclick = () => {
           fillForm(null);
           $('title')!.focus();
         };
@@ -1100,7 +1202,7 @@ const enabled = Boolean(ENV.publicSupabaseUrl && ENV.publicSupabaseAnonKey);
           fillForm(null);
           toast('Đã xoá', 'ok');
         };
-        $('nut-ds')!.onclick = () => {
+        $('btn-list')!.onclick = () => {
           const a = document.querySelector('aside')!;
           a.hidden = !a.hidden;
         };

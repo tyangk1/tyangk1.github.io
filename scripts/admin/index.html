@@ -120,7 +120,7 @@
         grid-template-columns: 1fr;
         min-height: 0;
       }
-      .body.co-xem {
+      .body.has-preview {
         grid-template-columns: 1fr 1fr;
       }
       .col {
@@ -129,7 +129,7 @@
            Chỉ đặt `overflow-y: auto` thì trục X thành `auto` theo mặc định, và
            trên màn 390px nó sinh một bar cuộn ngang 24px dù KHÔNG phần tử con
            nào vượt mép phải — đã kiểm từng phần tử. Cột này cuộn dọc, cuộn ngang
-           ở đây không wrap giờ là điều mong muốn. */
+           ở đây không bao giờ là điều mong muốn. */
         overflow-x: hidden;
         min-width: 0;
         padding: 14px 16px 50px;
@@ -155,7 +155,7 @@
          Dưới 900px: danh sách bài thành một khối gập lại ở trên, không còn cột
          cố định 270px. Dưới 900px mà giữ hai cột thì cột soạn chỉ còn ~350px —
          không viết nổi. */
-      #nut-ds {
+      #btn-list {
         display: none;
       }
 
@@ -173,12 +173,12 @@
         aside[hidden] {
           display: none !important;
         }
-        #nut-ds {
+        #btn-list {
           display: inline-block;
         }
         /* Xem trước xếp DỌC trên màn hẹp. Chia đôi ngang ở 400px mỗi bên thì cả
            hai bên đều không đọc được. */
-        .body.co-xem {
+        .body.has-preview {
           grid-template-columns: 1fr;
           grid-template-rows: 1fr 1fr;
         }
@@ -294,14 +294,14 @@
       .counter.bad {
         color: var(--red);
       }
-      #errors:not(:empty) {
+      .errbox:not(:empty) {
         border: 1px solid var(--red);
         background: #f8514915;
         border-radius: 6px;
         padding: 9px 11px;
         margin-bottom: 12px;
       }
-      #errors ul {
+      .errbox ul {
         margin: 0;
         padding-left: 18px;
       }
@@ -315,6 +315,50 @@
       }
       #toast.bad {
         color: var(--red);
+      }
+      /* --- Hàng đợi chủ đề ------------------------------------------------
+         Bốn trạng thái, màu theo VIỆC CẦN LÀM chứ không theo thứ tự thời gian:
+           vàng  đang chờ  — bình thường, chưa tới lượt
+           xanh  đang soạn — máy đang làm, đừng đụng
+           lục   đã soạn   — xong, không còn việc gì
+           đỏ    thất bại  — CẦN người xem, đây là màu duy nhất đòi hành động */
+      .q-queued {
+        color: var(--yellow);
+      }
+      .q-drafting {
+        color: var(--blue);
+      }
+      .q-done {
+        color: var(--green);
+      }
+      .q-failed {
+        color: var(--red);
+      }
+      select {
+        width: 100%;
+        background: var(--bg);
+        color: var(--text);
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        padding: 8px 9px;
+        font: inherit;
+      }
+
+      /* Màn hình hàng đợi trải cả HAI cột của grid trên `body`.
+         Bản deploy có `.shell` bọc ngoài nên chỉ cần ẩn/hiện; ở đây `aside` và `main`
+         là con trực tiếp của `body`, nên màn hình mới phải tự dựng lại grid của nó. */
+      #screen-queue {
+        grid-column: 1 / -1;
+        display: grid;
+        grid-template-columns: 270px 1fr;
+        min-height: 0;
+        overflow: hidden;
+      }
+      @media (max-width: 900px) {
+        #screen-queue {
+          grid-template-columns: 1fr;
+          grid-template-rows: auto 1fr;
+        }
       }
       .note {
         color: var(--muted);
@@ -459,7 +503,7 @@
         color: var(--muted);
         flex: none;
       }
-      #khung-xem {
+      #preview-frame {
         flex: 1;
         width: 100%;
         border: 0;
@@ -476,7 +520,7 @@
         padding: 1px 5px;
         border-radius: 4px;
       }
-      pre.ketqua {
+      pre.result-box {
         background: var(--panel);
         border: 1px solid var(--border);
         border-radius: 6px;
@@ -503,27 +547,28 @@
   </head>
   <body>
     <aside>
-      <div class="dau">
-        <button class="primary" id="nut-moi">+ Bài mới</button>
-        <button id="nut-sync" title="Kéo nội dung từ database ra file MDX">Đồng bộ</button>
+      <div class="header">
+        <button class="primary" id="btn-new">+ Bài mới</button>
+        <button id="btn-queue" title="Hàng đợi chủ đề cho việc soạn bài tự động">Chủ đề</button>
+        <button id="btn-sync" title="Kéo nội dung từ database ra file MDX">Đồng bộ</button>
       </div>
-      <div class="ds" id="ds"></div>
+      <div class="list" id="ds"></div>
     </aside>
 
     <main>
       <div class="bar">
-        <button id="nut-ds" aria-pressed="false" title="Ẩn/hiện danh sách bài">☰</button>
+        <button id="btn-list" aria-pressed="false" title="Ẩn/hiện danh sách bài">☰</button>
         <button class="primary" id="btn-save">Lưu</button>
-        <button id="nut-xem" aria-pressed="false">Xem trước</button>
+        <button id="btn-preview" aria-pressed="false">Xem trước</button>
         <button id="btn-image">Tải ảnh lên…</button>
         <button class="danger" id="btn-delete">Xoá bài</button>
         <span id="toast"></span>
       </div>
 
       <div class="body" id="body">
-        <div class="cot">
-          <div id="errors"></div>
-          <h1 id="tieu">Bài mới</h1>
+        <div class="col">
+          <div id="errors" class="errbox"></div>
+          <h1 id="heading">Bài mới</h1>
 
           <fieldset>
             <legend>Bắt buộc</legend>
@@ -562,7 +607,7 @@
               </label>
               <label>
                 <!-- Để ngày ở tương lai là ĐẶT LỊCH: bài nằm im tới đúng ngày đó rồi
-                     tự lên. `#scheduleHint` nói ra date lúc chọn ngày. -->
+                     tự lên. `#scheduleHint` nói ra ngay lúc chọn ngày. -->
                 <span class="label"><span>Ngày đăng</span><em id="scheduleHint"></em></span>
                 <input type="date" id="published_at" />
               </label>
@@ -606,7 +651,7 @@
               </label>
             </div>
 
-            <div class="cb">
+            <div class="checks">
               <label><input type="checkbox" id="draft" /> Bài nháp (không lên site)</label>
               <label><input type="checkbox" id="featured" /> Nổi bật ở trang chủ</label>
             </div>
@@ -641,28 +686,30 @@
           </div>
 
           <div class="dropzone" id="dropzone">Kéo ảnh vào đây để tải lên và chèn vào bài</div>
-          <pre class="ketqua" id="ketqua" hidden></pre>
+          <pre class="result-box" id="result-box" hidden></pre>
         </div>
 
-        <div class="cot" id="cot-xem" hidden>
+        <div class="col" id="col-preview" hidden>
           <div class="preview-bar">
             <button id="btn-refresh">Cập nhật xem trước</button>
             <span id="preview-status"></span>
           </div>
           <div class="side" id="side-dev" hidden>
-            <b id="ly-do-dev"></b><br /><br />
-            Xem trước dùng <b>chính site</b> để render, nên cần dev server chạy song song:
+            <b id="dev-reason"></b><br /><br />
+            Xem trước dùng <b>chính site</b> để render, nên cần dev server chạy alive alive:
             <br /><br /><code>pnpm dev</code><br /><br />
             Phải là <code>pnpm dev</code>, <b>không</b> phải <code>pnpm preview</code> —
             <code>preview</code> phục vụ bản build tĩnh trong <code>dist/</code> nên bài vừa sửa
             không hiện, bài mới tạo trả 404, và không có dấu hiệu nào cho biết bạn đang xem bản cũ.
           </div>
-          <iframe id="khung-xem" title="Xem trước bài viết"></iframe>
+          <iframe id="preview-frame" title="Xem trước bài viết"></iframe>
         </div>
       </div>
 
       <input type="file" id="file-input" accept="image/*" multiple hidden />
     </main>
+
+    <div id="screen-queue" hidden></div>
 
     <script type="module">
       // Bộ tô màu và mẫu chèn lấy từ module dùng chung với admin đã deploy — xem
@@ -673,6 +720,9 @@
       // `slugify` cũng lấy từ đây. Trước đây mỗi admin giữ một bản copy — ba bản cho
       // một công thức, và slug là URL của bài nên lệch nhau là link gãy.
       import { postStatus, STATUS_LABELS, today, slugify } from '/lib/post.mjs';
+      // Màn hình hàng đợi dùng CHUNG với `/admin` trên site. Ở đây chỉ tiêm cách nói
+      // chuyện với database: qua `/api/queue` của server cục bộ (server dùng service key).
+      import { mountQueueUi } from '/lib/queue-ui.mjs';
 
       const $ = (id) => document.getElementById(id);
       let config = { limits: {} };
@@ -869,7 +919,7 @@
 
         const slug = $('slug').value.trim();
         const hopLe = /^[a-z0-9]+(-[a-z0-9]+)*$/.test(slug);
-        $('count-slug').textContent = slug ? (hopLe ? 'hợp lệ' : 'bad định dạng') : '';
+        $('count-slug').textContent = slug ? (hopLe ? 'hợp lệ' : 'sai định dạng') : '';
         $('count-slug').className = `counter ${slug && hopLe ? 'ok' : slug ? 'bad' : ''}`;
         $('slug-note').textContent = slug ? `URL: /blog/${slug}` : '';
       }
@@ -919,7 +969,7 @@
         $('featured').checked = b?.featured ?? false;
 
         editingSlug = b?.slug ?? null;
-        $('tieu').textContent = b ? b.title || b.slug : 'Bài mới';
+        $('heading').textContent = b ? b.title || b.slug : 'Bài mới';
         $('btn-delete').disabled = !b;
         $('errors').innerHTML = '';
         updateCounters();
@@ -967,7 +1017,7 @@
 
           if (result.errors) {
             $('errors').innerHTML =
-              `<b>Chưa lưu được:</b><ul>${result.errors.map((l) => `<li>${l.thongDiep}</li>`).join('')}</ul>`;
+              `<b>Chưa lưu được:</b><ul>${result.errors.map((l) => `<li>${l.message}</li>`).join('')}</ul>`;
             toast('Có lỗi cần sửa', 'bad');
             return false;
           }
@@ -975,7 +1025,7 @@
           $('errors').innerHTML = '';
           editingSlug = result.slug;
           await loadPosts();
-          $('tieu').textContent = $('title').value;
+          $('heading').textContent = $('title').value;
           if (!silent) toast('Đã lưu vào database', 'ok');
           return true;
         } catch (e) {
@@ -993,16 +1043,16 @@
 
       async function refreshPreview({ silent = false } = {}) {
         // Không cho hai lần cập nhật chồng nhau: `pnpm sync` ghi file, hai lần
-        // chạy song song có thể ghi dở đang lên nhau.
+        // chạy alive alive có thể ghi dở đang lên nhau.
         if (refreshing) return;
         refreshing = true;
 
         try {
-          const { song, lyDo } = await (await fetch('/api/dev-alive')).json();
-          $('side-dev').hidden = song;
-          $('khung-xem').hidden = !song;
-          $('ly-do-dev').textContent = lyDo ?? '';
-          if (!song) {
+          const { alive, reason } = await (await fetch('/api/dev-alive')).json();
+          $('side-dev').hidden = alive;
+          $('preview-frame').hidden = !alive;
+          $('dev-reason').textContent = reason ?? '';
+          if (!alive) {
             $('preview-status').textContent = '';
             return;
           }
@@ -1022,13 +1072,15 @@
           // Chờ Astro sinh route cho file MDX. Bài MỚI cần một nhịp; gán `src`
           // trước lúc đó là nhận 404 và mắc ở đấy vĩnh viễn, vì bên dưới cố tình
           // không gán lại `src` mỗi lần cập nhật.
-          let co = false;
-          for (let i = 0; i < 10 && !co; i += 1) {
-            ({ co } = await (await fetch(`/api/dev-page?slug=${encodeURIComponent(slug)}`)).json());
-            if (!co) await new Promise((r) => setTimeout(r, 700));
+          let exists = false;
+          for (let i = 0; i < 10 && !exists; i += 1) {
+            ({ exists } = await (
+              await fetch(`/api/dev-page?slug=${encodeURIComponent(slug)}`)
+            ).json());
+            if (!exists) await new Promise((r) => setTimeout(r, 700));
           }
 
-          if (!co) {
+          if (!exists) {
             $('preview-status').textContent =
               'dev server chưa sinh trang này — thử lại sau vài giây';
             return;
@@ -1038,7 +1090,7 @@
           // của Astro tự lo — gán lại `src` sẽ kéo iframe về đầu trang, mà đang
           // đọc đoạn giữa bài bị kéo lên đầu thì rất khó chịu.
           if (loaded !== slug) {
-            $('khung-xem').src = dich;
+            $('preview-frame').src = dich;
             loaded = slug;
           }
 
@@ -1050,11 +1102,11 @@
         }
       }
 
-      $('nut-xem').onclick = async () => {
-        const hien = $('cot-xem').hidden;
-        $('cot-xem').hidden = !hien;
-        $('body').classList.toggle('co-xem', hien);
-        $('nut-xem').setAttribute('aria-pressed', String(hien));
+      $('btn-preview').onclick = async () => {
+        const hien = $('col-preview').hidden;
+        $('col-preview').hidden = !hien;
+        $('body').classList.toggle('has-preview', hien);
+        $('btn-preview').setAttribute('aria-pressed', String(hien));
         if (hien) await refreshPreview();
       };
       $('btn-refresh').onclick = () => refreshPreview();
@@ -1075,7 +1127,7 @@
        */
       let scheduleHint = null;
       function scheduleRefresh() {
-        if ($('cot-xem').hidden) return;
+        if ($('col-preview').hidden) return;
         clearTimeout(scheduleHint);
         $('preview-status').textContent = 'sẽ cập nhật…';
         scheduleHint = setTimeout(() => refreshPreview({ silent: true }), 1500);
@@ -1128,21 +1180,87 @@
         fillForm(null);
         toast('Đã xoá', 'ok');
       };
-      $('nut-moi').onclick = () => {
+      $('btn-new').onclick = () => {
         fillForm(null);
         $('title').focus();
       };
-      $('nut-sync').onclick = async () => {
-        $('nut-sync').disabled = true;
+      /* --- Hàng đợi chủ đề --------------------------------------------------
+
+         `queue-ui.mjs` dựng cả màn hình; ở đây chỉ tiêm ba hàm truy cập dữ liệu và
+         nút chuyển qua lại. Ở bản deploy cùng module này nhận một adapter gọi thẳng
+         REST — đó là toàn bộ khác biệt giữa hai bản.
+      */
+      let queueUi = null;
+
+      const queueDb = {
+        async list() {
+          const r = await fetch('/api/queue');
+          if (!r.ok) throw new Error(`HTTP ${r.status}`);
+          return r.json();
+        },
+
+        async save(item, id, opts) {
+          const r = await fetch('/api/queue', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            // `__raw` cho server biết đây là nút "Thử lại": chỉ gửi status/attempts/
+            // last_error, không phải cả form — nên đừng đưa qua validate của chủ đề.
+            body: JSON.stringify({ ...item, id, __raw: Boolean(opts?.raw) }),
+          });
+          const j = await r.json();
+          if (!r.ok) {
+            const msg = Array.isArray(j.errors)
+              ? j.errors.map((e) => e.message).join(' · ')
+              : (j.errors ?? `HTTP ${r.status}`);
+            throw new Error(String(msg));
+          }
+          return j;
+        },
+
+        async remove(id) {
+          const r = await fetch(`/api/queue/${encodeURIComponent(id)}`, { method: 'DELETE' });
+          if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        },
+      };
+
+      function showQueue(show) {
+        document.querySelector('body > aside').hidden = show;
+        document.querySelector('body > main').hidden = show;
+        $('screen-queue').hidden = !show;
+
+        // Quay về thì TẢI LẠI danh sách bài: thứ hay xảy ra giữa hai lần mở màn hình
+        // này là trình soạn bài vừa sinh ra một bài nháp mới. Không tải lại thì nó
+        // không xuất hiện, và người dùng tưởng chưa soạn được.
+        if (!show) {
+          loadPosts();
+          return;
+        }
+
+        // Gắn một lần rồi giữ lại: dựng lại mỗi lần mở là mất chủ đề đang sửa.
+        if (!queueUi) {
+          queueUi = mountQueueUi($('screen-queue'), {
+            db: queueDb,
+            toast,
+            today: today(),
+            onExit: () => showQueue(false),
+          });
+        }
+        queueUi.refresh();
+      }
+
+      $('btn-queue').onclick = () => showQueue(true);
+
+      $('btn-sync').onclick = async () => {
+        $('btn-sync').disabled = true;
         toast('Đang đồng bộ ra file…');
         const result = await (await fetch('/api/sync', { method: 'POST' })).json();
-        $('ketqua').hidden = false;
-        $('ketqua').textContent = result.ra;
+        $('result-box').hidden = false;
+        $('result-box').textContent = result.out;
         toast(
-          result.ma === 0 ? 'Đồng bộ xong — giờ commit và push' : 'Đồng bộ lỗi',
-          result.ma === 0 ? 'ok' : 'bad',
+          result.code === 0 ? 'Đồng bộ xong — giờ commit và push' : 'Đồng bộ lỗi',
+          result.code === 0 ? 'ok' : 'bad',
         );
-        $('nut-sync').disabled = false;
+        $('btn-sync').disabled = false;
       };
       $('btn-image').onclick = () => $('file-input').click();
       $('file-input').onchange = (e) => uploadImages([...e.target.files]);
@@ -1170,10 +1288,10 @@
       $('draft').addEventListener('change', updateCounters);
       $('content').addEventListener('input', renderHighlight);
 
-      $('nut-ds').onclick = () => {
+      $('btn-list').onclick = () => {
         const a = document.querySelector('aside');
         a.hidden = !a.hidden;
-        $('nut-ds').setAttribute('aria-pressed', String(a.hidden));
+        $('btn-list').setAttribute('aria-pressed', String(a.hidden));
       };
       $('content').addEventListener('scroll', () => {
         $('hl').scrollTop = $('content').scrollTop;
