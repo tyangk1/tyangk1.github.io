@@ -5,6 +5,47 @@ Tài liệu này nói về **nội dung**, không nói về kỹ thuật. Phần
 
 ---
 
+## 0. Bốn bước từ lúc gõ chữ tới lúc bài lên site
+
+```bash
+pnpm db:start          # chỉ khi muốn xem trước ở máy (cần Docker)
+pnpm dev               # http://localhost:4321 — thấy cả bài draft
+
+# 1. Soạn bài trong Supabase Studio (bảng `posts`)
+# 2. Có ảnh thì:
+pnpm anh:upload "./anh/Sơ đồ cache.png"     # in ra URL, dán vào bài
+
+# 3. Kéo nội dung từ database ra file MDX
+pnpm sync
+
+# 4. Commit rồi push — CI tự build và deploy, khoảng 1–2 phút
+git add -A && git commit -m "Bài mới: ..." && git push
+```
+
+**Bước 3 là bước dễ quên nhất.** Quên nó thì push vẫn thành công, CI vẫn xanh,
+site vẫn deploy — chỉ là bằng nội dung của lần commit trước. Không có lỗi nào để
+lần ra. Kiểm nhanh trước khi push:
+
+```bash
+git status --short src/content/
+```
+
+Ba điều dễ hiểu sai:
+
+| Điều              | Sự thật                                                                                                 |
+| ----------------- | ------------------------------------------------------------------------------------------------------- |
+| Nguồn sự thật     | Database, **lúc soạn**. Sửa file trong `src/content/` bằng tay là vô nghĩa — lần `pnpm sync` sau ghi đè |
+| Bài `draft: true` | `pnpm sync` **loại hẳn**. Muốn xem trước thì `pnpm dev` (nó tự dùng `sync:drafts`)                      |
+| Ảnh               | Nằm trong Supabase Storage nhưng được tải về và tối ưu **lúc build**, phục vụ từ chính site             |
+
+Đã kiểm cả chuỗi bằng một bài thật: chèn vào Supabase với `draft = true` → `pnpm sync`
+đúng 8 bài (loại nó) → `sync --drafts` đúng 9 bài → đổi sang `draft = false` →
+build sinh đủ trang, ảnh OG, 4 biến thể ảnh bìa, có trong sitemap/RSS/chỉ mục tìm
+kiếm → push → bài hiện trên site và trên trang chủ, ảnh tải từ `/_astro/` chứ không
+từ Supabase.
+
+---
+
 ## 1. Trước khi viết: chọn đúng bài để viết
 
 Đừng bắt đầu bằng "hôm nay viết gì". Bắt đầu bằng một trong ba nguồn sau:
@@ -149,8 +190,24 @@ thành khó đọc trên điện thoại. Bảng đã được tự bọc trong 
 
 ### Ảnh
 
-- Đặt ảnh trong `src/assets/` rồi tham chiếu từ frontmatter — Astro tự nén và tự
-  sinh AVIF/WebP.
+Cách khuyên dùng — **Supabase Storage**, một lệnh:
+
+```bash
+pnpm anh:upload "./anh/Sơ đồ cache.png"
+```
+
+Nó bỏ dấu tên file, thu nhỏ về 1600px, chuyển WebP nếu nhỏ hơn, đặt cache một
+năm, rồi in ra URL kèm sẵn dòng để dán vào bài. Ví dụ thật đã đo: `103.6KB →
+11.0KB` (−89%).
+
+Dán URL đó vào frontmatter hoặc vào `<Figure>`. Astro **tải ảnh về lúc build**,
+sinh nhiều kích thước kèm `srcset`, rồi phục vụ từ chính site — nên người đọc
+không tải ảnh từ Supabase, không tốn băng thông Storage, và Storage lỗi cũng không
+ảnh hưởng người đang đọc.
+
+Ảnh trong `src/assets/` cũng vẫn dùng được (Astro tự nén, tự sinh AVIF/WebP) —
+chọn cách này khi ảnh nhỏ và muốn nó nằm luôn trong git.
+
 - **Alt là bắt buộc.** Có `coverImage` mà thiếu `coverAlt` là build hỏng.
 - Alt mô tả _nội dung_ ảnh, không mô tả _loại_ ảnh: "Biểu đồ cho thấy thời gian
   tải giảm từ 4,2s xuống 0,9s" chứ không "Ảnh chụp màn hình".
