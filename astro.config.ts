@@ -65,7 +65,12 @@ export default defineConfig({
     mdx(),
     sitemap({
       // Ảnh OG là endpoint sinh ảnh, không phải trang — không đưa vào sitemap.
-      filter: (page) => !page.includes('/og/'),
+      //
+      // `/admin` cũng bị loại: nó đã có `noindex`, mà vừa `noindex` vừa nằm trong
+      // sitemap là tự mâu thuẫn — sitemap nghĩa là "hãy index trang này". Google
+      // sẽ nghe thẻ `noindex` nên không có hại thật, nhưng nó chỉ đường cho người
+      // lạ tới trang đăng nhập một cách vô ích.
+      filter: (page) => !page.includes('/og/') && !page.includes('/admin'),
     }),
   ],
 

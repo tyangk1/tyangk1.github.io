@@ -66,9 +66,20 @@ for (const file of files) {
   if (h1Count !== 1) report(file, `có ${h1Count} thẻ <h1> (cần đúng 1)`);
 
   // 4. Thẻ meta bắt buộc.
+  //
+  // Trang `noindex` được miễn `description` và `canonical`: hai thẻ đó tồn tại để
+  // máy tìm kiếm hiển thị và chọn URL chuẩn, mà trang đã nói "đừng index" thì
+  // không có gì để hiển thị. Đặt canonical trên trang noindex còn là tín hiệu tự
+  // mâu thuẫn. `<title>` thì vẫn bắt buộc — nó là tên tab của người đang mở.
+  const noindex = /<meta name="robots" content="[^"]*noindex/.test(raw);
+
   if (!/<title>[^<]+<\/title>/.test(raw)) report(file, 'thiếu <title>');
-  if (!/<meta name="description" content="[^"]+"/.test(raw)) report(file, 'thiếu meta description');
-  if (!/<link rel="canonical" href="[^"]+"/.test(raw)) report(file, 'thiếu canonical');
+
+  if (!noindex) {
+    if (!/<meta name="description" content="[^"]+"/.test(raw))
+      report(file, 'thiếu meta description');
+    if (!/<link rel="canonical" href="[^"]+"/.test(raw)) report(file, 'thiếu canonical');
+  }
 
   // 5. Link nội bộ trỏ vào trang không tồn tại.
   for (const match of body.matchAll(/href="(\/[^"#?]*)"/g)) {
