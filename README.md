@@ -602,6 +602,24 @@ Lý do quan trọng hơn sự tiện: chất lượng văn tiếng Việt giữa
 Một bài 2000 từ tốn khoảng 3–4k token đầu ra, tức cỡ nghìn đồng — free tier có thật
 (Google AI Studio, Groq) nhưng thử rồi đổi ý phải rẻ.
 
+**Chọn tên model cẩn thận.** Với AI Studio bậc free, `gemini-2.0-flash` và
+`gemini-2.5-pro` trả **429 `RESOURCE_EXHAUSTED`** ngay từ request đầu, còn
+`gemini-flash-latest` thì chạy. Và phân biệt được hai mã lỗi này là quan trọng:
+
+| Phản hồi                                 | Nghĩa                                                   |
+| ---------------------------------------- | ------------------------------------------------------- |
+| `400 API key not valid`                  | Khoá sai                                                |
+| `401 invalid authentication credentials` | Không phải API key (vd. token OAuth)                    |
+| **`429 RESOURCE_EXHAUSTED`**             | Khoá **đúng**, model hết quota — đổi `AI_MODEL` là xong |
+
+Cách kiểm nhanh khoá còn sống mà không tốn quota sinh nội dung:
+
+```bash
+curl "https://generativelanguage.googleapis.com/v1beta/models?key=$AI_API_KEY"
+```
+
+200 kèm danh sách model nghĩa là khoá tốt; sau đó chỉ còn việc chọn model nào còn quota.
+
 Cố ý **không** dùng `response_format: json_schema`: chuẩn đó chỉ một phần nhà cung cấp
 hỗ trợ, và nơi không hỗ trợ thì trả 400 chứ không bỏ qua.
 

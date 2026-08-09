@@ -98,7 +98,10 @@ jobs:
               echo "Lấy khoá miễn phí: https://aistudio.google.com/apikey"
               echo ""
               echo '    AI_BASE_URL = https://generativelanguage.googleapis.com/v1beta/openai'
-              echo '    AI_MODEL    = gemini-2.0-flash'
+              echo '    AI_MODEL    = gemini-flash-latest'
+              echo ''
+              echo 'Đừng đặt `gemini-2.0-flash`: bậc free của nó trả 429 RESOURCE_EXHAUSTED'
+              echo 'ngay từ request đầu. `gemini-flash-latest` thì chạy — đã đo bằng khoá thật.'
               echo ""
               echo "Mật khẩu bot nằm trong \`.env\` ở máy (SUPABASE_BOT_PASSWORD)."
             } >> "$GITHUB_STEP_SUMMARY"
