@@ -670,7 +670,9 @@
       import { highlightMdx, MDX_SNIPPETS } from '/lib/highlight-mdx.mjs';
       // Trạng thái bài (nháp / đặt lịch / đã đăng) cũng lấy từ module dùng chung. Hai
       // admin mà tự tính riêng thì cùng một bài sẽ được gắn hai nhãn khác nhau.
-      import { postStatus, STATUS_LABELS, today } from '/lib/post.mjs';
+      // `slugify` cũng lấy từ đây. Trước đây mỗi admin giữ một bản copy — ba bản cho
+      // một công thức, và slug là URL của bài nên lệch nhau là link gãy.
+      import { postStatus, STATUS_LABELS, today, slugify } from '/lib/post.mjs';
 
       const $ = (id) => document.getElementById(id);
       let config = { limits: {} };
@@ -695,16 +697,6 @@
       function toast(chu, loai = '') {
         $('toast').textContent = chu;
         $('toast').className = loai;
-      }
-
-      function slugify(s) {
-        return s
-          .normalize('NFD')
-          .replace(/\p{M}/gu, '')
-          .replace(/[đĐ]/g, (c) => (c === 'đ' ? 'd' : 'D'))
-          .toLowerCase()
-          .replace(/[^a-z0-9]+/g, '-')
-          .replace(/^-+|-+$/g, '');
       }
 
       const hlCode = $('hl').firstElementChild;

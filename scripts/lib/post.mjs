@@ -50,6 +50,30 @@ export function postStatus(post, homNay = today()) {
   return date > homNay ? 'scheduled' : 'published';
 }
 
+/**
+ * Tiêu đề → slug, bỏ dấu tiếng Việt.
+ *
+ * Cùng công thức với `slugify()` trong `src/utils/format.ts`, và phải giữ cho khớp:
+ * slug ở đây trở thành URL của bài, còn hàm kia là thứ site dùng để sinh URL tag.
+ * Lệch nhau thì link nội bộ trỏ sai mà không có lỗi nào để thấy.
+ *
+ * Không import từ file kia được vì nó là TypeScript, còn module này chạy cả trong
+ * trình duyệt. Trước đây mỗi trang admin giữ một bản copy riêng — ba bản cho một
+ * công thức. Giờ còn hai: bản TS cho site, bản này cho mọi thứ khác.
+ *
+ * `\p{M}` xoá toàn bộ dấu thanh sau khi NFD tách chúng ra thành ký tự riêng. `đ`
+ * phải xử lý riêng vì nó KHÔNG phải "d + dấu" trong Unicode.
+ */
+export function slugify(input) {
+  return String(input ?? '')
+    .normalize('NFD')
+    .replace(/\p{M}/gu, '')
+    .replace(/[đĐ]/g, 'd')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+}
+
 /** Nhãn tiếng Việt cho ba trạng thái trên, dùng chung cho hai trang admin. */
 export const STATUS_LABELS = {
   draft: 'nháp',

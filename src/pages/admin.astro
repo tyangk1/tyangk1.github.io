@@ -629,6 +629,7 @@ const enabled = Boolean(ENV.publicSupabaseUrl && ENV.publicSupabaseAnonKey);
         postStatus,
         STATUS_LABELS,
         today,
+        slugify,
       } from '../../scripts/lib/post.mjs';
 
       const cfg = (window as unknown as { __ADMIN?: Record<string, unknown> }).__ADMIN;
@@ -831,16 +832,6 @@ const enabled = Boolean(ENV.publicSupabaseUrl && ENV.publicSupabaseAnonKey);
           $('count-slug')!.textContent = slug ? (hopLe ? 'hợp lệ' : 'bad định dạng') : '';
           $('count-slug')!.className = `counter ${slug && hopLe ? 'ok' : slug ? 'bad' : ''}`;
           $('slug-note')!.textContent = slug ? `URL: /blog/${slug}` : '';
-        }
-
-        function slugify(s: string) {
-          return s
-            .normalize('NFD')
-            .replace(/\p{M}/gu, '')
-            .replace(/[đĐ]/g, (c) => (c === 'đ' ? 'd' : 'D'))
-            .toLowerCase()
-            .replace(/[^a-z0-9]+/g, '-')
-            .replace(/^-+|-+$/g, '');
         }
 
         // --- Form -----------------------------------------------------------

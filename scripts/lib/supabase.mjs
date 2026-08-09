@@ -9,27 +9,12 @@
  * biến `PUBLIC_*` vào bundle client, nên cách đặt tên này tự bảo vệ.
  */
 import { createClient } from '@supabase/supabase-js';
-import { readFile } from 'node:fs/promises';
+import { loadEnv } from './env.mjs';
 
-/** Đọc .env thủ công vì script chạy bằng `node` thuần, không qua Vite. */
-async function napEnv() {
-  for (const file of ['.env', '.env.local']) {
-    try {
-      const raw = await readFile(file, 'utf8');
-      for (const line of raw.split(/\r?\n/)) {
-        const match = line.match(/^\s*([A-Z0-9_]+)\s*=\s*(.*)$/);
-        if (!match) continue;
-        const [, key, rawValue] = match;
-        if (process.env[key] !== undefined) continue;
-        process.env[key] = rawValue.trim().replace(/^['"]|['"]$/g, '');
-      }
-    } catch {
-      // Không có file .env thì bỏ qua — biến có thể đã đặt sẵn ở môi trường.
-    }
-  }
-}
-
-await napEnv();
+// Nạp `.env` trước khi đọc biến. Hàm này từng nằm ngay trong file này; đã tách ra
+// `lib/env.mjs` để script nào cần biến môi trường khỏi phải import cả module database
+// chỉ để lấy tác dụng phụ.
+await loadEnv();
 
 export const SUPABASE_URL = process.env['SUPABASE_URL'] ?? process.env['PUBLIC_SUPABASE_URL'] ?? '';
 export const SUPABASE_SERVICE_KEY = process.env['SUPABASE_SERVICE_ROLE_KEY'] ?? '';
