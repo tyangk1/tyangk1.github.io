@@ -5,19 +5,40 @@ Tài liệu này nói về **nội dung**, không nói về kỹ thuật. Phần
 
 ---
 
-## 0. Bốn bước từ lúc gõ chữ tới lúc bài lên site
+## 0. Từ lúc gõ chữ tới lúc bài lên site
 
 ```bash
-pnpm admin     # http://127.0.0.1:4322 — viết bài, tải ảnh, bấm Đồng bộ
-pnpm dev       # http://localhost:4321 — xem trước, thấy cả bài nháp
-
-# rồi:
-git add -A && git commit -m "Bài mới: ..." && git push
+pnpm admin     # http://127.0.0.1:4322 — viết bài, tải ảnh, xem trước, bấm Lưu
 ```
 
-Trang admin gộp ba bước đầu vào một chỗ: gõ bài, kéo thả ảnh (nó tự nén và chèn
-`<Figure>`), rồi bấm **Đồng bộ** để kéo nội dung ra file MDX. Còn lại đúng một
-việc là commit và push.
+Bỏ tick **Bài nháp** khi xong là hết việc. Cron đồng bộ và deploy trong vòng 20
+phút, không cần commit hay push gì.
+
+Muốn lên ngay thì bấm **Đồng bộ** trong trang admin rồi commit, hoặc vào tab
+Actions trên GitHub bấm "Run workflow" ở _Tự động publish_.
+
+Không ở máy chính thì mở **`/admin` trên site**, đăng nhập, sửa, lưu. Không có xem
+trước ở đó (trình duyệt không chạy được `pnpm sync`) nên để dành cho sửa nhanh —
+viết bài dài thì dùng `pnpm admin`.
+
+### Hẹn ngày đăng
+
+Để **Ngày đăng** ở tương lai là một cái hẹn, không phải chữ để hiển thị: bài nằm
+im tới 00:00 ngày đó theo giờ Việt Nam rồi **tự lên**. Không cần mở máy hôm đó.
+
+Trang admin gắn nhãn **đặt lịch** (xanh) và ghi rõ còn mấy ngày. Ba nhãn:
+
+| Nhãn         | Nghĩa                                               |
+| ------------ | --------------------------------------------------- |
+| **nháp**     | Còn đang viết. Ngày đăng chưa có tác dụng gì        |
+| **đặt lịch** | Xong rồi, chưa tới ngày. Không còn việc gì phải làm |
+| **đã đăng**  | Đang trên site                                      |
+
+Muốn đăng ngay thì để ngày hôm nay hoặc quá khứ. Muốn hoãn một bài đã lên thì đổi
+ngày sang tương lai — nó sẽ bị rút khỏi site ở lần đồng bộ kế tiếp.
+
+Độ trễ bằng nhịp cron: bài hẹn 00:00 thường lên khoảng 00:00–00:20, có thể muộn
+hơn vì cron của GitHub hay trễ khi máy bận. Không dùng cho thứ cần đúng phút.
 
 <details>
 <summary>Làm bằng dòng lệnh, nếu thích</summary>
@@ -38,21 +59,24 @@ git add -A && git commit -m "Bài mới: ..." && git push
 
 </details>
 
-**Bước 3 là bước dễ quên nhất.** Quên nó thì push vẫn thành công, CI vẫn xanh,
-site vẫn deploy — chỉ là bằng nội dung của lần commit trước. Không có lỗi nào để
-lần ra. Kiểm nhanh trước khi push:
+Nếu đi đường dòng lệnh thì **`pnpm sync` là bước dễ quên nhất.** Quên nó thì push
+vẫn thành công, CI vẫn xanh, site vẫn deploy — chỉ là bằng nội dung của lần commit
+trước. Không có lỗi nào để lần ra. Kiểm nhanh trước khi push:
 
 ```bash
 git status --short src/content/
 ```
 
-Ba điều dễ hiểu sai:
+Đi qua cron thì không gặp chuyện này: nó sync rồi commit ngay trong cùng một lần chạy.
 
-| Điều              | Sự thật                                                                                                 |
-| ----------------- | ------------------------------------------------------------------------------------------------------- |
-| Nguồn sự thật     | Database, **lúc soạn**. Sửa file trong `src/content/` bằng tay là vô nghĩa — lần `pnpm sync` sau ghi đè |
-| Bài `draft: true` | `pnpm sync` **loại hẳn**. Muốn xem trước thì `pnpm dev` (nó tự dùng `sync:drafts`)                      |
-| Ảnh               | Nằm trong Supabase Storage nhưng được tải về và tối ưu **lúc build**, phục vụ từ chính site             |
+Bốn điều dễ hiểu sai:
+
+| Điều                | Sự thật                                                                                                 |
+| ------------------- | ------------------------------------------------------------------------------------------------------- |
+| Nguồn sự thật       | Database, **lúc soạn**. Sửa file trong `src/content/` bằng tay là vô nghĩa — lần `pnpm sync` sau ghi đè |
+| Bài `draft: true`   | `pnpm sync` **loại hẳn**. Muốn xem trước thì `pnpm dev` (nó tự dùng `sync:drafts`)                      |
+| Ngày đăng tương lai | Cũng bị loại hẳn, y như bài nháp — nhưng **tự vào** khi tới ngày, không cần làm gì                      |
+| Ảnh                 | Nằm trong Supabase Storage nhưng được tải về và tối ưu **lúc build**, phục vụ từ chính site             |
 
 Đã kiểm cả chuỗi bằng một bài thật: chèn vào Supabase với `draft = true` → `pnpm sync`
 đúng 8 bài (loại nó) → `sync --drafts` đúng 9 bài → đổi sang `draft = false` →
@@ -398,3 +422,15 @@ Cách giữ nhịp mà tôi thấy hiệu quả:
 5. Đăng.
 
 Bước 3 là bước hay bị bỏ, và cũng là bước tạo khác biệt lớn nhất.
+
+### Dùng đặt lịch để giữ nhịp
+
+Cảm hứng đến theo cụm, không đến đều. Viết được ba bài trong một cuối tuần thì đừng
+đăng cả ba cùng lúc — hai bài đầu sẽ ăn hết lượt đọc của bài thứ ba, rồi ba tuần sau
+trang im lặng.
+
+Thay vào đó hẹn chúng cách nhau: bài này hôm nay, bài sau hai tuần nữa, bài cuối một
+tháng nữa. Bỏ tick nháp cho cả ba, để ba ngày khác nhau, rồi quên đi. Chúng tự lên.
+
+Đây là chỗ đặt lịch có giá trị thật: nó biến "viết đều" — thứ phụ thuộc tâm trạng
+từng tuần — thành "viết theo cụm rồi phát đều", thứ chỉ phụ thuộc một lần quyết định.

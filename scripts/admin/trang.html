@@ -90,6 +90,14 @@
       .dang {
         color: var(--luc);
       }
+      /* Xong rồi, đang chờ tới ngày — xanh chứ không vàng, vì không còn việc gì phải làm. */
+      .dat_lich {
+        color: var(--xanh);
+      }
+      #hen {
+        font-style: normal;
+        text-align: right;
+      }
 
       main {
         display: flex;
@@ -550,7 +558,9 @@
                 <input type="text" id="tags" />
               </label>
               <label>
-                <span class="nhan"><span>Ngày đăng</span></span>
+                <!-- Để ngày ở tương lai là ĐẶT LỊCH: bài nằm im tới đúng ngày đó rồi
+                     tự lên. `#hen` nói ra ngay lúc chọn ngày. -->
+                <span class="nhan"><span>Ngày đăng</span><em id="hen"></em></span>
                 <input type="date" id="published_at" />
               </label>
               <label>
@@ -655,6 +665,9 @@
       // Bộ tô màu và mẫu chèn lấy từ module dùng chung với admin đã deploy — xem
       // `scripts/lib/to-mau-mdx.mjs`. Giữ bản copy ở đây thì hai admin sẽ trôi lệch.
       import { toMauMdx, MAU_MDX } from '/lib/to-mau-mdx.mjs';
+      // Trạng thái bài (nháp / đặt lịch / đã đăng) cũng lấy từ module dùng chung. Hai
+      // admin mà tự tính riêng thì cùng một bài sẽ được gắn hai nhãn khác nhau.
+      import { trangThaiBai, NHAN_TRANG_THAI, ngayHomNay } from '/lib/kiem-bai.mjs';
 
       const $ = (id) => document.getElementById(id);
       let cauHinh = { gioiHan: {} };
@@ -778,7 +791,41 @@
         el.className = `dem ${ok ? 'ok' : 'sai'}`;
       }
 
+      /**
+       * Nói cho người viết biết cái ngày vừa chọn có nghĩa gì. Giống hệt hàm cùng tên
+       * trong `src/pages/admin.astro` — cùng ba câu cho ba trạng thái.
+       */
+      function capNhatHen() {
+        const el = $('hen');
+        if (!el) return;
+
+        const ngay = $('published_at').value;
+
+        if ($('draft').checked) {
+          el.textContent = 'đang là nháp — ngày chưa có tác dụng';
+          el.className = 'nhap';
+          return;
+        }
+        if (!ngay) {
+          el.textContent = '';
+          return;
+        }
+
+        const homNay = ngayHomNay();
+        if (ngay > homNay) {
+          const soNgay = Math.round(
+            (Date.parse(`${ngay}T00:00:00Z`) - Date.parse(`${homNay}T00:00:00Z`)) / 86400000,
+          );
+          el.textContent = `đặt lịch — tự lên sau ${soNgay} ngày, không cần làm gì`;
+          el.className = 'dat_lich';
+        } else {
+          el.textContent = 'đã tới ngày — bấm Đồng bộ là lên site';
+          el.className = 'dang';
+        }
+      }
+
       function capNhatDem() {
+        capNhatHen();
         const g = cauHinh.gioiHan;
         demKyTu('title', $('title').value.trim().length, 1, g.titleToiDa);
         demKyTu(
@@ -846,7 +893,9 @@
         $('slug').value = b?.slug ?? '';
         $('description').value = b?.description ?? '';
         $('content').value = b?.content ?? '';
-        $('published_at').value = b?.published_at ?? new Date().toISOString().slice(0, 10);
+        // `ngayHomNay()` chứ không phải `toISOString()`: cái sau cho ra ngày UTC, nên
+        // mở form lúc 6 giờ sáng ở Việt Nam sẽ điền lùi mất một ngày.
+        $('published_at').value = b?.published_at ?? ngayHomNay();
         $('content_updated_at').value = b?.content_updated_at ?? '';
         $('tags').value = (b?.tags ?? []).join(', ');
         $('takeaways').value = (b?.takeaways ?? []).join('\n');
@@ -873,7 +922,7 @@
               b,
             ) => `<div class="muc" data-slug="${b.slug}" ${b.slug === slugDangSua ? 'aria-current="true"' : ''}>
               <b>${b.title.replace(/</g, '&lt;')}</b>
-              <small><span class="the ${b.draft ? 'nhap' : 'dang'}">${b.draft ? 'nháp' : 'đã đăng'}</span>${b.published_at ?? ''}</small>
+              <small><span class="the ${trangThaiBai(b)}">${NHAN_TRANG_THAI[trangThaiBai(b)]}</span>${b.published_at ?? ''}</small>
             </div>`,
           )
           .join('');
@@ -1094,6 +1143,10 @@
         $(id).addEventListener('input', capNhatDem);
         $(id).addEventListener('input', henLamMoi);
       }
+
+      // Ô nháp không nằm trong TRUONG (nó là checkbox, không phải ô chữ) nhưng nó đổi
+      // câu ở `#hen`: bỏ tick nháp thì cái ngày mới bắt đầu có nghĩa.
+      $('draft').addEventListener('change', capNhatDem);
       $('content').addEventListener('input', veLaiHl);
 
       $('nut-ds').onclick = () => {

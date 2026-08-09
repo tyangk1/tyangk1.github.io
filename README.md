@@ -408,20 +408,74 @@ Những chi tiết đáng nói:
 | Ảnh đầu tiên tự thành ảnh bìa, ảnh sau chèn `<Figure>` | Đỡ một bước dán tay, và nhắc điền `alt` ngay                                                           |
 | `Ctrl+S` để lưu                                        | Đây là trình soạn thảo, phản xạ đó là tự nhiên                                                         |
 
-#### Vì sao là server cục bộ, không phải một trang trên site
+#### Vì sao server cục bộ nghe trên `127.0.0.1`
 
-Site là tĩnh trên GitHub Pages. Một trang `/admin` ở đó là HTML **công khai**, nên
-muốn an toàn phải dựng Supabase Auth **và** siết RLS xuống đúng một user id — vì
-`authenticated` trong Supabase nghĩa là _bất kỳ ai đăng ký được_, không phải "chủ
-blog". Bỏ qua chi tiết đó là mở cửa cho người lạ sửa bài.
+Đó là dòng quan trọng nhất trong `scripts/admin/server.mjs`. Mặc định của Node là
+nghe **mọi** giao diện mạng, tức ai cùng Wi-Fi cũng mở được trang admin của bạn.
+Ràng buộc về đúng localhost là thứ cho phép server này giữ khoá `service_role`:
+khoá đó không bao giờ ra khỏi máy.
 
-Server cục bộ không có bề mặt tấn công nào để siết: nó chỉ nghe trên `127.0.0.1`
-(dòng quan trọng nhất trong `scripts/admin/server.mjs` — mặc định của Node là nghe
-mọi giao diện mạng, tức ai cùng Wi-Fi cũng mở được), và khoá `service_role` không
-bao giờ ra khỏi máy.
+### Trang admin thứ hai — `/admin` trên site
 
-**Đánh đổi: không viết bài từ điện thoại được.** Với blog một tác giả, đó là cái
-giá đúng để trả.
+Có **hai** trang admin, mỗi trang một việc. Chúng không trùng nhau:
+
+|                | `pnpm admin` (cục bộ)             | `/admin` (trên site)                            |
+| -------------- | --------------------------------- | ----------------------------------------------- |
+| Dùng khi       | Viết bài dài                      | Sửa nhanh từ điện thoại hoặc máy khác           |
+| Xem trước sống | **Có**                            | Không — trình duyệt không chạy được `pnpm sync` |
+| Nút Đồng bộ    | Có                                | Không — cron làm việc đó                        |
+| Khoá dùng      | `service_role`, không ra khỏi máy | Khoá công khai + Supabase Auth                  |
+
+Dùng chung [`to-mau-mdx.mjs`](scripts/lib/to-mau-mdx.mjs) (tô màu, mẫu chèn) và
+[`kiem-bai.mjs`](scripts/lib/kiem-bai.mjs) (validate, trạng thái bài). Hai admin
+mà kiểm khác nhau thì cùng một bài sẽ được nơi này nhận nơi kia từ chối.
+
+#### Trang công khai thì bảo mật nằm ở đâu
+
+`/admin` là HTML công khai, và điều đó **không sao** — mọi thứ quan trọng ở tầng
+database. Nhưng chỉ đúng nếu RLS được siết, vì `authenticated` trong Supabase nghĩa
+là _bất kỳ ai đăng ký được_, không phải "chủ blog".
+
+Nên quyền ghi không dựa vào `authenticated` mà dựa vào **bảng `admins`**: policy
+gọi `la_admin()`, hàm này kiểm `auth.uid()` có nằm trong bảng đó không. Thêm hoặc
+bớt người quản trị là một dòng `INSERT`/`DELETE`, không phải sửa policy. Hệ quả có
+lợi: mở đăng ký cũng không sao — người lạ tạo được tài khoản nhưng không có tên
+trong `admins` thì không ghi được gì.
+
+Bảng `admins` bật RLS và **không có policy nào**, đồng thời bị thu hồi hết quyền ở
+tầng GRANT. Nghĩa là không ai đọc được danh sách admin qua API; chỉ `la_admin()`
+(hàm `security definer`) đọc được.
+
+Đã kiểm **bằng cách tấn công**, không phải bằng đọc policy. Tạo một tài khoản thứ
+hai không có trong `admins`, đăng nhập, rồi thử:
+
+| Thao tác             | Kết quả                                               |
+| -------------------- | ----------------------------------------------------- |
+| Đọc bài đã đăng      | 200 — thấy 8 bài                                      |
+| Đọc bài nháp         | **không thấy** (admin thấy 9)                         |
+| Ghi bài mới          | **403**                                               |
+| Sửa bài có sẵn       | 204 nhưng **0 dòng đổi** — đã xác minh trong database |
+| Xoá bài              | 204 nhưng **bài còn nguyên** — đã xác minh            |
+| Đọc email newsletter | **0 dòng**                                            |
+
+Hai dòng 204 đáng chú ý: REST API trả về "thành công" khi RLS lọc hết dòng cần
+sửa. Đọc mã trả về mà tin là xong thì sẽ kết luận sai — phải vào database đếm lại.
+
+Ba lỗi tìm được lúc dựng trang này:
+
+1. **Tải ảnh trả HTTP 400, body rỗng.** Đo từng header mới ra thủ phạm: `x-upsert`
+   — endpoint POST của Storage từ chối header đó. Giả thuyết đầu (sai định dạng
+   `Cache-Control`) là **sai**: cả `31536000` lẫn `max-age=31536000` đều được nhận.
+2. **`/admin` lọt vào sitemap.** Vừa `noindex` vừa nằm trong sitemap là tự mâu
+   thuẫn. Đã loại, và thêm `Disallow` vào robots.txt kèm ghi chú rằng robots.txt
+   **không phải** bảo mật.
+3. **`check:html` đỏ** vì `/admin` thiếu `description` và `canonical`. Sửa
+   **checker** chứ không thêm thẻ giả: trang `noindex` được miễn hai thẻ đó vì
+   chúng tồn tại để máy tìm kiếm hiển thị. `<title>` thì vẫn bắt buộc.
+
+Access token của Supabase sống 1 giờ, nên viết bài dài là chắc chắn hết hạn giữa
+lúc viết và mọi lần lưu sẽ trả 401 — mất bài. Hàm gọi API tự làm mới bằng refresh
+token khi gặp 401 rồi thử lại.
 
 Đã kiểm bằng thao tác thật trên trình duyệt:
 
@@ -439,11 +493,52 @@ giá đúng để trả.
 | Bấm Callout                            | chèn khối 102 ký tự đúng vị trí con trỏ                                     |
 | Bấm Xem trước                          | chia đôi màn hình, iframe render đúng bài — có `.callout` và `.steps`       |
 
-### Đăng bài = build lại
+### Đăng bài = build lại, và việc đó đã tự động
 
-Site tĩnh nên sửa DB xong phải build lại mới thấy. Tự động hoá: Supabase
-→ Database Webhooks → gọi Deploy Hook của Cloudflare Pages mỗi khi bảng `posts`
-thay đổi. Build mất khoảng 10 giây.
+Site tĩnh nên sửa DB xong phải build lại mới thấy. Việc đó do workflow
+[`tu-dong-publish.yml`](.github/workflows/tu-dong-publish.yml) làm, **mỗi 20 phút**:
+
+```
+sync từ DB  →  có gì đổi thì commit  →  CI  →  Deploy
+```
+
+Không đổi gì thì nó thoát sớm, không tốn phút CI. Muốn lên ngay thì vào tab
+Actions bấm "Run workflow".
+
+Nó dùng **khoá công khai**, không phải `service_role`: đồng bộ chỉ cần đọc bài đã
+đăng, dự án và lượt xem — khoá công khai đọc được cả ba. Đặt `service_role` vào
+Actions là mở thêm chỗ cho nó rò rỉ mà không được gì.
+
+#### Đặt lịch đăng
+
+Để `published_at` ở **tương lai** là một cái hẹn: bài nằm im tới 00:00 ngày đó
+theo giờ Việt Nam rồi tự lên. Không cần bấm gì, không cần mở máy.
+
+Chặn ở **ba tầng**, mỗi tầng gác một đường khác nhau — không phải một tầng lặp ba
+lần:
+
+| Tầng                                                                                     | Gác đường nào                                                       |
+| ---------------------------------------------------------------------------------------- | ------------------------------------------------------------------- |
+| RLS policy ([`dat_lich_dang.sql`](supabase/migrations/20260810000000_dat_lich_dang.sql)) | Cron ở trên, chạy bằng khoá công khai                               |
+| `.lte()` trong [`db-sync.mjs`](scripts/db-sync.mjs)                                      | `pnpm sync` / `pnpm build` ở máy — service key **đi xuyên RLS**     |
+| `getPublishedPosts()` trong [`posts.ts`](src/utils/posts.ts)                             | `build:ci` đọc file đã commit (kể cả file do `pnpm dev` ghi ra đĩa) |
+
+Tầng RLS là tầng quan trọng nhất, vì nó chặn cả việc **đọc trước**: không có nó,
+ai lấy khoá công khai trong bundle cũng gọi REST API đọc được toàn văn bài chưa
+tới hạn. Chỉ chặn lúc build thì HTML sạch nhưng dữ liệu vẫn hở.
+
+Tầng thứ ba nghe như thừa nhưng không phải: `pnpm dev` chạy `sync --drafts`, ghi
+**cả** bài nháp và bài đặt lịch ra `src/content/blog/`. Ai commit sau khi dev mà
+không có tầng này thì CI đăng luôn cả hai loại.
+
+**Độ trễ**: bằng nhịp cron. Bài hẹn 00:00 thường lên trong khoảng 00:00–00:20, và
+có thể muộn hơn — cron của GitHub hay trễ khi máy bận. Cần đúng phút thì cách này
+không làm được.
+
+**Múi giờ**: `Asia/Ho_Chi_Minh`, không phải UTC. Dùng `current_date` của Postgres
+thì bài hẹn ngày 10 chỉ lên lúc 7 giờ sáng ngày 10. Chuỗi múi giờ bị chép ở ba
+chỗ không import được từ nhau (TypeScript, module chạy cả trong trình duyệt, và
+SQL) — `pnpm check:content` so cả ba và fail nếu lệch.
 
 ### Ràng buộc nằm ở HAI tầng
 
@@ -804,16 +899,38 @@ cũng cho ra đúng một kết quả. Database vẫn là nguồn sự thật l�
 
 ### Quy trình đăng bài
 
+Ba đường, chọn theo việc đang làm.
+
+**1. Viết bài mới (đường chính).**
+
 ```bash
-pnpm db:start                 # bật Supabase cục bộ
-# sửa nội dung trong Supabase Studio
-pnpm sync                     # DB → src/content/**
-git add -A && git commit -m "Bài mới: ..." && git push
+pnpm admin                    # mở trang soạn ở 127.0.0.1:4322
+# viết, kéo ảnh vào, bấm Xem trước, bấm Lưu
+# bỏ tick "Bài nháp" khi xong
 ```
 
-Bước `pnpm sync` + commit là bắt buộc. Quên thì site vẫn deploy nhưng bằng nội
-dung của lần commit trước — đó là cái giá của việc commit file sinh tự động.
-Kiểm nhanh trước khi push: `git status --short src/content/`.
+Rồi **không cần làm gì nữa**: cron đồng bộ và deploy trong vòng 20 phút. Muốn lên
+ngay thì bấm Đồng bộ trong trang admin, hoặc:
+
+```bash
+pnpm sync && git add src/content src/data && git commit -m "Bài mới: ..." && git push
+```
+
+**2. Sửa nhanh, không ở máy chính.** Mở `/admin` trên site, đăng nhập, sửa, lưu.
+Cron lo phần còn lại.
+
+**3. Hẹn ngày.** Để `published_at` ở tương lai. Bài nằm im tới 00:00 ngày đó theo
+giờ Việt Nam rồi tự lên. Trang admin hiện nhãn **đặt lịch** và ghi rõ còn mấy ngày.
+
+Điều duy nhất cần nhớ: `src/content/` là file **sinh tự động** nhưng có commit. Nếu
+bạn tự chạy `pnpm sync` rồi quên push thì site vẫn deploy bằng nội dung lần commit
+trước. Kiểm nhanh: `git status --short src/content/`. Đi qua cron thì không gặp
+chuyện này vì cron commit ngay sau khi sync.
+
+Cẩn thận một chỗ: `pnpm dev` chạy `sync --drafts`, ghi **cả** bài nháp và bài đặt
+lịch ra `src/content/blog/`. Đừng `git add -A` sau khi dev mà không xem lại — dù có
+lọt vào commit thì `getPublishedPosts()` vẫn chặn không cho lên site, nhưng nội
+dung bài nháp sẽ nằm công khai trong repo.
 
 ### Ba tính năng đang TẮT trên site thật
 

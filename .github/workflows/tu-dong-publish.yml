@@ -8,6 +8,17 @@ name: Tự động publish
 #
 # Commit ở đây sẽ kích hoạt workflow CI, và CI xanh thì Deploy chạy. Không cần
 # thêm bước build nào trong file này.
+#
+# ĐÂY CŨNG LÀ THỨ LÀM ĐẶT LỊCH HOẠT ĐỘNG.
+#
+# Bài để ngày ở tương lai bị RLS ẩn khỏi khoá công khai, nên `pnpm sync` bên dưới
+# không thấy và không ghi ra file. Tới 00:00 ngày đó theo giờ Việt Nam, policy bắt
+# đầu trả bài về; lần chạy kế tiếp thấy nó, ghi file, commit, và Deploy đưa lên
+# site. Không ai phải bấm gì.
+#
+# Hệ quả: độ trễ của đặt lịch = nhịp cron. Bài hẹn 00:00 thường lên trong khoảng
+# 00:00–00:20, và có thể muộn hơn vì cron của GitHub hay trễ khi máy bận. Nếu cần
+# đúng phút thì cách này không làm được — nhưng với blog thì không cần.
 on:
   schedule:
     # Mỗi 20 phút. Đủ nhanh để không phải chờ lâu sau khi sửa bài, đủ chậm để

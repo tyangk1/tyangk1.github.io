@@ -27,7 +27,20 @@ export const SITE = {
   /** Ngôn ngữ chính, dùng cho thẻ <html lang> và RSS. */
   lang: 'vi',
 
-  /** Múi giờ dùng khi hiển thị ngày tháng. */
+  /**
+   * Múi giờ dùng khi hiển thị ngày tháng — và khi quyết định bài đặt lịch đã tới
+   * hạn chưa.
+   *
+   * Điều thứ hai mới là điều quan trọng. Supabase chạy UTC, nên nếu so ngày bằng
+   * `current_date` thì bài đặt ngày 10/8 chỉ lên lúc 7 giờ sáng ngày 10 giờ Việt
+   * Nam. Mọi tầng lọc đều đổi sang múi giờ này trước khi so.
+   *
+   * Giá trị này bị lặp lại ở hai chỗ KHÔNG import được từ đây — `MUI_GIO` trong
+   * `scripts/lib/kiem-bai.mjs` (module này chạy cả trong trình duyệt nên không
+   * đọc được file TypeScript) và câu policy trong migration `dat_lich_dang`
+   * (SQL không import gì cả). `pnpm check:content` so ba chỗ đó với dòng này và
+   * fail nếu lệch — chép tay thì phải có người canh.
+   */
   timeZone: 'Asia/Ho_Chi_Minh',
 
   /**

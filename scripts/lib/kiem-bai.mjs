@@ -13,6 +13,50 @@
  * `supabase/migrations/20260808000000_khoi_tao_noi_dung.sql`.
  */
 
+/**
+ * Múi giờ quyết định "hôm nay" là ngày nào.
+ *
+ * PHẢI khớp `SITE.timeZone` trong `src/site.config.ts`. Không import được từ đó
+ * vì file này còn chạy trong trình duyệt (cả hai trang admin đều nạp nó như ES
+ * module), mà trình duyệt không đọc được file TypeScript. `pnpm check:content`
+ * so hai giá trị và fail nếu lệch.
+ */
+export const MUI_GIO = 'Asia/Ho_Chi_Minh';
+
+/**
+ * Hôm nay theo múi giờ blog, dạng `YYYY-MM-DD`.
+ *
+ * Dùng `Intl` chứ không tự cộng 7 tiếng: cộng tay thì đúng với Việt Nam nhưng sai
+ * ngay khi ai đó đổi `MUI_GIO` sang vùng có giờ mùa hè. `en-CA` là locale duy
+ * nhất trong danh sách chuẩn cho ra sẵn `YYYY-MM-DD`.
+ */
+export function ngayHomNay(luc = new Date()) {
+  return new Intl.DateTimeFormat('en-CA', { timeZone: MUI_GIO }).format(luc);
+}
+
+/**
+ * Trạng thái thật của một bài, suy ra từ `draft` VÀ `published_at`.
+ *
+ * Ba trạng thái, không phải hai — đây là chỗ mà bản trước sai: nó chỉ nhìn
+ * `draft`, nên bài để ngày ở tương lai vẫn hiện "đã đăng" và lên site ngay.
+ *
+ *   nhap     — còn là nháp, không ai thấy ngoài chính mình.
+ *   dat_lich — xong rồi nhưng chưa tới ngày. Tới ngày thì TỰ lên, không cần làm gì.
+ *   dang     — đang trên site.
+ */
+export function trangThaiBai(bai, homNay = ngayHomNay()) {
+  if (bai.draft) return 'nhap';
+  const ngay = String(bai.published_at ?? '').slice(0, 10);
+  return ngay > homNay ? 'dat_lich' : 'dang';
+}
+
+/** Nhãn tiếng Việt cho ba trạng thái trên, dùng chung cho hai trang admin. */
+export const NHAN_TRANG_THAI = {
+  nhap: 'nháp',
+  dat_lich: 'đặt lịch',
+  dang: 'đã đăng',
+};
+
 export const GIOI_HAN = {
   titleToiDa: 70,
   descriptionMin: 120,

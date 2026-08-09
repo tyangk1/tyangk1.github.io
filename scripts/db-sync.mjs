@@ -19,6 +19,7 @@
 import { mkdir, readdir, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { daCauHinh, taoClient, SUPABASE_URL, laKhoaCongKhai } from './lib/supabase.mjs';
+import { ngayHomNay } from './lib/kiem-bai.mjs';
 
 const THU_MUC_BLOG = 'src/content/blog';
 const THU_MUC_PROJECTS = 'src/content/projects';
@@ -60,8 +61,18 @@ async function donThuMuc(dir, duoi) {
 
 async function dongBoBaiViet(supabase, layCaNhap) {
   let query = supabase.from('posts').select('*').order('published_at', { ascending: false });
-  // Ở production chỉ lấy bài đã đăng. Ở dev lấy cả bài nháp để xem trước.
-  if (!layCaNhap) query = query.eq('draft', false);
+
+  /*
+    Ở production chỉ lấy bài đã đăng VÀ đã tới ngày. Ở dev lấy hết để xem trước.
+
+    Hai điều kiện, không phải một. Bỏ `lte` thì bài đặt ngày 10/12 lên site ngay
+    hôm nay — đặt lịch chẳng có tác dụng gì. Đây chính là lỗi của bản trước.
+
+    Lọc ở đây dù RLS đã lọc, vì `pnpm sync` chạy bằng service key và service key
+    ĐI XUYÊN RLS. Chỉ dựa vào policy thì lệnh sync ở máy mình lại là đường duy
+    nhất làm rò bài chưa tới hạn.
+  */
+  if (!layCaNhap) query = query.eq('draft', false).lte('published_at', ngayHomNay());
 
   const { data, error } = await query;
   if (error) throw new Error(`Đọc bảng posts thất bại: ${error.message}`);

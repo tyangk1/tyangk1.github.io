@@ -134,6 +134,18 @@ const bat = Boolean(ENV.publicSupabaseUrl && ENV.publicSupabaseAnonKey);
       .dang {
         color: var(--luc);
       }
+      /* Đặt lịch: xong rồi, đang chờ tới ngày. Xanh chứ không vàng — vàng là
+         "còn việc phải làm", còn bài này thì không cần làm gì nữa. */
+      .dat_lich {
+        color: var(--xanh);
+      }
+
+      /* Lời nhắc bên phải nhãn "Ngày đăng". Bỏ in nghiêng: đây là câu thông báo
+         trạng thái, không phải chữ được nhấn mạnh. */
+      #hen {
+        font-style: normal;
+        text-align: right;
+      }
 
       main {
         display: flex;
@@ -490,6 +502,7 @@ const bat = Boolean(ENV.publicSupabaseUrl && ENV.publicSupabaseAnonKey);
                     <label>
                       <span class="nhan">
                         <span>Ngày đăng</span>
+                        <em id="hen" />
                       </span>
                       <input type="date" id="published_at" />
                     </label>
@@ -610,7 +623,13 @@ const bat = Boolean(ENV.publicSupabaseUrl && ENV.publicSupabaseAnonKey);
 
     <script>
       import { toMauMdx, MAU_MDX } from '../../scripts/lib/to-mau-mdx.mjs';
-      import { kiemBai, chuanHoaBai } from '../../scripts/lib/kiem-bai.mjs';
+      import {
+        kiemBai,
+        chuanHoaBai,
+        trangThaiBai,
+        NHAN_TRANG_THAI,
+        ngayHomNay,
+      } from '../../scripts/lib/kiem-bai.mjs';
 
       const cfg = (window as unknown as { __ADMIN?: Record<string, unknown> }).__ADMIN;
       const $ = (id: string) => document.getElementById(id) as HTMLElement | null;
@@ -721,6 +740,52 @@ const bat = Boolean(ENV.publicSupabaseUrl && ENV.publicSupabaseAnonKey);
           el.className = `dem ${n >= min && n <= max ? 'ok' : 'sai'}`;
         }
 
+        /**
+         * Viết lời nhắc vào `#hen`, ngay bên phải nhãn "Ngày đăng".
+         *
+         * Ô ngày đăng là một cái HẸN, không phải chữ để hiển thị: để ngày mai thì bài
+         * nằm im tới đúng ngày đó rồi tự lên. Không nói ra thì không ai đoán được —
+         * tính năng không ai biết là tính năng không tồn tại.
+         *
+         * Ba câu, khớp với ba trạng thái trong `trangThaiBai`:
+         *   nháp            — ngày chưa có tác dụng, bài không lên dù để ngày nào.
+         *   tương lai       — đang hẹn; nói rõ còn mấy ngày và rằng KHÔNG cần làm gì.
+         *   hôm nay/quá khứ — sẽ lên ở lần đồng bộ kế tiếp.
+         *
+         * Lưu ý cho người sửa sau: markup của trang này nằm trong một biểu thức
+         * ternary `{!bat ? (...) : (...)}`, tức là JSX. Đừng đặt `<!-- -->` vào đó —
+         * prettier sẽ ném SyntaxError và CI đỏ. Chú thích về markup viết ở đây.
+         */
+        function capNhatHen() {
+          const el = $('hen');
+          if (!el) return;
+
+          const ngay = val('published_at');
+          const nhap = ($('draft') as HTMLInputElement | null)?.checked;
+
+          if (nhap) {
+            el.textContent = 'đang là nháp — ngày chưa có tác dụng';
+            el.className = 'nhap';
+            return;
+          }
+          if (!ngay) {
+            el.textContent = '';
+            return;
+          }
+
+          const homNay = ngayHomNay();
+          if (ngay > homNay) {
+            const soNgay = Math.round(
+              (Date.parse(`${ngay}T00:00:00Z`) - Date.parse(`${homNay}T00:00:00Z`)) / 86400000,
+            );
+            el.textContent = `đặt lịch — tự lên sau ${soNgay} ngày, không cần làm gì`;
+            el.className = 'dat_lich';
+          } else {
+            el.textContent = 'sẽ lên site ở lần đồng bộ kế tiếp (~20 phút)';
+            el.className = 'dang';
+          }
+        }
+
         function capNhatDem() {
           dem('title', val('title').trim().length, 1, G['titleToiDa']!);
           dem(
@@ -750,6 +815,8 @@ const bat = Boolean(ENV.publicSupabaseUrl && ENV.publicSupabaseAnonKey);
           const chu = ta().value.trim().split(/\s+/).filter(Boolean).length;
           $('dem-content')!.textContent =
             `${chu.toLocaleString('vi-VN')} từ · ~${Math.max(1, Math.round(chu / 200))} phút`;
+
+          capNhatHen();
 
           const slug = val('slug').trim();
           const hopLe = /^[a-z0-9]+(-[a-z0-9]+)*$/.test(slug);
@@ -802,7 +869,9 @@ const bat = Boolean(ENV.publicSupabaseUrl && ENV.publicSupabaseAnonKey);
           dat('slug', b?.slug);
           dat('description', b?.description);
           dat('content', b?.content);
-          dat('published_at', b?.published_at ?? new Date().toISOString().slice(0, 10));
+          // `ngayHomNay()` chứ không phải `toISOString()`: cái sau cho ra ngày UTC,
+          // nên mở form lúc 6 giờ sáng ở Việt Nam sẽ điền lùi mất một ngày.
+          dat('published_at', b?.published_at ?? ngayHomNay());
           dat('content_updated_at', b?.content_updated_at);
           dat('tags', (b?.tags ?? []).join(', '));
           dat('takeaways', (b?.takeaways ?? []).join('\n'));
@@ -827,7 +896,7 @@ const bat = Boolean(ENV.publicSupabaseUrl && ENV.publicSupabaseAnonKey);
               const t = String(b.title).replace(/</g, '&lt;');
               return `<div class="muc" data-slug="${b.slug}" ${b.slug === slugDangSua ? 'aria-current="true"' : ''}>
                 <b>${t}</b>
-                <small><span class="the ${b.draft ? 'nhap' : 'dang'}">${b.draft ? 'nháp' : 'đã đăng'}</span>${b.published_at ?? ''}</small>
+                <small><span class="the ${trangThaiBai(b)}">${NHAN_TRANG_THAI[trangThaiBai(b)]}</span>${b.published_at ?? ''}</small>
               </div>`;
             })
             .join('');
@@ -1026,6 +1095,11 @@ const bat = Boolean(ENV.publicSupabaseUrl && ENV.publicSupabaseAnonKey);
 
         for (const id of ['title', 'slug', 'description', 'tags', 'takeaways', 'content'])
           $(id)!.addEventListener('input', capNhatDem);
+
+        // Ngày đăng và ô nháp cũng phải gọi lại — cả hai đổi câu ở `#hen`. Thiếu
+        // hai dòng này thì lời nhắc "đặt lịch" chỉ đúng lúc mới mở form rồi đứng im.
+        $('published_at')!.addEventListener('input', capNhatDem);
+        $('draft')!.addEventListener('change', capNhatDem);
         $('content')!.addEventListener('input', veLaiHl);
         $('content')!.addEventListener('scroll', () => {
           $('hl')!.scrollTop = ta().scrollTop;

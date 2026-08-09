@@ -1,17 +1,51 @@
 import { getCollection, type CollectionEntry } from 'astro:content';
 import { slugify } from '~/utils/format';
+import { SITE } from '~/site.config';
 
 export type Post = CollectionEntry<'blog'>;
 
 /**
  * Nguồn duy nhất để lấy bài viết. Mọi trang đều phải đi qua hàm này —
- * nhờ vậy quy tắc "bài draft không lên production" chỉ tồn tại ở một chỗ.
+ * nhờ vậy quy tắc "bài nào được lên production" chỉ tồn tại ở một chỗ.
  *
- * Ở dev vẫn thấy bài draft để xem trước; ở production thì bị loại.
+ * Hai điều kiện loại bài ở production:
+ *
+ *   draft            — còn đang viết.
+ *   ngày ở tương lai — đã đặt lịch, chưa tới hạn.
+ *
+ * Ở dev thì thấy hết, vì mục đích của dev là xem trước thứ chưa lên.
+ *
+ * Đây là tầng chặn thứ ba sau RLS policy và `db-sync`. Hai tầng kia đã đủ cho
+ * luồng bình thường; tầng này bắt trường hợp file MDX được commit tay vào
+ * `src/content/blog/` mà không đi qua database.
  */
 export async function getPublishedPosts(): Promise<Post[]> {
-  const posts = await getCollection('blog', ({ data }) => import.meta.env.DEV || !data.draft);
+  const homNay = ngayHomNay();
+
+  const posts = await getCollection(
+    'blog',
+    ({ data }) => import.meta.env.DEV || (!data.draft && ngayCuaBai(data.publishedAt) <= homNay),
+  );
+
   return posts.sort((a, b) => b.data.publishedAt.valueOf() - a.data.publishedAt.valueOf());
+}
+
+/** Hôm nay theo múi giờ blog, dạng `YYYY-MM-DD`. Xem chú thích ở `SITE.timeZone`. */
+function ngayHomNay(): string {
+  return new Intl.DateTimeFormat('en-CA', { timeZone: SITE.timeZone }).format(new Date());
+}
+
+/**
+ * Ngày đăng của bài dưới dạng `YYYY-MM-DD` để so chuỗi với `ngayHomNay()`.
+ *
+ * Frontmatter `publishedAt: 2026-08-10` được Zod đổi thành Date lúc nửa đêm UTC,
+ * nên `toISOString()` trả lại đúng ngày đã viết. KHÔNG dùng `Intl` với
+ * `SITE.timeZone` ở đây: nó sẽ đổi mốc nửa đêm UTC đó sang giờ Việt Nam và với
+ * múi giờ âm sẽ lùi mất một ngày — hai giá trị đang so không cùng bản chất, một
+ * cái là ngày người viết gõ ra, cái kia là thời điểm thật.
+ */
+function ngayCuaBai(publishedAt: Date): string {
+  return publishedAt.toISOString().slice(0, 10);
 }
 
 /** Bài được đánh dấu `featured`, dùng cho khối nổi bật ở trang chủ. */
