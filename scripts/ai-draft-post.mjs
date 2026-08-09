@@ -44,12 +44,29 @@ const AI_BASE_URL = env('AI_BASE_URL').replace(/\/+$/, '');
 const AI_MODEL = env('AI_MODEL');
 const AI_API_KEY = env('AI_API_KEY');
 
+/**
+ * Đọc một biến số, quay về mặc định khi thiếu HOẶC không phải số.
+ *
+ * `env()` đã coi chuỗi rỗng là không có, nhưng `Number('abc')` vẫn là NaN — và một tham
+ * số NaN đi xuống `claim_content_queue_item` thì so sánh nào cũng false, tức là im lặng
+ * không lấy chủ đề nào. Lỗi đó đã xảy ra một lần với chuỗi rỗng trên CI; chặn luôn cả
+ * dạng còn lại của nó.
+ */
+function num(name, fallback) {
+  const n = Number(env(name, String(fallback)));
+  if (!Number.isFinite(n) || n < 0) {
+    console.warn(`⚠ ${name} không phải số hợp lệ, dùng mặc định ${fallback}.`);
+    return fallback;
+  }
+  return n;
+}
+
 /** Soạn trước ngày đăng bao nhiêu ngày, để còn thời gian duyệt. */
-const LEAD_DAYS = Number(env('AI_LEAD_DAYS', '3'));
+const LEAD_DAYS = num('AI_LEAD_DAYS', 3);
 /** Bao nhiêu lần thất bại thì bỏ một chủ đề. */
-const MAX_ATTEMPTS = Number(env('AI_MAX_ATTEMPTS', '3'));
+const MAX_ATTEMPTS = num('AI_MAX_ATTEMPTS', 3);
 /** Số lần đưa lỗi validate lại cho model tự sửa, trong CÙNG một lượt soạn. */
-const MAX_FIXES = Number(env('AI_MAX_FIXES', '2'));
+const MAX_FIXES = num('AI_MAX_FIXES', 2);
 
 const argv = process.argv.slice(2);
 const flag = (name) => argv.includes(`--${name}`);

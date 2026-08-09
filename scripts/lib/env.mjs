@@ -40,7 +40,22 @@ export async function loadEnv() {
   }
 }
 
-/** Đọc một biến sau khi đã nạp. Trả '' thay vì undefined để chỗ gọi khỏi phải kiểm. */
+/**
+ * Đọc một biến sau khi đã nạp. Trả '' thay vì undefined để chỗ gọi khỏi phải kiểm.
+ *
+ * CHUỖI RỖNG ĐƯỢC COI LÀ KHÔNG CÓ, và đây không phải chi tiết thẩm mỹ.
+ *
+ * Trong GitHub Actions, `AI_LEAD_DAYS: ${{ vars.AI_LEAD_DAYS }}` khi biến CHƯA ĐƯỢC ĐẶT
+ * cho ra chuỗi rỗng, không phải undefined. Nên `process.env[name] ?? fallback` không bao
+ * giờ dùng tới fallback, và `Number('')` là 0.
+ *
+ * Đã trả giá để biết: `AI_MAX_ATTEMPTS` thành 0, `claim_content_queue_item(max_attempts:
+ * 0)` xét `attempts < 0` nên KHÔNG BAO GIỜ lấy được chủ đề nào. Workflow chạy xanh, in
+ * "Không có chủ đề nào tới hạn", và hàng đợi thì vẫn đang có việc.
+ *
+ * Ở máy không bao giờ thấy lỗi này: `.env` thì hoặc có giá trị, hoặc không có dòng đó.
+ */
 export function env(name, fallback = '') {
-  return process.env[name] ?? fallback;
+  const value = process.env[name];
+  return value === undefined || String(value).trim() === '' ? fallback : value;
 }
