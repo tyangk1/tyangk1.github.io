@@ -80,17 +80,50 @@ async function danhSachBai() {
   return data;
 }
 
-async function luuBai(thoBai) {
+/**
+ * `slugGoc` là slug bài đang mở, gửi kèm từ trang admin. Nó khác `bai.slug` khi
+ * người viết vừa đổi slug.
+ *
+ * Có nó thì UPDATE theo slug gốc — đổi slug là đổi TÊN. Không có nó thì INSERT.
+ *
+ * Bản trước dùng `upsert(bai, { onConflict: 'slug' })` cho cả hai trường hợp. Nó
+ * không lỗi 409 (SDK gắn đúng header `resolution=merge-duplicates`), nhưng đổi slug
+ * của một bài cũ thì tạo ra bài MỚI và để bài cũ nằm lại — hai bài trùng nội dung,
+ * không có gì báo. Trang admin đã deploy từng có bản lỗi nặng hơn của cùng chỗ này.
+ */
+async function luuBai(thoBai, slugGoc) {
   const bai = chuanHoaBai(thoBai);
   const loi = kiemBai(bai);
   if (loi.length > 0) return { loi };
 
-  const { error } = await supabase.from('posts').upsert(bai, { onConflict: 'slug' });
+  // Postgres vẫn là lớp chặn cuối. Nếu nó từ chối thì nghĩa là `kiemBai` bỏ sót một
+  // ràng buộc — trả nguyên văn để còn lần ra được.
+  const thatBai = (error) => ({
+    loi: [
+      {
+        truong: '',
+        thongDiep: error.message.includes('posts_slug_key')
+          ? `Slug "${bai.slug}" đã có bài khác dùng.`
+          : `Database từ chối: ${error.message}`,
+      },
+    ],
+  });
 
-  if (error) {
-    // Postgres vẫn là lớp chặn cuối. Nếu nó từ chối thì nghĩa là `kiemBai` bỏ sót
-    // một ràng buộc — trả nguyên văn để còn lần ra được.
-    return { loi: [{ truong: '', thongDiep: `Database từ chối: ${error.message}` }] };
+  if (slugGoc) {
+    const { data, error } = await supabase
+      .from('posts')
+      .update(bai)
+      .eq('slug', slugGoc)
+      .select('slug');
+    if (error) return thatBai(error);
+    if (!data || data.length === 0) {
+      return {
+        loi: [{ truong: '', thongDiep: `Không thấy bài "${slugGoc}" để sửa — có thể đã bị xoá.` }],
+      };
+    }
+  } else {
+    const { error } = await supabase.from('posts').insert(bai);
+    if (error) return thatBai(error);
   }
 
   return { ok: true, slug: bai.slug };
@@ -174,7 +207,11 @@ const server = createServer(async (req, res) => {
     }
 
     if (req.method === 'PUT' && duong === '/api/bai') {
-      const ketQua = await luuBai(JSON.parse((await docBody(req)).toString('utf8')));
+      const tho = JSON.parse((await docBody(req)).toString('utf8'));
+      // `slug_goc` đi kèm trong body chứ không phải query, để route khỏi phụ thuộc
+      // vào việc `duong` có giữ query string hay không. `chuanHoaBai` dựng object
+      // theo danh sách trường cố định nên khoá lạ này không lọt xuống database.
+      const ketQua = await luuBai(tho, tho.slug_goc || null);
       return json(res, ketQua.loi ? 422 : 200, ketQua);
     }
 

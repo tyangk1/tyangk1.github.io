@@ -670,7 +670,15 @@ const bat = Boolean(ENV.publicSupabaseUrl && ENV.publicSupabaseAnonKey);
           tuyChon: RequestInit = {},
           thuLai = true,
         ): Promise<Response> {
-          const res = await fetch(`${URL_SB}${duong}`, { ...tuyChon, headers: dau() });
+          // Gộp header của caller lên trên, không ghi đè bằng `dau()`.
+          //
+          // Bản trước viết `headers: dau()` nên mọi header caller truyền vào bị bỏ
+          // lặng lẽ. Không có lỗi nào để thấy — chỉ là `Prefer` không bao giờ tới
+          // được PostgREST, và đó là một nửa nguyên nhân của lỗi trùng slug.
+          const res = await fetch(`${URL_SB}${duong}`, {
+            ...tuyChon,
+            headers: { ...dau(), ...((tuyChon.headers as Record<string, string>) ?? {}) },
+          });
           if (res.status !== 401 || !thuLai || !phien) return res;
 
           const r = await fetch(`${URL_SB}/auth/v1/token?grant_type=refresh_token`, {
@@ -930,16 +938,58 @@ const bat = Boolean(ENV.publicSupabaseUrl && ENV.publicSupabaseAnonKey);
           }
 
           tt('Đang lưu…');
-          const r = await goi('/rest/v1/posts?on_conflict=slug', {
-            method: 'POST',
-            body: JSON.stringify(bai),
-          });
+
+          /*
+            Sửa bài thì PATCH, tạo bài mới thì POST. Hai lệnh khác nhau, không phải
+            một lệnh upsert dùng cho cả hai.
+
+            Bản trước gọi `POST /posts?on_conflict=slug` và tưởng đó là upsert. Không
+            phải: PostgREST chỉ upsert khi có thêm header `Prefer:
+            resolution=merge-duplicates`, mà `goi()` lúc đó đang ghi đè header của
+            caller nên nó không bao giờ tới. Kết quả là INSERT thuần, và mọi lần lưu
+            một bài đã có đều trả 409 `posts_slug_key`. Lỗi anh gặp lúc sửa ảnh bài cũ.
+
+            Vá bằng cách thêm header đó thì hết 409 nhưng che một lỗi khác: upsert
+            khớp theo slug, nên ĐỔI slug của bài cũ sẽ tạo một bài MỚI và để bài cũ
+            nằm lại — hai bài trùng nội dung, không có gì báo. PATCH theo slug gốc thì
+            đổi slug là đổi tên thật.
+
+            Tách hai lệnh còn cho hai thất bại đúng nghĩa: tạo bài mới mà slug đã có
+            thì 409 (đúng — đừng ghi đè bài người khác), còn sửa bài đã bị xoá ở nơi
+            khác thì 0 dòng thay vì lặng lẽ tạo lại.
+          */
+          const slugGoc = slugDangSua;
+          const dangSua = slugGoc !== null;
+
+          const r = await goi(
+            dangSua ? `/rest/v1/posts?slug=eq.${encodeURIComponent(slugGoc)}` : '/rest/v1/posts',
+            {
+              method: dangSua ? 'PATCH' : 'POST',
+              // `return=representation` để đếm được số dòng thật sự đổi. RLS lọc hết
+              // dòng thì PostgREST vẫn trả 2xx — mã trả về KHÔNG nói lên điều gì.
+              headers: { Prefer: 'return=representation' },
+              body: JSON.stringify(bai),
+            },
+          );
 
           if (!r.ok) {
             const chiTiet = await r.text();
-            $('loi')!.innerHTML =
-              `<b>Database từ chối (HTTP ${r.status}):</b><ul><li>${chiTiet.slice(0, 300)}</li></ul>`;
+            const trungSlug = chiTiet.includes('posts_slug_key');
+            $('loi')!.innerHTML = trungSlug
+              ? `<b>Slug <code>${bai.slug}</code> đã có bài khác dùng.</b><ul><li>Đổi slug, hoặc mở bài đang dùng slug đó ra sửa.</li></ul>`
+              : `<b>Database từ chối (HTTP ${r.status}):</b><ul><li>${chiTiet.slice(0, 300)}</li></ul>`;
             tt(r.status === 403 ? 'Tài khoản này không có quyền ghi' : 'Lưu thất bại', 'sai');
+            return;
+          }
+
+          // 2xx nhưng 0 dòng: RLS đã lọc, hoặc bài không còn tồn tại. Không báo thì
+          // người viết đóng tab với niềm tin là đã lưu.
+          const dong = (await r.json().catch(() => [])) as unknown[];
+          if (dangSua && dong.length === 0) {
+            $('loi')!.innerHTML =
+              '<b>Không có dòng nào được sửa.</b><ul><li>Bài này có thể đã bị xoá, hoặc tài khoản không có quyền ghi. Tải lại danh sách rồi thử lại.</li></ul>';
+            tt('Chưa lưu được', 'sai');
+            await taiDanhSach();
             return;
           }
 
@@ -1089,7 +1139,36 @@ const bat = Boolean(ENV.publicSupabaseUrl && ENV.publicSupabaseAnonKey);
           const mau = (MAU_MDX as Record<string, string>)[lam ?? ''];
           if (mau) {
             const t = ta();
-            thayDoan(t.selectionStart, t.selectionEnd, mau);
+
+            /*
+              Chèn SAU phần đang chọn, không thay thế nó.
+
+              Bản trước gọi `thayDoan(selectionStart, selectionEnd, mau)`, nên chọn
+              một đoạn rồi bấm Callout là đoạn đó BIẾN MẤT, thay bằng template. Không
+              có hỏi lại, và sau khi Lưu thì không hoàn lại được.
+
+              Đó không phải chuyện giả định: chính tôi đã xoá mất câu mở của bài
+              `cache-http-ba-tang` đúng theo cách này — chọn "Tôi từng", bấm B, rồi
+              bấm Callout khi phần chọn còn nguyên. Bài đã lên site với một khối
+              Callout mẫu ở đầu suốt mấy giờ, phải lấy lại từ commit đầu tiên.
+
+              Nút đậm/nghiêng và nút link thì BAO quanh phần chọn — đúng rồi, giữ
+              nguyên. Chỉ khối component mới cần đổi.
+            */
+            // Chèn ở CUỐI DÒNG chứa con trỏ, không phải ngay tại con trỏ.
+            //
+            // Khối MDX phải nằm giữa hai đoạn văn. Chèn đúng vị trí con trỏ thì nó cắt
+            // đôi câu đang viết, và nếu con trỏ nằm trong cặp `**` thì cắt đôi cả cặp
+            // đó — không mất chữ, nhưng ra một mớ không ai muốn đọc.
+            const xuongDong = t.value.indexOf('\n', t.selectionEnd);
+            const viTri = xuongDong === -1 ? t.value.length : xuongDong;
+
+            // Mọi mẫu trong `MAU_MDX` đã tự mở đầu bằng '\n'. Thêm đúng MỘT '\n' nữa
+            // để có dòng trống phía trên, và chỉ khi phía trước chưa sẵn là dòng trống.
+            const truoc = t.value.slice(0, viTri);
+            const dem = truoc === '' || truoc.endsWith('\n') ? '' : '\n';
+
+            thayDoan(viTri, viTri, dem + mau);
           }
         });
 

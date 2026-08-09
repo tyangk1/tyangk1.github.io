@@ -778,7 +778,24 @@
         }
         if (MAU_MDX[lam]) {
           const t = ta();
-          thayDoan(t.selectionStart, t.selectionEnd, MAU_MDX[lam]);
+
+          /*
+            Chèn SAU phần đang chọn, không thay thế nó. Bản trước thay thế, nên chọn
+            một đoạn rồi bấm Callout là đoạn đó biến mất — và sau khi Lưu thì không
+            hoàn lại được. Chính tôi đã xoá mất câu mở của một bài thật theo đúng cách
+            này. Nút đậm/nghiêng và link thì BAO quanh phần chọn, đúng rồi, giữ nguyên.
+          */
+          // Chèn ở CUỐI DÒNG chứa con trỏ, không phải ngay tại con trỏ: khối MDX phải
+          // nằm giữa hai đoạn văn, chèn giữa câu thì cắt đôi câu (và cắt đôi cả cặp
+          // `**` nếu con trỏ đang ở trong đó).
+          const xuongDong = t.value.indexOf('\n', t.selectionEnd);
+          const viTri = xuongDong === -1 ? t.value.length : xuongDong;
+
+          // Mẫu đã tự mở đầu bằng '\n'. Thêm đúng MỘT '\n' nữa để có dòng trống trên.
+          const truoc = t.value.slice(0, viTri);
+          const dem = truoc === '' || truoc.endsWith('\n') ? '' : '\n';
+
+          thayDoan(viTri, viTri, dem + MAU_MDX[lam]);
         }
       });
 
@@ -947,7 +964,9 @@
           const r = await fetch('/api/bai', {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(docForm()),
+            // `slug_goc` cho server biết đây là SỬA bài nào. Thiếu nó thì đổi slug
+            // sẽ tạo bài mới và để bài cũ nằm lại — hai bài trùng nội dung.
+            body: JSON.stringify({ ...docForm(), slug_goc: slugDangSua }),
           });
           const kq = await r.json();
 
