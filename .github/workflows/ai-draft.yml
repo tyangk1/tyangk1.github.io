@@ -1,0 +1,144 @@
+name: AI draft
+
+# Mỗi ngày lấy một chủ đề tới hạn trong `content_queue` và soạn thành bài.
+#
+# VÌ SAO KHÔNG CÓ BƯỚC DEPLOY Ở ĐÂY
+#
+# Workflow này chỉ GHI VÀO DATABASE. Bài soạn ra là nháp (mode 'draft') hoặc đặt lịch
+# theo `publish_on` — cả hai đều bị RLS ẩn khỏi khoá công khai, nên không có gì để đưa
+# lên site ngay. Khi tới ngày, workflow "Auto publish" (chạy mỗi 20 phút) thấy bài,
+# đồng bộ ra file, commit và deploy. Thêm bước deploy ở đây là deploy một thứ không đổi.
+#
+# MỘT BÀI MỖI LẦN CHẠY, CỐ Ý
+#
+# Không truyền `--all` ở nhịp cron. Cron ngày một lần + một bài mỗi lần = tối đa một
+# bài mỗi ngày, và đó đúng là nhịp một blog cá nhân cần. `--all` có sẵn ở nút bấm tay
+# cho lúc muốn dồn nhiều bài.
+on:
+  schedule:
+    # 18:00 UTC = 01:00 giờ Việt Nam. Soạn xong trước khi chủ blog thức, nên sáng ra
+    # là có bài nháp để đọc. Giờ cụ thể không quan trọng lắm vì mặc định soạn TRƯỚC
+    # ngày đăng 3 ngày (AI_LEAD_DAYS) — không có gì lên site ngay sau lần chạy này.
+    - cron: '0 18 * * *'
+
+  workflow_dispatch:
+    inputs:
+      all:
+        description: Soạn hết mọi chủ đề tới hạn, không chỉ một bài
+        type: boolean
+        default: false
+      dry:
+        description: Soạn nhưng KHÔNG ghi vào database (để xem thử)
+        type: boolean
+        default: false
+
+# Không xin quyền gì với repo: workflow này không đọc code ngoài checkout, không
+# commit, không deploy. Mọi thao tác đi qua Supabase bằng tài khoản bot.
+permissions:
+  contents: read
+
+concurrency:
+  group: ai-draft
+  cancel-in-progress: false
+
+jobs:
+  draft:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    env:
+      # KHÔNG phải bí mật: URL endpoint và tên model. Dùng `vars` để còn đọc được
+      # trong log khi cần lần lỗi — GitHub che sạch mọi `secrets` trong log, và đó là
+      # thứ làm việc debug khó hơn khi giá trị vốn công khai.
+      AI_BASE_URL: ${{ vars.AI_BASE_URL }}
+      AI_MODEL: ${{ vars.AI_MODEL }}
+      AI_LEAD_DAYS: ${{ vars.AI_LEAD_DAYS }}
+      AI_MAX_ATTEMPTS: ${{ vars.AI_MAX_ATTEMPTS }}
+      AI_MAX_FIXES: ${{ vars.AI_MAX_FIXES }}
+
+      AI_API_KEY: ${{ secrets.AI_API_KEY }}
+
+      PUBLIC_SUPABASE_URL: ${{ vars.PUBLIC_SUPABASE_URL }}
+      PUBLIC_SUPABASE_ANON_KEY: ${{ vars.PUBLIC_SUPABASE_ANON_KEY }}
+
+      # Tài khoản bot, KHÔNG phải service key.
+      #
+      # Service key đi xuyên toàn bộ RLS — đặt nó ở đây là cho một workflow soạn bài
+      # cái quyền đọc bảng email người đăng ký. Tài khoản bot có tên trong `admins`
+      # nhưng `can_read_subscribers = false`, nên nó ghi được bài mà không thấy địa chỉ
+      # của ai. Đã kiểm bằng JWT thật: bảng có 2 dòng, chủ blog thấy 2, bot thấy 0.
+      #
+      # Thu hồi: xoá một dòng trong bảng `admins`.
+      SUPABASE_BOT_EMAIL: ${{ secrets.SUPABASE_BOT_EMAIL }}
+      SUPABASE_BOT_PASSWORD: ${{ secrets.SUPABASE_BOT_PASSWORD }}
+
+    steps:
+      # Chưa cấu hình thì THOÁT XANH, không đỏ.
+      #
+      # Tính năng này là tuỳ chọn. Nếu thiếu khoá mà workflow fail thì mỗi ngày có một
+      # dấu X đỏ và một email báo lỗi — và thứ đó dạy người ta bỏ qua CI đỏ, đúng cái
+      # phản xạ không nên có.
+      - name: Kiểm cấu hình
+        id: check
+        run: |
+          missing=""
+          [ -z "$AI_BASE_URL" ]           && missing="$missing AI_BASE_URL(vars)"
+          [ -z "$AI_MODEL" ]              && missing="$missing AI_MODEL(vars)"
+          [ -z "$AI_API_KEY" ]            && missing="$missing AI_API_KEY(secret)"
+          [ -z "$SUPABASE_BOT_EMAIL" ]    && missing="$missing SUPABASE_BOT_EMAIL(secret)"
+          [ -z "$SUPABASE_BOT_PASSWORD" ] && missing="$missing SUPABASE_BOT_PASSWORD(secret)"
+
+          if [ -n "$missing" ]; then
+            {
+              echo "### Soạn bài tự động: chưa bật"
+              echo ""
+              echo "Còn thiếu:$missing"
+              echo ""
+              echo "Đặt ở Settings → Secrets and variables → Actions."
+              echo "Lấy khoá miễn phí: https://aistudio.google.com/apikey"
+              echo ""
+              echo '    AI_BASE_URL = https://generativelanguage.googleapis.com/v1beta/openai'
+              echo '    AI_MODEL    = gemini-2.0-flash'
+              echo ""
+              echo "Mật khẩu bot nằm trong \`.env\` ở máy (SUPABASE_BOT_PASSWORD)."
+            } >> "$GITHUB_STEP_SUMMARY"
+            echo "Chưa cấu hình:$missing — bỏ qua, không coi là lỗi."
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/checkout@v5
+        if: steps.check.outputs.ready == 'true'
+
+      - uses: pnpm/action-setup@v4
+        if: steps.check.outputs.ready == 'true'
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v5
+        if: steps.check.outputs.ready == 'true'
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Cài dependency
+        if: steps.check.outputs.ready == 'true'
+        run: pnpm install --frozen-lockfile
+
+      - name: Soạn bài
+        if: steps.check.outputs.ready == 'true'
+        run: |
+          args=""
+          [ "${{ inputs.all }}" = "true" ] && args="$args --all"
+          [ "${{ inputs.dry }}" = "true" ] && args="$args --dry"
+          echo "pnpm ai:draft$args"
+          pnpm ai:draft $args | tee draft.log
+
+          {
+            echo "### Soạn bài tự động"
+            echo ""
+            echo '```'
+            cat draft.log
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
