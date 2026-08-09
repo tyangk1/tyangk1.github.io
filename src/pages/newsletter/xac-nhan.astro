@@ -98,15 +98,22 @@ import BaseLayout from '~/layouts/BaseLayout.astro';
 
           const ketQua: unknown = await res.json();
 
+          // Ba mã trạng thái, xem migration 20260809010000.
+          //
+          // Bấm lại link khi đang còn đăng ký vẫn trả `xong` — token không hết
+          // hạn sau lần dùng đầu. Vô hại: xác nhận hai lần cũng chỉ là đã xác
+          // nhận. Nhưng `da_huy` thì phải nói khác hẳn, vì lúc đó link CỐ TÌNH
+          // không còn tác dụng.
           if (ketQua === 'xong') {
             hien('Xong. Từ giờ mỗi khi có bài mới bạn sẽ nhận được một email.', true);
-          } else {
-            // `khong_thay`: token sai, hoặc đã dùng rồi ở lần bấm trước.
+          } else if (ketQua === 'da_huy') {
             hien(
-              'Link này không còn dùng được. Có thể bạn đã xác nhận xong ở lần bấm trước — ' +
-                'nếu vậy thì không cần làm gì thêm.',
+              'Trước đó bạn đã huỷ đăng ký, nên link này không còn tác dụng. ' +
+                'Muốn nhận lại thì đăng ký lại ở khối cuối bài viết bất kỳ.',
               true,
             );
+          } else {
+            hien('Link này không dùng được. Kiểm lại xem bạn đã copy đủ cả đường dẫn chưa.', true);
           }
         } catch {
           hien('Không kết nối được lúc này. Thử tải lại trang sau một phút.');
