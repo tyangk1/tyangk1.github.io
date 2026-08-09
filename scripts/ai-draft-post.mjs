@@ -68,6 +68,23 @@ const MAX_ATTEMPTS = num('AI_MAX_ATTEMPTS', 3);
 /** Số lần đưa lỗi validate lại cho model tự sửa, trong CÙNG một lượt soạn. */
 const MAX_FIXES = num('AI_MAX_FIXES', 2);
 
+/**
+ * Ngân sách token cho một lượt trả lời. 24000, không phải 8000.
+ *
+ * Với model có suy nghĩ (`gemini-flash-latest` là một trong số đó), `max_tokens` tính CẢ
+ * phần suy nghĩ, không chỉ phần chữ trả về. Đã đo trên đúng một brief:
+ *
+ *   max_tokens=8000   completion 1764 · prompt 1246 · total 9242  -> finish_reason=length
+ *   max_tokens=24000  completion 1875 · prompt 1246 · total 8438  -> finish_reason=stop
+ *
+ * 9242 - 1246 - 1764 = 6232 token ẩn. Chữ trả về chỉ 1764 token mà ngân sách 8000 vẫn
+ * hết — phần suy nghĩ ăn gần hết. Bị cắt thì JSON mất dấu `}` cuối và không parse được.
+ *
+ * Vì sao ở máy không thấy: brief ngắn hơn thì suy nghĩ ít hơn và vừa 8000. Đó là một
+ * ngưỡng không xác định, không phải một giới hạn ổn định — nên phải đặt rộng ra.
+ */
+const MAX_TOKENS = num('AI_MAX_TOKENS', 24000);
+
 const argv = process.argv.slice(2);
 const flag = (name) => argv.includes(`--${name}`);
 const value = (name) =>
@@ -102,7 +119,7 @@ async function callModel(messages) {
       Authorization: `Bearer ${AI_API_KEY}`,
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({ model: AI_MODEL, messages, temperature: 0.7, max_tokens: 8000 }),
+    body: JSON.stringify({ model: AI_MODEL, messages, temperature: 0.7, max_tokens: MAX_TOKENS }),
   });
 
   const text = await r.text();
@@ -115,10 +132,30 @@ async function callModel(messages) {
     throw new Error(`AI trả về thứ không phải JSON: ${text.slice(0, 200)}`);
   }
 
-  const content = payload?.choices?.[0]?.message?.content;
+  const choice = payload?.choices?.[0];
+  const content = choice?.message?.content;
   if (typeof content !== 'string' || !content.trim()) {
     throw new Error(`AI trả về rỗng: ${JSON.stringify(payload).slice(0, 300)}`);
   }
+
+  /*
+    Bắt việc BỊ CẮT ngay tại đây, đừng để nó đi xuống bước bóc JSON.
+
+    Phản hồi bị cắt vẫn là một chuỗi hợp lệ, chỉ thiếu dấu `}` cuối — nên `parseDraft`
+    báo "Không tìm thấy object JSON nào", một câu không chỉ ra được nguyên nhân. Người
+    đọc log sẽ đi tìm lỗi ở prompt trong khi vấn đề là ngân sách token.
+  */
+  if (choice.finish_reason === 'length') {
+    const u = payload.usage ?? {};
+    const hidden = (u.total_tokens ?? 0) - (u.prompt_tokens ?? 0) - (u.completion_tokens ?? 0);
+    throw new Error(
+      `Phản hồi bị CẮT vì hết token (finish_reason=length). ` +
+        `max_tokens=${MAX_TOKENS}, đã dùng: prompt ${u.prompt_tokens ?? '?'} + ` +
+        `chữ trả về ${u.completion_tokens ?? '?'} + suy nghĩ ${hidden > 0 ? hidden : '?'}. ` +
+        `Với model có suy nghĩ thì max_tokens tính cả phần suy nghĩ — nâng AI_MAX_TOKENS lên.`,
+    );
+  }
+
   return content;
 }
 
