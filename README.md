@@ -58,6 +58,7 @@ pnpm build && pnpm preview
 | `pnpm db:stop`        | Tắt Supabase cục bộ                                                     |
 | `pnpm db:push`        | **Một lần**: đẩy nội dung dạng file hiện có vào database                |
 | `pnpm db:reset`       | Dựng lại database từ migration (xoá sạch dữ liệu)                       |
+| `pnpm db:gop`         | Gộp migration thành 1 file dán được vào SQL Editor, chạy lại được       |
 | `pnpm db:subscribers` | Xem danh sách đăng ký newsletter (`--csv` để xuất file)                 |
 | `pnpm giscus:setup`   | Lấy tự động 4 giá trị cấu hình giscus: `pnpm giscus:setup owner/repo`   |
 | `pnpm anh:upload`     | Ảnh ở máy → Supabase Storage, in ra URL để dán vào bài                  |
@@ -282,18 +283,46 @@ pnpm db:push                  # đẩy nội dung lên
 | **Bảng** posts / projects / post_views / newsletter_subscribers | ❌ **chưa có**                                |
 
 Bốn bảng đó trả 404 — project trắng, chưa chạy migration lần nào. Tạo bảng là
-lệnh **DDL**, mà DDL không đi qua REST API được: nó cần mật khẩu database, thứ
-không nằm trong bộ khoá API. Nên bước này phải do chủ project chạy:
+lệnh **DDL**, và DDL không đi qua REST API được. Nó cần một trong hai thứ mà chỉ
+chủ project có:
+
+| Đường                    | Cần gì                                 |
+| ------------------------ | -------------------------------------- |
+| `supabase db push`       | Đăng nhập CLI **và** mật khẩu database |
+| Management API           | Personal access token `sbp_...`        |
+| **SQL Editor** (dễ nhất) | Không cần gì thêm — chỉ dán và bấm Run |
+
+**Cách 1 — SQL Editor, khuyên dùng.** Không phải cấp thêm khoá cho ai:
+
+1. Mở SQL Editor của project trên `supabase.com/dashboard`
+2. Dán toàn bộ [`supabase/migrate-mot-lan.sql`](./supabase/migrate-mot-lan.sql)
+3. Bấm **Run**
+
+File đó do `pnpm db:gop` sinh từ `supabase/migrations/`. Nó không chỉ nối file —
+`create table`/`create index` được đổi thành `if not exists`, còn
+`create trigger`/`create policy` được chèn `drop ... if exists` ngay trước, vì
+Postgres không có `or replace` cho hai loại đó. **Đã kiểm bằng cách chạy thật**
+trên một database trắng với `ON_ERROR_STOP=1`: hai lần liên tiếp đều exit 0, và
+kết quả có đúng 4 bảng (RLS bật cả 4), 5 hàm, 5 policy.
+
+**Cách 2 — CLI.** Cần đăng nhập CLI trước, đây là chỗ hay bị vướng:
 
 ```bash
+npx supabase login                 # mở trình duyệt để lấy access token
 npx supabase link --project-ref aglhmdrxpiwvnafctbxy
-npx supabase db push
+npx supabase db push               # hỏi mật khẩu database
+```
+
+Mật khẩu database ở **Project Settings → Database → Database password** (quên thì
+Reset tại đó). Thiếu bước `login` thì `link` báo lỗi xác thực, không phải lỗi mật
+khẩu — dễ đi sai hướng.
+
+**Sau khi bảng đã có** (bước này chạy được với khoá API, không cần mật khẩu):
+
+```bash
 pnpm db:push        # nạp 8 bài + 4 dự án lên project mới
 pnpm sync           # kéo về lại thành file, rồi commit
 ```
-
-Mật khẩu database lấy ở **Project Settings → Database → Database password**
-(quên thì Reset ở đó luôn). `supabase link` sẽ hỏi mật khẩu đó.
 
 Cho tới khi chạy xong, `pnpm sync` / `pnpm dev` / `pnpm build` đều dừng với
 thông báo chỉ đúng hai lệnh trên — `db-sync.mjs` phân biệt được "database không
