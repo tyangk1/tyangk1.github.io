@@ -35,9 +35,9 @@ export const SITE = {
    * `current_date` thì bài đặt ngày 10/8 chỉ lên lúc 7 giờ sáng ngày 10 giờ Việt
    * Nam. Mọi tầng lọc đều đổi sang múi giờ này trước khi so.
    *
-   * Giá trị này bị lặp lại ở hai chỗ KHÔNG import được từ đây — `MUI_GIO` trong
-   * `scripts/lib/kiem-bai.mjs` (module này chạy cả trong trình duyệt nên không
-   * đọc được file TypeScript) và câu policy trong migration `dat_lich_dang`
+   * Giá trị này bị lặp lại ở hai chỗ KHÔNG import được từ đây — `TIME_ZONE` trong
+   * `scripts/lib/post.mjs` (module này chạy cả trong trình duyệt nên không
+   * đọc được file TypeScript) và câu policy trong migration `scheduled_publishing`
    * (SQL không import gì cả). `pnpm check:content` so ba chỗ đó với dòng này và
    * fail nếu lệch — chép tay thì phải có người canh.
    */

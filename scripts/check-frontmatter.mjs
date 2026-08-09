@@ -78,7 +78,7 @@ console.log(`✓ ${files.length} bài viết, frontmatter hợp lệ.`);
 
   Ba chỗ đó không import được từ nhau:
     src/site.config.ts        — TypeScript, dùng lúc build.
-    scripts/lib/kiem-bai.mjs  — module này chạy CẢ trong trình duyệt nên không
+    scripts/lib/post.mjs  — module này chạy CẢ trong trình duyệt nên không
                                 đọc được file .ts.
     migration dat_lich_dang   — SQL, không import gì cả.
 
@@ -86,30 +86,30 @@ console.log(`✓ ${files.length} bài viết, frontmatter hợp lệ.`);
   Lệch nhau là kiểu lỗi tệ nhất: không có gì sập, bài chỉ lên sớm hoặc muộn vài
   tiếng, và phải rất lâu sau mới có ai để ý.
 */
-const NGUON_MUI_GIO = [
+const TIME_ZONE_SOURCES = [
   ['src/site.config.ts', /timeZone:\s*'([^']+)'/],
-  ['scripts/lib/kiem-bai.mjs', /MUI_GIO\s*=\s*'([^']+)'/],
+  ['scripts/lib/post.mjs', /TIME_ZONE\s*=\s*'([^']+)'/],
   // Cố tình neo vào `)::date` chứ không chỉ `at time zone '...'`: chuỗi múi giờ còn
   // xuất hiện trong phần chú thích của file SQL, mà chú thích thì không phải cái chạy.
-  ['supabase/migrations/20260810000000_dat_lich_dang.sql', /at time zone '([^']+)'\)::date/],
+  ['supabase/migrations/20260810000000_scheduled_publishing.sql', /at time zone '([^']+)'\)::date/],
 ];
 
-const daDoc = [];
-for (const [file, mau] of NGUON_MUI_GIO) {
+const found = [];
+for (const [file, pattern] of TIME_ZONE_SOURCES) {
   const raw = await readFile(file, 'utf8');
-  const m = raw.match(mau);
+  const m = raw.match(pattern);
   if (!m) {
     console.error(`✗ Không tìm thấy khai báo múi giờ trong ${file}`);
     process.exit(1);
   }
-  daDoc.push([file, m[1]]);
+  found.push([file, m[1]]);
 }
 
-const khacNhau = new Set(daDoc.map(([, tz]) => tz));
-if (khacNhau.size > 1) {
+const distinct = new Set(found.map(([, tz]) => tz));
+if (distinct.size > 1) {
   console.error('\n✗ Múi giờ khai không khớp giữa các file — bài đặt lịch sẽ lên sai ngày:');
-  for (const [file, tz] of daDoc) console.error(`    ${tz}  ${file}`);
+  for (const [file, tz] of found) console.error(`    ${tz}  ${file}`);
   process.exit(1);
 }
 
-console.log(`✓ Múi giờ khớp ở ${daDoc.length} chỗ: ${daDoc[0][1]}`);
+console.log(`✓ Múi giờ khớp ở ${found.length} chỗ: ${found[0][1]}`);

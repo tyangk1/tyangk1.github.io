@@ -1,4 +1,4 @@
-name: Tự động publish
+name: Auto publish
 
 # Kéo nội dung từ database ra file, và commit nếu có gì đổi.
 #
@@ -11,7 +11,7 @@ name: Tự động publish
 # không thành vòng lặp vô hạn. Đã trả giá để biết: bài đầu tiên đi qua đường này
 # nằm trong repo mà 404 trên site, và không có workflow run nào cho commit đó.
 #
-# Nên job `deploy` bên dưới gọi thẳng `dung-va-deploy.yml` — cùng đúng các bước mà
+# Nên job `deploy` bên dưới gọi thẳng `build-and-deploy.yml` — cùng đúng các bước mà
 # workflow Deploy dùng, không phải bản copy. Nó chỉ chạy khi bước trên thật sự
 # commit, nên nhịp cron 20 phút không sinh ra lần deploy vô ích nào.
 #
@@ -41,7 +41,7 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  dong-bo:
+  sync:
     runs-on: ubuntu-latest
     timeout-minutes: 8
 
@@ -113,14 +113,14 @@ jobs:
   # Chỉ chạy khi bước trên thật sự commit. Nhờ `if` này mà nhịp cron 20 phút không
   # sinh ra lần deploy nào khi không có gì đổi.
   deploy:
-    needs: dong-bo
-    if: needs.dong-bo.outputs.da-commit == 'true'
+    needs: sync
+    if: needs.sync.outputs.da-commit == 'true'
 
     permissions:
       contents: read
       pages: write
       id-token: write
 
-    uses: ./.github/workflows/dung-va-deploy.yml
+    uses: ./.github/workflows/build-and-deploy.yml
     with:
-      ref: ${{ needs.dong-bo.outputs.sha }}
+      ref: ${{ needs.sync.outputs.sha }}

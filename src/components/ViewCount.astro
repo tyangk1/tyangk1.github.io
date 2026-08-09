@@ -24,26 +24,26 @@ const { slug } = Astro.props;
   luotXemBat && (
     <span
       class="inline-flex items-center gap-1.5"
-      data-luot-xem={slug}
+      data-view-count={slug}
       data-supabase-url={ENV.publicSupabaseUrl}
       data-supabase-key={ENV.publicSupabaseAnonKey}
       hidden
     >
       <Icon name="eye" size={14} />
-      <span data-luot-xem-so>—</span>
+      <span data-view-count-value>—</span>
       <span>lượt đọc</span>
     </span>
   )
 }
 
 <script>
-  const el = document.querySelector<HTMLElement>('[data-luot-xem]');
+  const el = document.querySelector<HTMLElement>('[data-view-count]');
 
   if (el) {
     const slug = el.dataset['luotXem'] ?? '';
     const url = el.dataset['supabaseUrl'] ?? '';
     const key = el.dataset['supabaseKey'] ?? '';
-    const so = el.querySelector<HTMLElement>('[data-luot-xem-so]');
+    const count = el.querySelector<HTMLElement>('[data-view-count-value]');
 
     // Chỉ cộng một lần cho mỗi tab. Tải lại trang không làm số nhảy thêm —
     // không chống được bot, nhưng chặn được cái sai thường gặp nhất là chính
@@ -69,10 +69,10 @@ const { slug } = Astro.props;
               headers: chung,
             },
           )
-        : await fetch(`${url}/rest/v1/rpc/tang_luot_xem`, {
+        : await fetch(`${url}/rest/v1/rpc/increment_view_count`, {
             method: 'POST',
             headers: { ...chung, 'Content-Type': 'application/json' },
-            body: JSON.stringify({ bai_slug: slug }),
+            body: JSON.stringify({ post_slug: slug }),
           });
 
       if (!res.ok) return null;
@@ -93,7 +93,7 @@ const { slug } = Astro.props;
         // Bài mới chưa ai đọc thì để ẩn — "1 lượt đọc" trông tệ hơn là không có gì.
         if (tong === null || tong < 5) return;
 
-        if (so) so.textContent = new Intl.NumberFormat('vi-VN').format(tong);
+        if (count) count.textContent = new Intl.NumberFormat('vi-VN').format(tong);
         el.hidden = false;
 
         if (!daXemTrongTab) {

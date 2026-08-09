@@ -17,7 +17,7 @@
  * đúng phần hướng dẫn mà người dùng cần đọc. Gán `exitCode` rồi `return` để Node
  * xả hết stdout trước khi kết thúc.
  */
-function thoatLoi(...dong) {
+function exitWithError(...dong) {
   for (const d of dong) console.error(d);
   process.exitCode = 1;
 }
@@ -34,7 +34,7 @@ async function main() {
   const repo = process.argv[2];
 
   if (!repo || !/^[\w.-]+\/[\w.-]+$/.test(repo)) {
-    return thoatLoi(
+    return exitWithError(
       'Cách dùng: pnpm giscus:setup <chu-so-huu>/<ten-repo>\n' +
         'Ví dụ:     pnpm giscus:setup tenban/blog',
     );
@@ -45,7 +45,7 @@ async function main() {
   if (!res.ok) {
     // giscus trả 403 cho cả ba nguyên nhân dưới đây, nên phải liệt kê hết chứ
     // không đoán bừa một cái.
-    return thoatLoi(
+    return exitWithError(
       `✗ giscus không đọc được repo "${repo}" (HTTP ${res.status}).\n`,
       'Ba nguyên nhân, kiểm theo đúng thứ tự này:\n',
       '  1. Repo phải PUBLIC.',
@@ -62,7 +62,7 @@ async function main() {
   const categories = data.categories ?? [];
 
   if (categories.length === 0) {
-    return thoatLoi(
+    return exitWithError(
       `✗ Repo "${repo}" đã bật Discussions nhưng chưa có category nào.\n` +
         '  Vào tab Discussions của repo, tạo một category (ví dụ "Announcements").',
     );
@@ -70,15 +70,15 @@ async function main() {
 
   // Ưu tiên "Announcements": chỉ chủ repo mở được thread mới, nên khách không tạo
   // được discussion rác. Đây cũng là lựa chọn giscus khuyến nghị.
-  const chon =
+  const choice =
     categories.find((c) => c.name === 'Announcements') ??
     categories.find((c) => c.name === 'General') ??
     categories[0];
 
   console.log(`✓ Đọc được repo "${repo}".\n`);
-  console.log(`Category dùng: ${chon.name}`);
+  console.log(`Category dùng: ${choice.name}`);
 
-  if (chon.name !== 'Announcements') {
+  if (choice.name !== 'Announcements') {
     console.log(
       '\n⚠ Nên dùng category "Announcements": chỉ chủ repo mở được thread mới,\n' +
         '  nên khách không tạo được discussion rác. Tạo nó ở tab Discussions rồi chạy lại.',
@@ -88,13 +88,13 @@ async function main() {
   console.log('\nDán bốn dòng này vào .env:\n');
   console.log(`PUBLIC_GISCUS_REPO=${repo}`);
   console.log(`PUBLIC_GISCUS_REPO_ID=${data.repositoryId}`);
-  console.log(`PUBLIC_GISCUS_CATEGORY=${chon.name}`);
-  console.log(`PUBLIC_GISCUS_CATEGORY_ID=${chon.id}`);
+  console.log(`PUBLIC_GISCUS_CATEGORY=${choice.name}`);
+  console.log(`PUBLIC_GISCUS_CATEGORY_ID=${choice.id}`);
 
   if (categories.length > 1) {
     console.log(`\nCác category khác nếu muốn đổi:`);
     for (const c of categories) {
-      if (c.id !== chon.id) console.log(`  ${c.name.padEnd(22)} ${c.id}`);
+      if (c.id !== choice.id) console.log(`  ${c.name.padEnd(22)} ${c.id}`);
     }
   }
 

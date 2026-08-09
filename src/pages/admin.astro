@@ -1,6 +1,6 @@
 ---
 import { ENV } from '~/env';
-import { GIOI_HAN } from '../../scripts/lib/kiem-bai.mjs';
+import { LIMITS } from '../../scripts/lib/post.mjs';
 
 /**
  * Trang quản trị chạy TRÊN SITE — dùng để sửa bài từ điện thoại hoặc máy khác.
@@ -28,7 +28,7 @@ import { GIOI_HAN } from '../../scripts/lib/kiem-bai.mjs';
  * Khoá dùng ở đây là khoá CÔNG KHAI, đúng thứ đã có trong mọi trang khác của site.
  * Không có bí mật nào trong bundle.
  */
-const bat = Boolean(ENV.publicSupabaseUrl && ENV.publicSupabaseAnonKey);
+const enabled = Boolean(ENV.publicSupabaseUrl && ENV.publicSupabaseAnonKey);
 ---
 
 <html lang="vi">
@@ -41,15 +41,15 @@ const bat = Boolean(ENV.publicSupabaseUrl && ENV.publicSupabaseAnonKey);
       :root {
         --bg: #0d1117;
         --panel: #161b22;
-        --vien: #30363d;
-        --chu: #e6edf3;
-        --mo: #8b949e;
-        --xanh: #58a6ff;
-        --luc: #3fb950;
-        --do: #f85149;
-        --vang: #d29922;
-        --tim: #a371f7;
-        --cam: #ffa657;
+        --border: #30363d;
+        --text: #e6edf3;
+        --muted: #8b949e;
+        --blue: #58a6ff;
+        --green: #3fb950;
+        --red: #f85149;
+        --yellow: #d29922;
+        --purple: #a371f7;
+        --orange: #ffa657;
         --mono: ui-monospace, 'Cascadia Code', Consolas, monospace;
       }
       * {
@@ -65,84 +65,84 @@ const bat = Boolean(ENV.publicSupabaseUrl && ENV.publicSupabaseAnonKey);
           system-ui,
           sans-serif;
         background: var(--bg);
-        color: var(--chu);
+        color: var(--text);
       }
 
       /* --- Đăng nhập --- */
-      .vao {
+      .login {
         max-width: 380px;
         margin: 14vh auto;
         padding: 0 18px;
       }
-      .vao h1 {
+      .login h1 {
         font-size: 20px;
         margin: 0 0 6px;
       }
-      .vao p {
-        color: var(--mo);
+      .login p {
+        color: var(--muted);
         font-size: 13px;
         margin: 0 0 20px;
       }
 
       /* --- Khung chính --- */
-      .khung {
+      .shell {
         display: grid;
         grid-template-columns: 260px 1fr;
         height: 100dvh;
         overflow: hidden;
       }
       aside {
-        border-right: 1px solid var(--vien);
+        border-right: 1px solid var(--border);
         display: flex;
         flex-direction: column;
         min-height: 0;
       }
-      .ds {
+      .list {
         overflow-y: auto;
         flex: 1;
       }
-      .muc {
+      .item {
         padding: 10px 12px;
-        border-bottom: 1px solid var(--vien);
+        border-bottom: 1px solid var(--border);
         cursor: pointer;
         display: grid;
         gap: 3px;
       }
-      .muc[aria-current='true'] {
+      .item[aria-current='true'] {
         background: var(--panel);
-        box-shadow: inset 3px 0 0 var(--xanh);
+        box-shadow: inset 3px 0 0 var(--blue);
       }
-      .muc b {
+      .item b {
         font-size: 13px;
         font-weight: 600;
       }
-      .muc small {
-        color: var(--mo);
+      .item small {
+        color: var(--muted);
         font-size: 11px;
         display: flex;
         gap: 6px;
       }
-      .the {
+      .badge {
         font-size: 10px;
         padding: 1px 5px;
         border-radius: 999px;
         border: 1px solid currentColor;
       }
-      .nhap {
-        color: var(--vang);
+      .draft {
+        color: var(--yellow);
       }
-      .dang {
-        color: var(--luc);
+      .published {
+        color: var(--green);
       }
       /* Đặt lịch: xong rồi, đang chờ tới ngày. Xanh chứ không vàng — vàng là
          "còn việc phải làm", còn bài này thì không cần làm gì nữa. */
-      .dat_lich {
-        color: var(--xanh);
+      .scheduled {
+        color: var(--blue);
       }
 
       /* Lời nhắc bên phải nhãn "Ngày đăng". Bỏ in nghiêng: đây là câu thông báo
          trạng thái, không phải chữ được nhấn mạnh. */
-      #hen {
+      #scheduleHint {
         font-style: normal;
         text-align: right;
       }
@@ -153,17 +153,17 @@ const bat = Boolean(ENV.publicSupabaseUrl && ENV.publicSupabaseAnonKey);
         min-width: 0;
         min-height: 0;
       }
-      .thanh,
-      .dau {
+      .bar,
+      .header {
         padding: 9px 13px;
         display: flex;
         gap: 7px;
         align-items: center;
-        border-bottom: 1px solid var(--vien);
+        border-bottom: 1px solid var(--border);
         flex-wrap: wrap;
         flex: none;
       }
-      .cot {
+      .col {
         overflow-y: auto;
         overflow-x: hidden;
         padding: 14px 16px 60px;
@@ -174,20 +174,20 @@ const bat = Boolean(ENV.publicSupabaseUrl && ENV.publicSupabaseAnonKey);
         display: block;
         margin-bottom: 11px;
       }
-      .nhan {
+      .label {
         display: flex;
         justify-content: space-between;
         gap: 10px;
         font-size: 12px;
-        color: var(--mo);
+        color: var(--muted);
         margin-bottom: 4px;
       }
       input,
       textarea {
         width: 100%;
         background: var(--bg);
-        color: var(--chu);
-        border: 1px solid var(--vien);
+        color: var(--text);
+        border: 1px solid var(--border);
         border-radius: 6px;
         padding: 9px 10px;
         font: inherit;
@@ -197,103 +197,103 @@ const bat = Boolean(ENV.publicSupabaseUrl && ENV.publicSupabaseAnonKey);
       }
       input:focus,
       textarea:focus {
-        outline: 2px solid var(--xanh);
+        outline: 2px solid var(--blue);
         outline-offset: -1px;
       }
       button {
         background: var(--panel);
-        color: var(--chu);
-        border: 1px solid var(--vien);
+        color: var(--text);
+        border: 1px solid var(--border);
         border-radius: 6px;
         padding: 9px 13px;
         font: inherit;
         cursor: pointer;
         min-height: 38px;
       }
-      button.chinh {
+      button.primary {
         background: #1f6feb;
         border-color: #1f6feb;
         font-weight: 600;
       }
-      button.nguyhiem:hover {
-        border-color: var(--do);
-        color: var(--do);
+      button.danger:hover {
+        border-color: var(--red);
+        color: var(--red);
       }
       button:disabled {
         opacity: 0.5;
       }
-      .hang {
+      .row {
         display: grid;
         grid-template-columns: 1fr 1fr;
         gap: 11px;
       }
       fieldset {
-        border: 1px solid var(--vien);
+        border: 1px solid var(--border);
         border-radius: 6px;
         padding: 12px;
         margin: 0 0 12px;
       }
       legend {
         font-size: 12px;
-        color: var(--mo);
+        color: var(--muted);
         padding: 0 6px;
       }
-      .cb {
+      .checks {
         display: flex;
         gap: 18px;
         flex-wrap: wrap;
       }
-      .cb label {
+      .checks label {
         display: flex;
         gap: 7px;
         align-items: center;
         margin: 0;
         font-size: 14px;
       }
-      .dem.ok {
-        color: var(--luc);
+      .counter.ok {
+        color: var(--green);
       }
-      .dem.sai {
-        color: var(--do);
+      .counter.bad {
+        color: var(--red);
       }
-      #tt {
+      #toast {
         margin-left: auto;
         font-size: 12px;
-        color: var(--mo);
+        color: var(--muted);
       }
-      #tt.ok {
-        color: var(--luc);
+      #toast.ok {
+        color: var(--green);
       }
-      #tt.sai {
-        color: var(--do);
+      #toast.bad {
+        color: var(--red);
       }
-      #loi:not(:empty) {
-        border: 1px solid var(--do);
+      #errors:not(:empty) {
+        border: 1px solid var(--red);
         background: #f8514915;
         border-radius: 6px;
         padding: 10px 12px;
         margin-bottom: 12px;
       }
-      #loi ul {
+      #errors ul {
         margin: 0;
         padding-left: 18px;
       }
-      .ghi {
-        color: var(--mo);
+      .note {
+        color: var(--muted);
         font-size: 11px;
         margin-top: 3px;
       }
 
       /* Ô soạn phủ lớp tô màu — cùng kỹ thuật và cùng module với `pnpm admin`.
-         Xem `scripts/lib/to-mau-mdx.mjs`. */
-      .khung-soan {
+         Xem `scripts/lib/highlight-mdx.mjs`. */
+      .editor-wrap {
         position: relative;
-        border: 1px solid var(--vien);
+        border: 1px solid var(--border);
         border-radius: 6px;
         overflow: hidden;
       }
-      .khung-soan:focus-within {
-        outline: 2px solid var(--xanh);
+      .editor-wrap:focus-within {
+        outline: 2px solid var(--blue);
         outline-offset: -1px;
       }
       #hl,
@@ -319,56 +319,56 @@ const bat = Boolean(ENV.publicSupabaseUrl && ENV.publicSupabaseAnonKey);
         min-height: 280px;
         background: transparent;
         color: transparent;
-        caret-color: var(--chu);
+        caret-color: var(--text);
         border-radius: 0;
         resize: vertical;
       }
-      .t-heading {
-        color: var(--xanh);
+      .tok-heading {
+        color: var(--blue);
         font-weight: 700;
       }
-      .t-tag {
-        color: var(--tim);
+      .tok-tag {
+        color: var(--purple);
       }
-      .t-code {
-        color: var(--cam);
+      .tok-code {
+        color: var(--orange);
       }
-      .t-fence {
-        color: var(--mo);
+      .tok-fence {
+        color: var(--muted);
       }
-      .t-manh {
+      .tok-bold {
         font-weight: 700;
       }
-      .t-nghieng {
+      .tok-italic {
         font-style: italic;
       }
-      .t-link {
-        color: var(--luc);
+      .tok-link {
+        color: var(--green);
       }
-      .t-trich {
-        color: var(--mo);
+      .tok-quote {
+        color: var(--muted);
         font-style: italic;
       }
-      .t-ds {
-        color: var(--vang);
+      .tok-list {
+        color: var(--yellow);
       }
-      .congcu {
+      .toolbar {
         display: flex;
         gap: 5px;
         flex-wrap: wrap;
         margin-bottom: 6px;
       }
-      .congcu button {
+      .toolbar button {
         padding: 6px 9px;
         font-size: 12px;
         min-height: 34px;
       }
-      .keo {
-        border: 1px dashed var(--vien);
+      .dropzone {
+        border: 1px dashed var(--border);
         border-radius: 6px;
         padding: 10px;
         text-align: center;
-        color: var(--mo);
+        color: var(--muted);
         font-size: 12px;
         margin-top: 10px;
       }
@@ -377,19 +377,19 @@ const bat = Boolean(ENV.publicSupabaseUrl && ENV.publicSupabaseAnonKey);
       }
 
       @media (max-width: 900px) {
-        .khung {
+        .shell {
           grid-template-columns: 1fr;
           grid-template-rows: auto 1fr;
         }
         aside {
           border-right: 0;
-          border-bottom: 1px solid var(--vien);
+          border-bottom: 1px solid var(--border);
           max-height: 42vh;
         }
         #nut-ds {
           display: inline-block;
         }
-        .hang {
+        .row {
           grid-template-columns: 1fr;
         }
         #content {
@@ -401,8 +401,8 @@ const bat = Boolean(ENV.publicSupabaseUrl && ENV.publicSupabaseAnonKey);
 
   <body>
     {
-      !bat ? (
-        <div class="vao">
+      !enabled ? (
+        <div class="login">
           <h1>Chưa cấu hình</h1>
           <p>
             Trang quản trị cần <code>PUBLIC_SUPABASE_URL</code> và
@@ -412,97 +412,97 @@ const bat = Boolean(ENV.publicSupabaseUrl && ENV.publicSupabaseAnonKey);
         </div>
       ) : (
         <>
-          <div class="vao" id="man-vao">
+          <div class="login" id="screen-login">
             <h1>Quản trị nội dung</h1>
             <p>
-              Đăng nhập được không có nghĩa là ghi được: quyền ghi do bảng <code>admins</code> trong
-              database quyết định.
+              Đăng nhập được không có nghĩa là note được: quyền note do bảng <code>admins</code>{' '}
+              trong database quyết định.
             </p>
-            <form id="form-vao">
+            <form id="login-form">
               <label>
-                <span class="nhan">
+                <span class="label">
                   <span>Email</span>
                 </span>
                 <input type="email" id="email" autocomplete="username" required />
               </label>
               <label>
-                <span class="nhan">
+                <span class="label">
                   <span>Mật khẩu</span>
                 </span>
                 <input type="password" id="matkhau" autocomplete="current-password" required />
               </label>
-              <button class="chinh" type="submit" style="width:100%">
+              <button class="primary" type="submit" style="width:100%">
                 Đăng nhập
               </button>
-              <p id="loi-vao" style="color:var(--do);margin-top:12px" />
+              <p id="login-error" style="color:var(--red);margin-top:12px" />
             </form>
           </div>
 
-          <div class="khung" id="man-chinh" hidden>
+          <div class="shell" id="screen-main" hidden>
             <aside>
-              <div class="dau">
-                <button class="chinh" id="nut-moi">
+              <div class="header">
+                <button class="primary" id="nut-moi">
                   + Bài mới
                 </button>
-                <button id="nut-ra">Đăng xuất</button>
+                <button id="btn-logout">Đăng xuất</button>
               </div>
               <div class="ds" id="ds" />
             </aside>
 
             <main>
-              <div class="thanh">
+              <div class="bar">
                 <button id="nut-ds" aria-pressed="false">
                   ☰
                 </button>
-                <button class="chinh" id="nut-luu">
+                <button class="primary" id="btn-save">
                   Lưu
                 </button>
-                <button id="nut-anh">Ảnh…</button>
-                <button class="nguyhiem" id="nut-xoa">
+                <button id="btn-image">Ảnh…</button>
+                <button class="danger" id="btn-delete">
                   Xoá
                 </button>
-                <span id="tt" />
+                <span id="toast" />
               </div>
 
               <div class="cot">
-                <div id="loi" />
+                <div id="errors" />
 
                 <fieldset>
                   <legend>Bắt buộc</legend>
                   <label>
-                    <span class="nhan">
+                    <span class="label">
                       <span>Tiêu đề</span>
-                      <span class="dem" id="dem-title" />
+                      <span class="counter" id="count-title" />
                     </span>
                     <input type="text" id="title" />
                   </label>
                   <label>
-                    <span class="nhan">
+                    <span class="label">
                       <span>Slug — không đổi sau khi đã đăng</span>
-                      <span class="dem" id="dem-slug" />
+                      <span class="counter" id="count-slug" />
                     </span>
                     <input type="text" id="slug" />
-                    <span class="ghi" id="ghi-slug" />
+                    <span class="note" id="slug-note" />
                   </label>
                   <label>
-                    <span class="nhan">
+                    <span class="label">
                       <span>Mô tả (meta description)</span>
-                      <span class="dem" id="dem-description" />
+                      <span class="counter" id="count-description" />
                     </span>
                     <textarea id="description" rows="3" />
                   </label>
-                  <div class="hang">
+                  <div class="row">
                     <label>
-                      <span class="nhan">
+                      <span class="label">
                         <span>Tag, cách nhau bằng phẩy</span>
-                        <span class="dem" id="dem-tags" />
+                        <span class="counter" id="count-tags" />
                       </span>
                       <input type="text" id="tags" />
                     </label>
                     <label>
-                      <span class="nhan">
+                      <span class="label">
                         <span>Ngày đăng</span>
-                        <em id="hen" />
+                        <em id="scheduleHint" />
                       </span>
                       <input type="date" id="published_at" />
                     </label>
@@ -512,42 +512,42 @@ const bat = Boolean(ENV.publicSupabaseUrl && ENV.publicSupabaseAnonKey);
                 <fieldset>
                   <legend>Tuỳ chọn</legend>
                   <label>
-                    <span class="nhan">
+                    <span class="label">
                       <span>Điểm chính — mỗi dòng một ý</span>
-                      <span class="dem" id="dem-takeaways" />
+                      <span class="counter" id="count-takeaways" />
                     </span>
                     <textarea id="takeaways" rows="4" />
                   </label>
-                  <div class="hang">
+                  <div class="row">
                     <label>
-                      <span class="nhan">
+                      <span class="label">
                         <span>Ảnh bìa (URL)</span>
                       </span>
                       <input type="text" id="cover_image" />
                     </label>
                     <label>
-                      <span class="nhan">
+                      <span class="label">
                         <span>Mô tả ảnh bìa (alt)</span>
                       </span>
                       <input type="text" id="cover_alt" />
                     </label>
                   </div>
-                  <div class="hang">
+                  <div class="row">
                     <label>
-                      <span class="nhan">
+                      <span class="label">
                         <span>Tên series</span>
                       </span>
                       <input type="text" id="series_name" />
                     </label>
                     <label>
-                      <span class="nhan">
+                      <span class="label">
                         <span>Phần thứ</span>
                       </span>
                       <input type="number" id="series_part" min="1" />
                     </label>
                   </div>
                   <label>
-                    <span class="nhan">
+                    <span class="label">
                       <span>Ngày cập nhật nội dung</span>
                     </span>
                     <input type="date" id="content_updated_at" />
@@ -562,98 +562,98 @@ const bat = Boolean(ENV.publicSupabaseUrl && ENV.publicSupabaseAnonKey);
                   </div>
                 </fieldset>
 
-                <div class="nhan">
+                <div class="label">
                   <span>Thân bài (MDX)</span>
-                  <span class="dem" id="dem-content" />
+                  <span class="counter" id="count-content" />
                 </div>
 
-                <div class="congcu" id="congcu">
-                  <button data-tt="## ">H2</button>
-                  <button data-tt="### ">H3</button>
-                  <button data-bao="**">
+                <div class="toolbar" id="toolbar">
+                  <button data-toast="## ">H2</button>
+                  <button data-toast="### ">H3</button>
+                  <button data-wrap="**">
                     <b>B</b>
                   </button>
-                  <button data-bao="_">
+                  <button data-wrap="_">
                     <i>I</i>
                   </button>
-                  <button data-bao="`">code</button>
-                  <button data-lam="link">link</button>
-                  <button data-tt="- ">• ds</button>
-                  <button data-lam="fence">```</button>
-                  <button data-lam="callout">Callout</button>
-                  <button data-lam="steps">Steps</button>
-                  <button data-lam="figure">Figure</button>
-                  <button data-lam="pullquote">PullQuote</button>
+                  <button data-wrap="`">code</button>
+                  <button data-action="link">link</button>
+                  <button data-toast="- ">• ds</button>
+                  <button data-action="fence">```</button>
+                  <button data-action="callout">Callout</button>
+                  <button data-action="steps">Steps</button>
+                  <button data-action="figure">Figure</button>
+                  <button data-action="pullquote">PullQuote</button>
                 </div>
 
-                <div class="khung-soan">
+                <div class="editor-wrap">
                   <pre id="hl" aria-hidden="true">
                     <code />
                   </pre>
                   <textarea id="content" spellcheck="false" />
                 </div>
 
-                <div class="keo" id="keo">
+                <div class="dropzone" id="dropzone">
                   Kéo ảnh vào đây, hoặc bấm “Ảnh…”
                 </div>
-                <p class="ghi" style="margin-top:14px">
-                  Lưu là xong — nội dung vào database ngay. Site tĩnh nên bài lên trong vòng 20
-                  phút, do workflow “Tự động publish” chạy. Cần ngay thì bấm Run workflow ở tab
+                <p class="note" style="margin-top:14px">
+                  Lưu là xong — nội dung vào database date. Site tĩnh nên bài lên trong vòng 20
+                  phút, do workflow “Tự động publish” chạy. Cần date thì bấm Run workflow ở tab
                   Actions.
                 </p>
               </div>
             </main>
           </div>
 
-          <input type="file" id="chon-file" accept="image/*" multiple hidden />
+          <input type="file" id="file-input" accept="image/*" multiple hidden />
         </>
       )
     }
 
     <script
       define:vars={{
-        URL_SB: ENV.publicSupabaseUrl,
-        KHOA: ENV.publicSupabaseAnonKey,
-        GIOI_HAN,
+        SUPABASE_URL: ENV.publicSupabaseUrl,
+        KEY: ENV.publicSupabaseAnonKey,
+        LIMITS,
       }}
       is:inline
     >
-      window.__ADMIN = { URL_SB, KHOA, GIOI_HAN };
+      window.__ADMIN = { SUPABASE_URL, KEY, LIMITS };
     </script>
 
     <script>
-      import { toMauMdx, MAU_MDX } from '../../scripts/lib/to-mau-mdx.mjs';
+      import { highlightMdx, MDX_SNIPPETS } from '../../scripts/lib/highlight-mdx.mjs';
       import {
-        kiemBai,
-        chuanHoaBai,
-        trangThaiBai,
-        NHAN_TRANG_THAI,
-        ngayHomNay,
-      } from '../../scripts/lib/kiem-bai.mjs';
+        validatePost,
+        normalizePost,
+        postStatus,
+        STATUS_LABELS,
+        today,
+      } from '../../scripts/lib/post.mjs';
 
       const cfg = (window as unknown as { __ADMIN?: Record<string, unknown> }).__ADMIN;
       const $ = (id: string) => document.getElementById(id) as HTMLElement | null;
       const val = (id: string) => ($(id) as HTMLInputElement | null)?.value ?? '';
 
       if (cfg) {
-        const URL_SB = cfg['URL_SB'] as string;
-        const KHOA = cfg['KHOA'] as string;
-        const G = cfg['GIOI_HAN'] as Record<string, number>;
-        const KHOA_PHIEN = 'admin-phien';
+        const SUPABASE_URL = cfg['SUPABASE_URL'] as string;
+        const KEY = cfg['KEY'] as string;
+        const G = cfg['LIMITS'] as Record<string, number>;
+        const SESSION_KEY = 'admin-session';
 
-        let phien: { access_token: string; refresh_token: string } | null = null;
-        let danhSach: Record<string, unknown>[] = [];
-        let slugDangSua: string | null = null;
+        let session: { access_token: string; refresh_token: string } | null = null;
+        let posts: Record<string, unknown>[] = [];
+        let editingSlug: string | null = null;
 
         // --- Gọi Supabase ---------------------------------------------------
-        const dau = () => ({
-          apikey: KHOA,
-          Authorization: `Bearer ${phien?.access_token ?? KHOA}`,
+        const authHeaders = () => ({
+          apikey: KEY,
+          Authorization: `Bearer ${session?.access_token ?? KEY}`,
           'Content-Type': 'application/json',
         });
 
-        function tt(chu: string, loai = '') {
-          const el = $('tt');
+        function toast(chu: string, loai = '') {
+          const el = $('toast');
           if (el) {
             el.textContent = chu;
             el.className = loai;
@@ -665,69 +665,69 @@ const bat = Boolean(ENV.publicSupabaseUrl && ENV.publicSupabaseAnonKey);
          * hạn giữa lúc viết, và lúc đó mọi lần lưu sẽ trả 401 — mất bài. Nên làm
          * mới bằng refresh token trước khi gọi, khi gặp 401.
          */
-        async function goi(
-          duong: string,
-          tuyChon: RequestInit = {},
-          thuLai = true,
+        async function api(
+          path: string,
+          options: RequestInit = {},
+          retry = true,
         ): Promise<Response> {
-          // Gộp header của caller lên trên, không ghi đè bằng `dau()`.
+          // Gộp header của caller lên trên, không ghi đè bằng `authHeaders()`.
           //
-          // Bản trước viết `headers: dau()` nên mọi header caller truyền vào bị bỏ
+          // Bản trước viết `headers: authHeaders()` nên mọi header caller truyền vào bị bỏ
           // lặng lẽ. Không có lỗi nào để thấy — chỉ là `Prefer` không bao giờ tới
           // được PostgREST, và đó là một nửa nguyên nhân của lỗi trùng slug.
-          const res = await fetch(`${URL_SB}${duong}`, {
-            ...tuyChon,
-            headers: { ...dau(), ...((tuyChon.headers as Record<string, string>) ?? {}) },
+          const res = await fetch(`${SUPABASE_URL}${path}`, {
+            ...options,
+            headers: { ...authHeaders(), ...((options.headers as Record<string, string>) ?? {}) },
           });
-          if (res.status !== 401 || !thuLai || !phien) return res;
+          if (res.status !== 401 || !retry || !session) return res;
 
-          const r = await fetch(`${URL_SB}/auth/v1/token?grant_type=refresh_token`, {
+          const r = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=refresh_token`, {
             method: 'POST',
-            headers: { apikey: KHOA, 'Content-Type': 'application/json' },
-            body: JSON.stringify({ refresh_token: phien.refresh_token }),
+            headers: { apikey: KEY, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ refresh_token: session.refresh_token }),
           });
           if (!r.ok) {
-            dangXuat();
+            logout();
             return res;
           }
           const moi = await r.json();
-          phien = { access_token: moi.access_token, refresh_token: moi.refresh_token };
-          localStorage.setItem(KHOA_PHIEN, JSON.stringify(phien));
-          return goi(duong, tuyChon, false);
+          session = { access_token: moi.access_token, refresh_token: moi.refresh_token };
+          localStorage.setItem(SESSION_KEY, JSON.stringify(session));
+          return api(path, options, false);
         }
 
-        function dangXuat() {
-          phien = null;
-          localStorage.removeItem(KHOA_PHIEN);
-          $('man-chinh')!.hidden = true;
-          $('man-vao')!.hidden = false;
+        function logout() {
+          session = null;
+          localStorage.removeItem(SESSION_KEY);
+          $('screen-main')!.hidden = true;
+          $('screen-login')!.hidden = false;
         }
 
         // --- Tô màu ---------------------------------------------------------
         const hlCode = $('hl')!.firstElementChild!;
-        const ta = () => $('content') as HTMLTextAreaElement;
+        const editor = () => $('content') as HTMLTextAreaElement;
 
-        function veLaiHl() {
-          hlCode.innerHTML = toMauMdx(ta().value);
-          $('hl')!.scrollTop = ta().scrollTop;
+        function renderHighlight() {
+          hlCode.innerHTML = highlightMdx(editor().value);
+          $('hl')!.scrollTop = editor().scrollTop;
         }
 
-        function thayDoan(a: number, b: number, chuoi: string) {
-          const t = ta();
+        function replaceRange(a: number, b: number, chuoi: string) {
+          const t = editor();
           t.setRangeText(chuoi, a, b, 'end');
           t.focus();
           t.dispatchEvent(new Event('input', { bubbles: true }));
         }
 
-        function bao(dau2: string) {
-          const t = ta();
+        function wrap(dau2: string) {
+          const t = editor();
           const { selectionStart: a, selectionEnd: b, value: v } = t;
-          thayDoan(a, b, `${dau2}${v.slice(a, b)}${dau2}`);
+          replaceRange(a, b, `${dau2}${v.slice(a, b)}${dau2}`);
           if (a === b) t.selectionStart = t.selectionEnd = a + dau2.length;
         }
 
-        function themTienTo(tt2: string) {
-          const t = ta();
+        function addPrefix(tt2: string) {
+          const t = editor();
           const v = t.value;
           const d = v.lastIndexOf('\n', t.selectionStart - 1) + 1;
           const c =
@@ -737,72 +737,72 @@ const bat = Boolean(ENV.publicSupabaseUrl && ENV.publicSupabaseAnonKey);
             .split('\n')
             .map((x) => (x.startsWith(tt2) ? x.slice(tt2.length) : tt2 + x))
             .join('\n');
-          thayDoan(d, c, khoi);
+          replaceRange(d, c, khoi);
         }
 
         // --- Đếm ------------------------------------------------------------
-        function dem(id: string, n: number, min: number, max: number) {
-          const el = $(`dem-${id}`);
+        function counter(id: string, n: number, min: number, max: number) {
+          const el = $(`counter-${id}`);
           if (!el) return;
           el.textContent = `${n} / ${min}–${max}`;
-          el.className = `dem ${n >= min && n <= max ? 'ok' : 'sai'}`;
+          el.className = `counter ${n >= min && n <= max ? 'ok' : 'bad'}`;
         }
 
         /**
-         * Viết lời nhắc vào `#hen`, ngay bên phải nhãn "Ngày đăng".
+         * Viết lời nhắc vào `#scheduleHint`, ngay bên phải nhãn "Ngày đăng".
          *
          * Ô ngày đăng là một cái HẸN, không phải chữ để hiển thị: để ngày mai thì bài
          * nằm im tới đúng ngày đó rồi tự lên. Không nói ra thì không ai đoán được —
          * tính năng không ai biết là tính năng không tồn tại.
          *
-         * Ba câu, khớp với ba trạng thái trong `trangThaiBai`:
+         * Ba câu, khớp với ba trạng thái trong `postStatus`:
          *   nháp            — ngày chưa có tác dụng, bài không lên dù để ngày nào.
          *   tương lai       — đang hẹn; nói rõ còn mấy ngày và rằng KHÔNG cần làm gì.
          *   hôm nay/quá khứ — sẽ lên ở lần đồng bộ kế tiếp.
          *
          * Lưu ý cho người sửa sau: markup của trang này nằm trong một biểu thức
-         * ternary `{!bat ? (...) : (...)}`, tức là JSX. Đừng đặt `<!-- -->` vào đó —
+         * ternary `{!enabled ? (...) : (...)}`, tức là JSX. Đừng đặt `<!-- -->` vào đó —
          * prettier sẽ ném SyntaxError và CI đỏ. Chú thích về markup viết ở đây.
          */
-        function capNhatHen() {
-          const el = $('hen');
+        function updateScheduleHint() {
+          const el = $('scheduleHint');
           if (!el) return;
 
-          const ngay = val('published_at');
-          const nhap = ($('draft') as HTMLInputElement | null)?.checked;
+          const date = val('published_at');
+          const draft = ($('draft') as HTMLInputElement | null)?.checked;
 
-          if (nhap) {
+          if (draft) {
             el.textContent = 'đang là nháp — ngày chưa có tác dụng';
-            el.className = 'nhap';
+            el.className = 'draft';
             return;
           }
-          if (!ngay) {
+          if (!date) {
             el.textContent = '';
             return;
           }
 
-          const homNay = ngayHomNay();
-          if (ngay > homNay) {
-            const soNgay = Math.round(
-              (Date.parse(`${ngay}T00:00:00Z`) - Date.parse(`${homNay}T00:00:00Z`)) / 86400000,
+          const homNay = today();
+          if (date > homNay) {
+            const days = Math.round(
+              (Date.parse(`${date}T00:00:00Z`) - Date.parse(`${homNay}T00:00:00Z`)) / 86400000,
             );
-            el.textContent = `đặt lịch — tự lên sau ${soNgay} ngày, không cần làm gì`;
-            el.className = 'dat_lich';
+            el.textContent = `đặt lịch — tự lên sau ${days} ngày, không cần làm gì`;
+            el.className = 'scheduled';
           } else {
             el.textContent = 'sẽ lên site ở lần đồng bộ kế tiếp (~20 phút)';
-            el.className = 'dang';
+            el.className = 'published';
           }
         }
 
-        function capNhatDem() {
-          dem('title', val('title').trim().length, 1, G['titleToiDa']!);
-          dem(
+        function updateCounters() {
+          counter('title', val('title').trim().length, 1, G['titleToiDa']!);
+          counter(
             'description',
             val('description').trim().length,
             G['descriptionMin']!,
             G['descriptionMax']!,
           );
-          dem(
+          counter(
             'tags',
             val('tags')
               .split(',')
@@ -816,24 +816,24 @@ const bat = Boolean(ENV.publicSupabaseUrl && ENV.publicSupabaseAnonKey);
             .filter((t) => t.trim());
           const okTk =
             tk.length === 0 || (tk.length >= G['takeawaysMin']! && tk.length <= G['takeawaysMax']!);
-          const elTk = $('dem-takeaways')!;
+          const elTk = $('count-takeaways')!;
           elTk.textContent = `${tk.length} dòng`;
-          elTk.className = `dem ${okTk ? 'ok' : 'sai'}`;
+          elTk.className = `counter ${okTk ? 'ok' : 'bad'}`;
 
-          const chu = ta().value.trim().split(/\s+/).filter(Boolean).length;
-          $('dem-content')!.textContent =
+          const chu = editor().value.trim().split(/\s+/).filter(Boolean).length;
+          $('count-content')!.textContent =
             `${chu.toLocaleString('vi-VN')} từ · ~${Math.max(1, Math.round(chu / 200))} phút`;
 
-          capNhatHen();
+          updateScheduleHint();
 
           const slug = val('slug').trim();
           const hopLe = /^[a-z0-9]+(-[a-z0-9]+)*$/.test(slug);
-          $('dem-slug')!.textContent = slug ? (hopLe ? 'hợp lệ' : 'sai định dạng') : '';
-          $('dem-slug')!.className = `dem ${slug && hopLe ? 'ok' : slug ? 'sai' : ''}`;
-          $('ghi-slug')!.textContent = slug ? `URL: /blog/${slug}` : '';
+          $('count-slug')!.textContent = slug ? (hopLe ? 'hợp lệ' : 'bad định dạng') : '';
+          $('count-slug')!.className = `counter ${slug && hopLe ? 'ok' : slug ? 'bad' : ''}`;
+          $('slug-note')!.textContent = slug ? `URL: /blog/${slug}` : '';
         }
 
-        function slugHoa(s: string) {
+        function slugify(s: string) {
           return s
             .normalize('NFD')
             .replace(/\p{M}/gu, '')
@@ -844,12 +844,12 @@ const bat = Boolean(ENV.publicSupabaseUrl && ENV.publicSupabaseAnonKey);
         }
 
         // --- Form -----------------------------------------------------------
-        function docForm() {
+        function readForm() {
           return {
             slug: val('slug'),
             title: val('title'),
             description: val('description'),
-            content: ta().value,
+            content: editor().value,
             published_at: val('published_at') || null,
             content_updated_at: val('content_updated_at') || null,
             tags: val('tags')
@@ -869,75 +869,75 @@ const bat = Boolean(ENV.publicSupabaseUrl && ENV.publicSupabaseAnonKey);
           };
         }
 
-        function dienForm(b: Record<string, any> | null) {
-          const dat = (id: string, v: unknown) => {
+        function fillForm(b: Record<string, any> | null) {
+          const setField = (id: string, v: unknown) => {
             ($(id) as HTMLInputElement).value = v == null ? '' : String(v);
           };
-          dat('title', b?.title);
-          dat('slug', b?.slug);
-          dat('description', b?.description);
-          dat('content', b?.content);
-          // `ngayHomNay()` chứ không phải `toISOString()`: cái sau cho ra ngày UTC,
+          setField('title', b?.title);
+          setField('slug', b?.slug);
+          setField('description', b?.description);
+          setField('content', b?.content);
+          // `today()` chứ không phải `toISOString()`: cái sau cho ra ngày UTC,
           // nên mở form lúc 6 giờ sáng ở Việt Nam sẽ điền lùi mất một ngày.
-          dat('published_at', b?.published_at ?? ngayHomNay());
-          dat('content_updated_at', b?.content_updated_at);
-          dat('tags', (b?.tags ?? []).join(', '));
-          dat('takeaways', (b?.takeaways ?? []).join('\n'));
-          dat('series_name', b?.series_name);
-          dat('series_part', b?.series_part);
-          dat('cover_image', b?.cover_image);
-          dat('cover_alt', b?.cover_alt);
+          setField('published_at', b?.published_at ?? today());
+          setField('content_updated_at', b?.content_updated_at);
+          setField('tags', (b?.tags ?? []).join(', '));
+          setField('takeaways', (b?.takeaways ?? []).join('\n'));
+          setField('series_name', b?.series_name);
+          setField('series_part', b?.series_part);
+          setField('cover_image', b?.cover_image);
+          setField('cover_alt', b?.cover_alt);
           ($('draft') as HTMLInputElement).checked = b ? Boolean(b.draft) : true;
           ($('featured') as HTMLInputElement).checked = Boolean(b?.featured);
 
-          slugDangSua = (b?.slug as string) ?? null;
-          ($('nut-xoa') as HTMLButtonElement).disabled = !b;
-          $('loi')!.innerHTML = '';
-          capNhatDem();
-          veLaiHl();
-          veDanhSach();
+          editingSlug = (b?.slug as string) ?? null;
+          ($('btn-delete') as HTMLButtonElement).disabled = !b;
+          $('errors')!.innerHTML = '';
+          updateCounters();
+          renderHighlight();
+          renderList();
         }
 
-        function veDanhSach() {
-          $('ds')!.innerHTML = danhSach
+        function renderList() {
+          $('ds')!.innerHTML = posts
             .map((b: any) => {
               const t = String(b.title).replace(/</g, '&lt;');
-              return `<div class="muc" data-slug="${b.slug}" ${b.slug === slugDangSua ? 'aria-current="true"' : ''}>
+              return `<div class="item" data-slug="${b.slug}" ${b.slug === editingSlug ? 'aria-current="true"' : ''}>
                 <b>${t}</b>
-                <small><span class="the ${trangThaiBai(b)}">${NHAN_TRANG_THAI[trangThaiBai(b)]}</span>${b.published_at ?? ''}</small>
+                <small><span class="badge ${postStatus(b)}">${STATUS_LABELS[postStatus(b)]}</span>${b.published_at ?? ''}</small>
               </div>`;
             })
             .join('');
-          for (const el of $('ds')!.querySelectorAll<HTMLElement>('.muc')) {
+          for (const el of $('ds')!.querySelectorAll<HTMLElement>('.item')) {
             el.onclick = () => {
-              const b = danhSach.find((x: any) => x.slug === el.dataset['slug']);
-              if (b) dienForm(b as any);
-              document.querySelector('.cot')?.scrollTo(0, 0);
+              const b = posts.find((x: any) => x.slug === el.dataset['slug']);
+              if (b) fillForm(b as any);
+              document.querySelector('.col')?.scrollTo(0, 0);
             };
           }
         }
 
-        async function taiDanhSach() {
-          const r = await goi('/rest/v1/posts?select=*&order=published_at.desc');
+        async function loadPosts() {
+          const r = await api('/rest/v1/posts?select=*&order=published_at.desc');
           if (!r.ok) {
-            tt('Không tải được danh sách', 'sai');
+            toast('Không tải được danh sách', 'bad');
             return;
           }
-          danhSach = await r.json();
-          veDanhSach();
+          posts = await r.json();
+          renderList();
         }
 
-        async function luu() {
-          const bai = chuanHoaBai(docForm());
-          const loi = kiemBai(bai);
-          if (loi.length > 0) {
-            $('loi')!.innerHTML =
-              `<b>Chưa lưu được:</b><ul>${loi.map((l: any) => `<li>${l.thongDiep}</li>`).join('')}</ul>`;
-            tt('Có lỗi cần sửa', 'sai');
+        async function save() {
+          const post = normalizePost(readForm());
+          const errors = validatePost(post);
+          if (errors.length > 0) {
+            $('errors')!.innerHTML =
+              `<b>Chưa lưu được:</b><ul>${errors.map((l: any) => `<li>${l.thongDiep}</li>`).join('')}</ul>`;
+            toast('Có lỗi cần sửa', 'bad');
             return;
           }
 
-          tt('Đang lưu…');
+          toast('Đang lưu…');
 
           /*
             Sửa bài thì PATCH, tạo bài mới thì POST. Hai lệnh khác nhau, không phải
@@ -945,8 +945,8 @@ const bat = Boolean(ENV.publicSupabaseUrl && ENV.publicSupabaseAnonKey);
 
             Bản trước gọi `POST /posts?on_conflict=slug` và tưởng đó là upsert. Không
             phải: PostgREST chỉ upsert khi có thêm header `Prefer:
-            resolution=merge-duplicates`, mà `goi()` lúc đó đang ghi đè header của
-            caller nên nó không bao giờ tới. Kết quả là INSERT thuần, và mọi lần lưu
+            resolution=merge-duplicates`, mà `api()` lúc đó đang note đè header của
+            caller nên nó không wrap giờ tới. Kết quả là INSERT thuần, và mọi lần lưu
             một bài đã có đều trả 409 `posts_slug_key`. Lỗi anh gặp lúc sửa ảnh bài cũ.
 
             Vá bằng cách thêm header đó thì hết 409 nhưng che một lỗi khác: upsert
@@ -955,58 +955,60 @@ const bat = Boolean(ENV.publicSupabaseUrl && ENV.publicSupabaseAnonKey);
             đổi slug là đổi tên thật.
 
             Tách hai lệnh còn cho hai thất bại đúng nghĩa: tạo bài mới mà slug đã có
-            thì 409 (đúng — đừng ghi đè bài người khác), còn sửa bài đã bị xoá ở nơi
+            thì 409 (đúng — đừng note đè bài người khác), còn sửa bài đã bị xoá ở nơi
             khác thì 0 dòng thay vì lặng lẽ tạo lại.
           */
-          const slugGoc = slugDangSua;
-          const dangSua = slugGoc !== null;
+          const originalSlug = editingSlug;
+          const isEditing = originalSlug !== null;
 
-          const r = await goi(
-            dangSua ? `/rest/v1/posts?slug=eq.${encodeURIComponent(slugGoc)}` : '/rest/v1/posts',
+          const r = await api(
+            isEditing
+              ? `/rest/v1/posts?slug=eq.${encodeURIComponent(originalSlug)}`
+              : '/rest/v1/posts',
             {
-              method: dangSua ? 'PATCH' : 'POST',
+              method: isEditing ? 'PATCH' : 'POST',
               // `return=representation` để đếm được số dòng thật sự đổi. RLS lọc hết
               // dòng thì PostgREST vẫn trả 2xx — mã trả về KHÔNG nói lên điều gì.
               headers: { Prefer: 'return=representation' },
-              body: JSON.stringify(bai),
+              body: JSON.stringify(post),
             },
           );
 
           if (!r.ok) {
-            const chiTiet = await r.text();
-            const trungSlug = chiTiet.includes('posts_slug_key');
-            $('loi')!.innerHTML = trungSlug
-              ? `<b>Slug <code>${bai.slug}</code> đã có bài khác dùng.</b><ul><li>Đổi slug, hoặc mở bài đang dùng slug đó ra sửa.</li></ul>`
-              : `<b>Database từ chối (HTTP ${r.status}):</b><ul><li>${chiTiet.slice(0, 300)}</li></ul>`;
-            tt(r.status === 403 ? 'Tài khoản này không có quyền ghi' : 'Lưu thất bại', 'sai');
+            const detail = await r.text();
+            const duplicateSlug = detail.includes('posts_slug_key');
+            $('errors')!.innerHTML = duplicateSlug
+              ? `<b>Slug <code>${post.slug}</code> đã có bài khác dùng.</b><ul><li>Đổi slug, hoặc mở bài đang dùng slug đó ra sửa.</li></ul>`
+              : `<b>Database từ chối (HTTP ${r.status}):</b><ul><li>${detail.slice(0, 300)}</li></ul>`;
+            toast(r.status === 403 ? 'Tài khoản này không có quyền note' : 'Lưu thất bại', 'bad');
             return;
           }
 
           // 2xx nhưng 0 dòng: RLS đã lọc, hoặc bài không còn tồn tại. Không báo thì
           // người viết đóng tab với niềm tin là đã lưu.
-          const dong = (await r.json().catch(() => [])) as unknown[];
-          if (dangSua && dong.length === 0) {
-            $('loi')!.innerHTML =
-              '<b>Không có dòng nào được sửa.</b><ul><li>Bài này có thể đã bị xoá, hoặc tài khoản không có quyền ghi. Tải lại danh sách rồi thử lại.</li></ul>';
-            tt('Chưa lưu được', 'sai');
-            await taiDanhSach();
+          const rows = (await r.json().catch(() => [])) as unknown[];
+          if (isEditing && rows.length === 0) {
+            $('errors')!.innerHTML =
+              '<b>Không có dòng nào được sửa.</b><ul><li>Bài này có thể đã bị xoá, hoặc tài khoản không có quyền note. Tải lại danh sách rồi thử lại.</li></ul>';
+            toast('Chưa lưu được', 'bad');
+            await loadPosts();
             return;
           }
 
-          $('loi')!.innerHTML = '';
-          slugDangSua = bai.slug;
-          await taiDanhSach();
-          tt('Đã lưu — site cập nhật trong 20 phút', 'ok');
+          $('errors')!.innerHTML = '';
+          editingSlug = post.slug;
+          await loadPosts();
+          toast('Đã lưu — site cập nhật trong 20 phút', 'ok');
         }
 
         // --- Ảnh ------------------------------------------------------------
-        async function taiAnh(files: File[]) {
+        async function uploadImages(files: File[]) {
           for (const f of files) {
-            const duoi = (f.name.match(/\.[a-z0-9]+$/i)?.[0] ?? '').toLowerCase();
-            const ten = slugHoa(f.name.slice(0, f.name.length - duoi.length)) || 'anh';
-            const key = `${new Date().getFullYear()}/${ten}${duoi}`;
+            const ext = (f.name.match(/\.[a-z0-9]+$/i)?.[0] ?? '').toLowerCase();
+            const base = slugify(f.name.slice(0, f.name.length - ext.length)) || 'image';
+            const key = `${new Date().getFullYear()}/${base}${ext}`;
 
-            tt(`Đang tải ${f.name}…`);
+            toast(`Đang tải ${f.name}…`);
 
             // KHÔNG gửi `x-upsert`: endpoint POST của Storage từ chối header đó
             // bằng HTTP 400 với body rỗng — đã đo từng header để tìm ra. `x-upsert`
@@ -1014,11 +1016,11 @@ const bat = Boolean(ENV.publicSupabaseUrl && ENV.publicSupabaseAnonKey);
             //
             // `max-age=31536000` để ảnh được cache một năm. Supabase mặc định trả
             // `no-cache`, tức mỗi người đọc tải lại ảnh từ đầu.
-            const r = await fetch(`${URL_SB}/storage/v1/object/anh-blog/${key}`, {
+            const r = await fetch(`${SUPABASE_URL}/storage/v1/object/anh-blog/${key}`, {
               method: 'POST',
               headers: {
-                apikey: KHOA,
-                Authorization: `Bearer ${phien?.access_token}`,
+                apikey: KEY,
+                Authorization: `Bearer ${session?.access_token}`,
                 'Content-Type': f.type,
                 'Cache-Control': 'max-age=31536000',
               },
@@ -1028,122 +1030,122 @@ const bat = Boolean(ENV.publicSupabaseUrl && ENV.publicSupabaseAnonKey);
             if (!r.ok) {
               // Trùng tên thì nói rõ, đừng để người dùng đoán. Cố tình KHÔNG tự ghi
               // đè: một bài khác có thể đang dùng đúng ảnh đó.
-              tt(
+              toast(
                 r.status === 409
-                  ? `Đã có ảnh tên "${ten}${duoi}" — đổi tên file rồi thử lại.`
+                  ? `Đã có ảnh tên "${key}${ext}" — đổi tên file rồi thử lại.`
                   : r.status === 403
                     ? 'Tài khoản này không có quyền tải ảnh lên.'
                     : `Không tải được ảnh (HTTP ${r.status})`,
-                'sai',
+                'bad',
               );
               continue;
             }
 
-            const url = `${URL_SB}/storage/v1/object/public/anh-blog/${key}`;
+            const url = `${SUPABASE_URL}/storage/v1/object/public/anh-blog/${key}`;
             if (!val('cover_image')) {
               ($('cover_image') as HTMLInputElement).value = url;
-              tt('Đặt làm ảnh bìa — nhớ điền alt', 'ok');
+              toast('Đặt làm ảnh bìa — nhớ điền alt', 'ok');
               $('cover_alt')!.focus();
             } else {
-              const t = ta();
-              thayDoan(
+              const t = editor();
+              replaceRange(
                 t.selectionStart,
                 t.selectionEnd,
                 `\n<Figure\n  src="${url}"\n  alt=""\n  caption=""\n/>\n`,
               );
-              tt('Đã chèn <Figure> — nhớ điền alt', 'ok');
+              toast('Đã chèn <Figure> — nhớ điền alt', 'ok');
             }
           }
         }
 
         // --- Đăng nhập ------------------------------------------------------
-        async function vaoVoiPhien() {
-          $('man-vao')!.hidden = true;
-          $('man-chinh')!.hidden = false;
-          await taiDanhSach();
-          dienForm(null);
+        async function restoreSession() {
+          $('screen-login')!.hidden = true;
+          $('screen-main')!.hidden = false;
+          await loadPosts();
+          fillForm(null);
         }
 
-        $('form-vao')!.addEventListener('submit', async (e) => {
+        $('login-form')!.addEventListener('submit', async (e) => {
           e.preventDefault();
-          const oLoi = $('loi-vao')!;
-          oLoi.textContent = 'Đang đăng nhập…';
+          const errorBox = $('login-error')!;
+          errorBox.textContent = 'Đang đăng nhập…';
 
-          const r = await fetch(`${URL_SB}/auth/v1/token?grant_type=password`, {
+          const r = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=password`, {
             method: 'POST',
-            headers: { apikey: KHOA, 'Content-Type': 'application/json' },
+            headers: { apikey: KEY, 'Content-Type': 'application/json' },
             body: JSON.stringify({ email: val('email'), password: val('matkhau') }),
           });
 
           if (!r.ok) {
-            oLoi.textContent = 'Email hoặc mật khẩu không đúng.';
+            errorBox.textContent = 'Email hoặc mật khẩu không đúng.';
             return;
           }
 
           const d = await r.json();
-          phien = { access_token: d.access_token, refresh_token: d.refresh_token };
-          localStorage.setItem(KHOA_PHIEN, JSON.stringify(phien));
-          oLoi.textContent = '';
-          await vaoVoiPhien();
+          session = { access_token: d.access_token, refresh_token: d.refresh_token };
+          localStorage.setItem(SESSION_KEY, JSON.stringify(session));
+          errorBox.textContent = '';
+          await restoreSession();
         });
 
-        $('nut-ra')!.onclick = dangXuat;
-        $('nut-luu')!.onclick = luu;
+        $('btn-logout')!.onclick = logout;
+        $('btn-save')!.onclick = save;
         $('nut-moi')!.onclick = () => {
-          dienForm(null);
+          fillForm(null);
           $('title')!.focus();
         };
-        $('nut-xoa')!.onclick = async () => {
-          if (!slugDangSua) return;
-          if (!confirm(`Xoá hẳn bài "${slugDangSua}"?\n\nKhông hoàn lại được.`)) return;
-          const r = await goi(`/rest/v1/posts?slug=eq.${encodeURIComponent(slugDangSua)}`, {
+        $('btn-delete')!.onclick = async () => {
+          if (!editingSlug) return;
+          if (!confirm(`Xoá hẳn bài "${editingSlug}"?\n\nKhông hoàn lại được.`)) return;
+          const r = await api(`/rest/v1/posts?slug=eq.${encodeURIComponent(editingSlug)}`, {
             method: 'DELETE',
           });
           if (!r.ok) {
-            tt('Không xoá được', 'sai');
+            toast('Không xoá được', 'bad');
             return;
           }
-          await taiDanhSach();
-          dienForm(null);
-          tt('Đã xoá', 'ok');
+          await loadPosts();
+          fillForm(null);
+          toast('Đã xoá', 'ok');
         };
         $('nut-ds')!.onclick = () => {
           const a = document.querySelector('aside')!;
           a.hidden = !a.hidden;
         };
-        $('nut-anh')!.onclick = () => ($('chon-file') as HTMLInputElement).click();
-        ($('chon-file') as HTMLInputElement).onchange = (e) =>
-          taiAnh([...((e.target as HTMLInputElement).files ?? [])]);
+        $('btn-image')!.onclick = () => ($('file-input') as HTMLInputElement).click();
+        ($('file-input') as HTMLInputElement).onchange = (e) =>
+          uploadImages([...((e.target as HTMLInputElement).files ?? [])]);
 
-        const keo = $('keo')!;
+        const dropzone = $('dropzone')!;
         for (const su of ['dragenter', 'dragover'])
-          keo.addEventListener(su, (e) => e.preventDefault());
-        keo.addEventListener('drop', (e) => {
+          dropzone.addEventListener(su, (e) => e.preventDefault());
+        dropzone.addEventListener('drop', (e) => {
           e.preventDefault();
           const dt = (e as DragEvent).dataTransfer;
-          taiAnh([...(dt?.files ?? [])].filter((f) => f.type.startsWith('image/')));
+          uploadImages([...(dt?.files ?? [])].filter((f) => f.type.startsWith('image/')));
         });
 
-        $('congcu')!.addEventListener('click', (e) => {
+        $('toolbar')!.addEventListener('click', (e) => {
           const b = (e.target as HTMLElement).closest('button');
           if (!b) return;
           e.preventDefault();
-          if (b.dataset['tt']) return themTienTo(b.dataset['tt']);
-          if (b.dataset['bao']) return bao(b.dataset['bao']);
-          const lam = b.dataset['lam'];
-          if (lam === 'link') {
-            const t = ta();
-            const chon = t.value.slice(t.selectionStart, t.selectionEnd) || 'chữ hiện ra';
-            return thayDoan(t.selectionStart, t.selectionEnd, `[${chon}](https://)`);
+          if (b.dataset['toast']) return addPrefix(b.dataset['toast']);
+          if (b.dataset['wrap']) return wrap(b.dataset['wrap']);
+          const action = b.dataset['action'];
+          if (action === 'link') {
+            const t = editor();
+            const picked = t.value.slice(t.selectionStart, t.selectionEnd) || 'chữ hiện ra';
+            return replaceRange(t.selectionStart, t.selectionEnd, `[${picked}](https://)`);
           }
-          const mau = (MAU_MDX as Record<string, string>)[lam ?? ''];
-          if (mau) {
-            const t = ta();
+          const snippet = (MDX_SNIPPETS as Record<string, string>)[action ?? ''];
+          if (snippet) {
+            const t = editor();
 
             /*
               Chèn SAU phần đang chọn, không thay thế nó.
 
-              Bản trước gọi `thayDoan(selectionStart, selectionEnd, mau)`, nên chọn
+              Bản trước gọi `replaceRange(selectionStart, selectionEnd, snippet)`, nên chọn
               một đoạn rồi bấm Callout là đoạn đó BIẾN MẤT, thay bằng template. Không
               có hỏi lại, và sau khi Lưu thì không hoàn lại được.
 
@@ -1160,49 +1162,49 @@ const bat = Boolean(ENV.publicSupabaseUrl && ENV.publicSupabaseAnonKey);
             // Khối MDX phải nằm giữa hai đoạn văn. Chèn đúng vị trí con trỏ thì nó cắt
             // đôi câu đang viết, và nếu con trỏ nằm trong cặp `**` thì cắt đôi cả cặp
             // đó — không mất chữ, nhưng ra một mớ không ai muốn đọc.
-            const xuongDong = t.value.indexOf('\n', t.selectionEnd);
-            const viTri = xuongDong === -1 ? t.value.length : xuongDong;
+            const nextNewline = t.value.indexOf('\n', t.selectionEnd);
+            const pos = nextNewline === -1 ? t.value.length : nextNewline;
 
-            // Mọi mẫu trong `MAU_MDX` đã tự mở đầu bằng '\n'. Thêm đúng MỘT '\n' nữa
+            // Mọi mẫu trong `MDX_SNIPPETS` đã tự mở đầu bằng '\n'. Thêm đúng MỘT '\n' nữa
             // để có dòng trống phía trên, và chỉ khi phía trước chưa sẵn là dòng trống.
-            const truoc = t.value.slice(0, viTri);
-            const dem = truoc === '' || truoc.endsWith('\n') ? '' : '\n';
+            const before = t.value.slice(0, pos);
+            const counter = before === '' || before.endsWith('\n') ? '' : '\n';
 
-            thayDoan(viTri, viTri, dem + mau);
+            replaceRange(pos, pos, counter + snippet);
           }
         });
 
         for (const id of ['title', 'slug', 'description', 'tags', 'takeaways', 'content'])
-          $(id)!.addEventListener('input', capNhatDem);
+          $(id)!.addEventListener('input', updateCounters);
 
-        // Ngày đăng và ô nháp cũng phải gọi lại — cả hai đổi câu ở `#hen`. Thiếu
+        // Ngày đăng và ô nháp cũng phải gọi lại — cả hai đổi câu ở `#scheduleHint`. Thiếu
         // hai dòng này thì lời nhắc "đặt lịch" chỉ đúng lúc mới mở form rồi đứng im.
-        $('published_at')!.addEventListener('input', capNhatDem);
-        $('draft')!.addEventListener('change', capNhatDem);
-        $('content')!.addEventListener('input', veLaiHl);
+        $('published_at')!.addEventListener('input', updateCounters);
+        $('draft')!.addEventListener('change', updateCounters);
+        $('content')!.addEventListener('input', renderHighlight);
         $('content')!.addEventListener('scroll', () => {
-          $('hl')!.scrollTop = ta().scrollTop;
+          $('hl')!.scrollTop = editor().scrollTop;
         });
         $('title')!.addEventListener('input', () => {
-          if (!slugDangSua) ($('slug') as HTMLInputElement).value = slugHoa(val('title'));
-          capNhatDem();
+          if (!editingSlug) ($('slug') as HTMLInputElement).value = slugify(val('title'));
+          updateCounters();
         });
 
         document.addEventListener('keydown', (e) => {
           if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
             e.preventDefault();
-            if (!$('man-chinh')!.hidden) luu();
+            if (!$('screen-main')!.hidden) save();
           }
         });
 
         // Có phiên cũ trong localStorage thì vào luôn, không phải đăng nhập lại.
-        const luuTru = localStorage.getItem(KHOA_PHIEN);
-        if (luuTru) {
+        const store = localStorage.getItem(SESSION_KEY);
+        if (store) {
           try {
-            phien = JSON.parse(luuTru);
-            void vaoVoiPhien();
+            session = JSON.parse(store);
+            void restoreSession();
           } catch {
-            localStorage.removeItem(KHOA_PHIEN);
+            localStorage.removeItem(SESSION_KEY);
           }
         }
       }

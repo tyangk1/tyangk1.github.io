@@ -9,10 +9,10 @@
  *        pnpm db:subscribers --csv                   → CSV để nạp vào nhà cung cấp mail
  *        pnpm db:subscribers --csv > danh-sach.csv
  */
-import { taoClient } from './lib/supabase.mjs';
+import { createSupabaseClient } from './lib/supabase.mjs';
 
-const raCsv = process.argv.includes('--csv');
-const supabase = taoClient();
+const toCsv = process.argv.includes('--csv');
+const supabase = createSupabaseClient();
 
 const { data, error } = await supabase
   .from('newsletter_subscribers')
@@ -24,8 +24,8 @@ if (error) {
   process.exit(1);
 }
 
-const conTheoDoi = data.filter((r) => !r.unsubscribed_at);
-const daXacNhan = conTheoDoi.filter((r) => r.confirmed);
+const stillSubscribed = data.filter((r) => !r.unsubscribed_at);
+const confirmed = stillSubscribed.filter((r) => r.confirmed);
 
 /**
  * Gom hết thành một chuỗi rồi in một lần, và KHÔNG gọi `process.exit()`.
@@ -34,46 +34,42 @@ const daXacNhan = conTheoDoi.filter((r) => r.confirmed);
  * assertion `!(handle->flags & UV_HANDLE_CLOSING)` và mất dòng cuối. Để script
  * tự kết thúc thì stdout được xả hết.
  */
-function inRa(dong) {
-  console.log(dong.join('\n'));
+function print(row) {
+  console.log(row.join('\n'));
 }
 
-if (raCsv) {
+if (toCsv) {
   // Chỉ xuất người ĐÃ xác nhận và chưa huỷ — đây là danh sách được phép gửi thư.
-  inRa([
+  print([
     'email,confirmed_at,source',
-    ...daXacNhan.map((r) => `${r.email},${r.confirmed_at ?? ''},${r.source ?? ''}`),
+    ...confirmed.map((r) => `${r.email},${r.confirmed_at ?? ''},${r.source ?? ''}`),
   ]);
 } else {
-  const dong = [
+  const row = [
     `Tổng cộng:      ${data.length}`,
-    `Còn theo dõi:   ${conTheoDoi.length}`,
-    `Đã xác nhận:    ${daXacNhan.length}   ← chỉ gửi thư cho nhóm này`,
-    `Chưa xác nhận:  ${conTheoDoi.length - daXacNhan.length}`,
-    `Đã huỷ:         ${data.length - conTheoDoi.length}`,
+    `Còn theo dõi:   ${stillSubscribed.length}`,
+    `Đã xác nhận:    ${confirmed.length}   ← chỉ gửi thư cho nhóm này`,
+    `Chưa xác nhận:  ${stillSubscribed.length - confirmed.length}`,
+    `Đã huỷ:         ${data.length - stillSubscribed.length}`,
     '',
   ];
 
   if (data.length === 0) {
-    dong.push('Chưa có ai đăng ký.');
+    row.push('Chưa có ai đăng ký.');
   } else {
     for (const r of data) {
-      const trangThai = r.unsubscribed_at
-        ? 'đã huỷ'
-        : r.confirmed
-          ? 'đã xác nhận'
-          : 'chưa xác nhận';
-      dong.push(`  ${r.email.padEnd(36)} ${trangThai.padEnd(14)} ${(r.source ?? '').slice(0, 30)}`);
+      const status = r.unsubscribed_at ? 'đã huỷ' : r.confirmed ? 'đã xác nhận' : 'chưa xác nhận';
+      row.push(`  ${r.email.padEnd(36)} ${status.padEnd(14)} ${(r.source ?? '').slice(0, 30)}`);
     }
 
-    if (daXacNhan.length < conTheoDoi.length) {
-      dong.push(
+    if (confirmed.length < stillSubscribed.length) {
+      row.push(
         '',
         '⚠ Có người chưa xác nhận. Họ chỉ xác nhận được khi bạn gửi email chứa link',
-        '  gọi tới hàm xac_nhan_newsletter(). Xem README phần "Newsletter".',
+        '  gọi tới hàm confirm_newsletter(). Xem README phần "Newsletter".',
       );
     }
   }
 
-  inRa(dong);
+  print(row);
 }

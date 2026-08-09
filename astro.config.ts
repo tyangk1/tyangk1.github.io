@@ -23,15 +23,15 @@ import { rehypeContent } from './src/lib/rehype-content';
  * Ưu tiên `process.env` để CI vẫn đúng: ở đó biến đến từ Actions variables, không
  * có file `.env` nào.
  */
-function docBien(ten: string): string {
-  const tuMoiTruong = process.env[ten];
-  if (tuMoiTruong) return tuMoiTruong;
+function readEnvVar(name: string): string {
+  const fromProcessEnv = process.env[name];
+  if (fromProcessEnv) return fromProcessEnv;
 
   for (const file of ['.env.local', '.env']) {
     try {
       for (const line of readFileSync(file, 'utf8').split(/\r?\n/)) {
         const m = line.match(/^\s*([A-Z0-9_]+)\s*=\s*(.*)$/);
-        if (m && m[1] === ten) return (m[2] ?? '').trim().replace(/^['"]|['"]$/g, '');
+        if (m && m[1] === name) return (m[2] ?? '').trim().replace(/^['"]|['"]$/g, '');
       }
     } catch {
       // Không có file thì thử file kế tiếp.
@@ -49,7 +49,7 @@ function docBien(ten: string): string {
  * hai thứ không thể lệch nhau.
  */
 const supabaseHost = (() => {
-  const raw = docBien('PUBLIC_SUPABASE_URL');
+  const raw = readEnvVar('PUBLIC_SUPABASE_URL');
   if (!raw) return [];
   try {
     return [new URL(raw).hostname];

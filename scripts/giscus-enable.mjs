@@ -14,7 +14,7 @@
  *   3. Kích hoạt workflow Deploy để site build lại ngay.
  *
  * Chạy:
- *   GH_TOKEN=<token> pnpm giscus:bat
+ *   GH_TOKEN=<token> pnpm giscus:enable
  *
  * Token cần scope `repo` (để đặt variables) và `workflow` (để chạy Deploy).
  * Tạo ở https://github.com/settings/tokens — và thu hồi sau khi xong.
@@ -23,13 +23,13 @@ import { readFile } from 'node:fs/promises';
 
 const REPO = 'tyangk1/tyangk1.github.io';
 
-function thoatLoi(...dong) {
+function exitWithError(...dong) {
   for (const d of dong) console.error(d);
   process.exitCode = 1;
 }
 
 /** Đọc SITE.url để nhắc đúng domain nếu người dùng đã đổi tên miền. */
-async function docRepoTuConfig() {
+async function readRepoFromConfig() {
   try {
     const raw = await readFile('.env', 'utf8');
     const m = raw.match(/^\s*#?\s*PUBLIC_GISCUS_REPO=(.+)$/m);
@@ -44,20 +44,20 @@ async function main() {
   const token = process.env['GH_TOKEN'] ?? process.env['GITHUB_TOKEN'] ?? '';
 
   if (!token) {
-    return thoatLoi(
+    return exitWithError(
       '✗ Thiếu GH_TOKEN.',
       '',
       '  Tạo token ở https://github.com/settings/tokens với scope `repo` + `workflow`,',
       '  rồi chạy:',
       '',
-      '      $env:GH_TOKEN="ghp_..."; pnpm giscus:bat        (PowerShell)',
-      '      GH_TOKEN=ghp_... pnpm giscus:bat                (bash)',
+      '      $env:GH_TOKEN="ghp_..."; pnpm giscus:enable        (PowerShell)',
+      '      GH_TOKEN=ghp_... pnpm giscus:enable                (bash)',
       '',
       '  Thu hồi token ngay sau khi xong.',
     );
   }
 
-  const repo = await docRepoTuConfig();
+  const repo = await readRepoFromConfig();
 
   // --- 1. App giscus đã cài chưa ------------------------------------------
   //
@@ -69,7 +69,7 @@ async function main() {
   const res = await fetch(`https://giscus.app/api/discussions/categories?repo=${repo}`);
 
   if (!res.ok) {
-    return thoatLoi(
+    return exitWithError(
       `✗ giscus chưa đọc được repo (HTTP ${res.status}) — app chưa được cài.`,
       '',
       '  Cài tại: https://github.com/apps/giscus',
@@ -84,25 +84,25 @@ async function main() {
   const categories = data.categories ?? [];
 
   if (categories.length === 0) {
-    return thoatLoi(
+    return exitWithError(
       '✗ Repo đã bật Discussions nhưng chưa có category nào.',
       '  Vào tab Discussions của repo và tạo một category (ví dụ "Announcements").',
     );
   }
 
-  const chon =
+  const choice =
     categories.find((c) => c.name === 'Announcements') ??
     categories.find((c) => c.name === 'General') ??
     categories[0];
 
-  console.log(`✓ App đã cài. Dùng category "${chon.name}".`);
+  console.log(`✓ App đã cài. Dùng category "${choice.name}".`);
 
   // --- 2. Đặt Actions variables ------------------------------------------
-  const bien = {
+  const vars = {
     PUBLIC_GISCUS_REPO: repo,
     PUBLIC_GISCUS_REPO_ID: data.repositoryId,
-    PUBLIC_GISCUS_CATEGORY: chon.name,
-    PUBLIC_GISCUS_CATEGORY_ID: chon.id,
+    PUBLIC_GISCUS_CATEGORY: choice.name,
+    PUBLIC_GISCUS_CATEGORY_ID: choice.id,
   };
 
   const chung = {
@@ -114,7 +114,7 @@ async function main() {
 
   const goc = `https://api.github.com/repos/${repo}/actions/variables`;
 
-  for (const [name, value] of Object.entries(bien)) {
+  for (const [name, value] of Object.entries(vars)) {
     // POST để tạo; đã tồn tại thì API trả 409, lúc đó PATCH để cập nhật.
     let r = await fetch(goc, {
       method: 'POST',
@@ -131,7 +131,7 @@ async function main() {
     }
 
     if (!r.ok) {
-      return thoatLoi(
+      return exitWithError(
         `✗ Không đặt được biến ${name}: HTTP ${r.status}`,
         '  Token có đủ scope `repo` chưa?',
       );

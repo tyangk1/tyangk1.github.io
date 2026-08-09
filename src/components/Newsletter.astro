@@ -18,12 +18,12 @@ interface Props {
 const { heading = 'Nhận bài mới qua email' } = Astro.props;
 
 const isDev = import.meta.env.DEV;
-const hien = cheDoNewsletter !== 'tat' || isDev;
+const show = cheDoNewsletter !== 'tat' || isDev;
 const duongDanHienTai = Astro.url.pathname;
 ---
 
 {
-  hien && (
+  show && (
     <section
       class:list={[
         'my-12 rounded-card border p-6 sm:p-8',
@@ -110,32 +110,32 @@ const duongDanHienTai = Astro.url.pathname;
 }
 
 <script>
-  const khoi = document.querySelector<HTMLElement>('[data-newsletter][data-che-do="supabase"]');
-  const form = khoi?.querySelector<HTMLFormElement>('[data-newsletter-form]');
+  const block = document.querySelector<HTMLElement>('[data-newsletter][data-che-do="supabase"]');
+  const form = block?.querySelector<HTMLFormElement>('[data-newsletter-form]');
 
-  if (khoi && form) {
-    const nhap = form.querySelector<HTMLInputElement>('input[type=email]');
+  if (block && form) {
+    const input = form.querySelector<HTMLInputElement>('input[type=email]');
     const bay = form.querySelector<HTMLInputElement>('input[name=hp]');
     const nut = form.querySelector<HTMLButtonElement>('button[type=submit]');
-    const oTrangThai = khoi.querySelector<HTMLElement>('[data-newsletter-status]');
+    const oTrangThai = block.querySelector<HTMLElement>('[data-newsletter-status]');
 
-    const url = khoi.dataset['supabaseUrl'] ?? '';
-    const key = khoi.dataset['supabaseKey'] ?? '';
-    const tuTrang = khoi.dataset['tuTrang'] ?? '';
+    const url = block.dataset['supabaseUrl'] ?? '';
+    const key = block.dataset['supabaseKey'] ?? '';
+    const fromPage = block.dataset['fromPage'] ?? '';
 
     // Hàm RPC chỉ trả về mã trạng thái, không trả dữ liệu — nên phía này tự dịch
-    // sang câu tiếng Việt. Thông điệp của `moi` cố ý KHÔNG nói "kiểm tra email":
+    // sang câu tiếng Việt. Thông điệp của `subscribed` cố ý KHÔNG nói "kiểm tra email":
     // chưa cắm nhà cung cấp gửi thư thì chưa có email nào được gửi cả.
-    const CAU: Record<string, { text: string; loi: boolean }> = {
-      moi: { text: 'Đã ghi nhận. Bạn sẽ nhận email khi có bài mới.', loi: false },
-      da_co: { text: 'Địa chỉ này đã có trong danh sách rồi.', loi: false },
-      email_sai: { text: 'Địa chỉ email không đúng. Kiểm tra lại giúp tôi.', loi: true },
+    const MESSAGES: Record<string, { text: string; isError: boolean }> = {
+      subscribed: { text: 'Đã ghi nhận. Bạn sẽ nhận email khi có bài mới.', isError: false },
+      already_subscribed: { text: 'Địa chỉ này đã có trong danh sách rồi.', isError: false },
+      invalid_email: { text: 'Địa chỉ email không đúng. Kiểm tra lại giúp tôi.', isError: true },
     };
 
-    function hien(text: string, loi: boolean) {
+    function show(text: string, isError: boolean) {
       if (!oTrangThai) return;
       oTrangThai.textContent = text;
-      oTrangThai.className = `mt-3 min-h-5 text-sm ${loi ? 'text-accent' : 'text-muted'}`;
+      oTrangThai.className = `mt-3 min-h-5 text-sm ${isError ? 'text-accent' : 'text-muted'}`;
     }
 
     /**
@@ -146,44 +146,44 @@ const duongDanHienTai = Astro.url.pathname;
      * thông báo của lần gửi trước vẫn nằm đó, và người dùng đọc được một câu
      * không liên quan tới việc họ vừa làm.
      */
-    nhap?.addEventListener('input', () => hien('', false));
+    input?.addEventListener('input', () => show('', false));
 
     form.addEventListener('submit', async (event) => {
       event.preventDefault();
 
       // Bẫy bot có chữ nghĩa là không phải người — báo thành công rồi bỏ qua.
       if (bay?.value) {
-        hien(CAU['moi']!.text, false);
+        show(MESSAGES['subscribed']!.text, false);
         return;
       }
 
-      const email = nhap?.value.trim() ?? '';
+      const email = input?.value.trim() ?? '';
       if (!email) return;
 
       if (nut) nut.disabled = true;
-      hien('Đang gửi…', false);
+      show('Đang gửi…', false);
 
       try {
-        const res = await fetch(`${url}/rest/v1/rpc/dang_ky_newsletter`, {
+        const res = await fetch(`${url}/rest/v1/rpc/subscribe_newsletter`, {
           method: 'POST',
           headers: {
             apikey: key,
             Authorization: `Bearer ${key}`,
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify({ dia_chi: email, tu_trang: tuTrang }),
+          body: JSON.stringify({ email_address: email, from_page: fromPage }),
         });
 
         if (!res.ok) throw new Error(String(res.status));
 
-        const ma: unknown = await res.json();
-        const cau = typeof ma === 'string' ? CAU[ma] : undefined;
-        hien(cau?.text ?? 'Đã ghi nhận.', cau?.loi ?? false);
+        const code: unknown = await res.json();
+        const message = typeof code === 'string' ? MESSAGES[code] : undefined;
+        show(message?.text ?? 'Đã ghi nhận.', message?.isError ?? false);
 
         // Chỉ xoá ô nhập khi thành công, để người dùng sửa được email viết sai.
-        if (!cau?.loi && nhap) nhap.value = '';
+        if (!message?.isError && input) input.value = '';
       } catch {
-        hien('Không gửi được lúc này. Thử lại sau giúp tôi.', true);
+        show('Không gửi được lúc này. Thử lại sau giúp tôi.', true);
       } finally {
         if (nut) nut.disabled = false;
       }

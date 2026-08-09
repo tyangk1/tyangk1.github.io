@@ -14,42 +14,42 @@
 import { readdir, readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { parse as parseYaml } from 'yaml';
-import { taoClient } from './lib/supabase.mjs';
+import { createSupabaseClient } from './lib/supabase.mjs';
 
-const THU_MUC_BLOG = 'src/content/blog';
-const THU_MUC_PROJECTS = 'src/content/projects';
+const BLOG_DIR = 'src/content/blog';
+const PROJECTS_DIR = 'src/content/projects';
 
-function tachFrontmatter(raw) {
+function splitFrontmatter(raw) {
   const match = raw.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n?([\s\S]*)$/);
   if (!match) throw new Error('File không có frontmatter');
   return { data: parseYaml(match[1]) ?? {}, body: match[2] };
 }
 
 /** Ngày trong YAML có thể là Date hoặc chuỗi — quy về 'YYYY-MM-DD'. */
-function veNgay(value) {
+function toDate(value) {
   if (!value) return null;
   if (value instanceof Date) return value.toISOString().slice(0, 10);
   return String(value).slice(0, 10);
 }
 
-const supabase = taoClient();
+const supabase = createSupabaseClient();
 
 // --- Bài viết --------------------------------------------------------------
 
-const fileBlog = (await readdir(THU_MUC_BLOG)).filter((f) => /\.mdx?$/.test(f));
-const baiViet = [];
+const fileBlog = (await readdir(BLOG_DIR)).filter((f) => /\.mdx?$/.test(f));
+const posts = [];
 
 for (const file of fileBlog) {
-  const raw = await readFile(join(THU_MUC_BLOG, file), 'utf8');
-  const { data, body } = tachFrontmatter(raw);
+  const raw = await readFile(join(BLOG_DIR, file), 'utf8');
+  const { data, body } = splitFrontmatter(raw);
 
-  baiViet.push({
+  posts.push({
     slug: file.replace(/\.mdx?$/, ''),
     title: data.title,
     description: data.description,
     content: body.trim(),
-    published_at: veNgay(data.publishedAt),
-    content_updated_at: veNgay(data.updatedAt),
+    published_at: toDate(data.publishedAt),
+    content_updated_at: toDate(data.updatedAt),
     tags: data.tags ?? [],
     takeaways: data.takeaways ?? [],
     series_name: data.seriesName ?? null,
@@ -62,7 +62,7 @@ for (const file of fileBlog) {
 }
 
 // `onConflict: 'slug'` để chạy lại nhiều lần không tạo bản trùng.
-const { error: loiBai } = await supabase.from('posts').upsert(baiViet, { onConflict: 'slug' });
+const { error: loiBai } = await supabase.from('posts').upsert(posts, { onConflict: 'slug' });
 if (loiBai) {
   console.error('✗ Đẩy bài viết thất bại:', loiBai.message);
   if (loiBai.details) console.error('  ', loiBai.details);
@@ -71,12 +71,12 @@ if (loiBai) {
 
 // --- Dự án -----------------------------------------------------------------
 
-const fileProject = (await readdir(THU_MUC_PROJECTS)).filter((f) => f.endsWith('.json'));
-const duAn = [];
+const fileProject = (await readdir(PROJECTS_DIR)).filter((f) => f.endsWith('.json'));
+const projects = [];
 
 for (const file of fileProject) {
-  const data = JSON.parse(await readFile(join(THU_MUC_PROJECTS, file), 'utf8'));
-  duAn.push({
+  const data = JSON.parse(await readFile(join(PROJECTS_DIR, file), 'utf8'));
+  projects.push({
     slug: file.replace(/\.json$/, ''),
     name: data.name,
     description: data.description,
@@ -89,11 +89,11 @@ for (const file of fileProject) {
   });
 }
 
-const { error: loiDuAn } = await supabase.from('projects').upsert(duAn, { onConflict: 'slug' });
+const { error: loiDuAn } = await supabase.from('projects').upsert(projects, { onConflict: 'slug' });
 if (loiDuAn) {
   console.error('✗ Đẩy dự án thất bại:', loiDuAn.message);
   if (loiDuAn.details) console.error('  ', loiDuAn.details);
   process.exit(1);
 }
 
-console.log(`✓ Đã đẩy lên Supabase: ${baiViet.length} bài viết, ${duAn.length} dự án.`);
+console.log(`✓ Đã đẩy lên Supabase: ${posts.length} bài viết, ${projects.length} dự án.`);

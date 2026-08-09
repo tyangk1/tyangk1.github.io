@@ -10,15 +10,15 @@
       :root {
         --bg: #0d1117;
         --panel: #161b22;
-        --vien: #30363d;
-        --chu: #e6edf3;
-        --mo: #8b949e;
-        --xanh: #58a6ff;
-        --luc: #3fb950;
-        --do: #f85149;
-        --vang: #d29922;
-        --tim: #a371f7;
-        --cam: #ffa657;
+        --border: #30363d;
+        --text: #e6edf3;
+        --muted: #8b949e;
+        --blue: #58a6ff;
+        --green: #3fb950;
+        --red: #f85149;
+        --yellow: #d29922;
+        --purple: #a371f7;
+        --orange: #ffa657;
         --mono: ui-monospace, 'Cascadia Code', Consolas, monospace;
       }
       * {
@@ -31,70 +31,70 @@
           system-ui,
           sans-serif;
         background: var(--bg);
-        color: var(--chu);
+        color: var(--text);
         height: 100vh;
         display: grid;
         grid-template-columns: 270px 1fr;
         overflow: hidden;
       }
       aside {
-        border-right: 1px solid var(--vien);
+        border-right: 1px solid var(--border);
         display: flex;
         flex-direction: column;
         min-height: 0;
       }
-      .dau {
+      .header {
         padding: 10px;
-        border-bottom: 1px solid var(--vien);
+        border-bottom: 1px solid var(--border);
         display: flex;
         gap: 6px;
       }
-      .ds {
+      .list {
         overflow-y: auto;
         flex: 1;
       }
-      .muc {
+      .item {
         padding: 9px 11px;
-        border-bottom: 1px solid var(--vien);
+        border-bottom: 1px solid var(--border);
         cursor: pointer;
         display: grid;
         gap: 3px;
       }
-      .muc:hover {
+      .item:hover {
         background: var(--panel);
       }
-      .muc[aria-current='true'] {
+      .item[aria-current='true'] {
         background: var(--panel);
-        box-shadow: inset 3px 0 0 var(--xanh);
+        box-shadow: inset 3px 0 0 var(--blue);
       }
-      .muc b {
+      .item b {
         font-weight: 600;
         font-size: 13px;
       }
-      .muc small {
-        color: var(--mo);
+      .item small {
+        color: var(--muted);
         font-size: 11px;
         display: flex;
         gap: 6px;
         align-items: center;
       }
-      .the {
+      .badge {
         font-size: 10px;
         padding: 1px 5px;
         border-radius: 999px;
         border: 1px solid currentColor;
       }
-      .nhap {
-        color: var(--vang);
+      .draft {
+        color: var(--yellow);
       }
-      .dang {
-        color: var(--luc);
+      .published {
+        color: var(--green);
       }
       /* Xong rồi, đang chờ tới ngày — xanh chứ không vàng, vì không còn việc gì phải làm. */
-      .dat_lich {
-        color: var(--xanh);
+      .scheduled {
+        color: var(--blue);
       }
-      #hen {
+      #scheduleHint {
         font-style: normal;
         text-align: right;
       }
@@ -105,31 +105,31 @@
         min-height: 0;
         min-width: 0;
       }
-      .thanh {
+      .bar {
         padding: 9px 14px;
         display: flex;
         gap: 7px;
         align-items: center;
-        border-bottom: 1px solid var(--vien);
+        border-bottom: 1px solid var(--border);
         flex-wrap: wrap;
         flex: none;
       }
-      .than {
+      .body {
         flex: 1;
         display: grid;
         grid-template-columns: 1fr;
         min-height: 0;
       }
-      .than.co-xem {
+      .body.co-xem {
         grid-template-columns: 1fr 1fr;
       }
-      .cot {
+      .col {
         overflow-y: auto;
         /* `overflow-x: hidden` tường minh, không phải để bịt lỗi.
            Chỉ đặt `overflow-y: auto` thì trục X thành `auto` theo mặc định, và
-           trên màn 390px nó sinh một thanh cuộn ngang 24px dù KHÔNG phần tử con
+           trên màn 390px nó sinh một bar cuộn ngang 24px dù KHÔNG phần tử con
            nào vượt mép phải — đã kiểm từng phần tử. Cột này cuộn dọc, cuộn ngang
-           ở đây không bao giờ là điều mong muốn. */
+           ở đây không wrap giờ là điều mong muốn. */
         overflow-x: hidden;
         min-width: 0;
         padding: 14px 16px 50px;
@@ -138,8 +138,8 @@
          `[hidden]` chỉ đặt `display: none` ở UA stylesheet, nên bất kỳ rule
          `display` nào của tác giả cũng thắng nó. Thiếu phần này thì cột xem trước
          vẫn hiện ra dù chưa bật — đã gặp đúng lỗi đó. */
-      .cot + .cot:not([hidden]) {
-        border-left: 1px solid var(--vien);
+      .col + .col:not([hidden]) {
+        border-left: 1px solid var(--border);
         padding: 0;
         overflow: hidden;
         display: flex;
@@ -167,7 +167,7 @@
         }
         aside {
           border-right: 0;
-          border-bottom: 1px solid var(--vien);
+          border-bottom: 1px solid var(--border);
           max-height: 45vh;
         }
         aside[hidden] {
@@ -178,16 +178,16 @@
         }
         /* Xem trước xếp DỌC trên màn hẹp. Chia đôi ngang ở 400px mỗi bên thì cả
            hai bên đều không đọc được. */
-        .than.co-xem {
+        .body.co-xem {
           grid-template-columns: 1fr;
           grid-template-rows: 1fr 1fr;
         }
-        .cot + .cot:not([hidden]) {
+        .col + .col:not([hidden]) {
           border-left: 0;
-          border-top: 1px solid var(--vien);
+          border-top: 1px solid var(--border);
         }
-        .hang,
-        .hang3 {
+        .row,
+        .row3 {
           grid-template-columns: 1fr;
         }
         #content {
@@ -196,14 +196,14 @@
       }
 
       @media (max-width: 560px) {
-        .cot {
+        .col {
           padding: 10px 11px 40px;
         }
-        .thanh {
+        .bar {
           padding: 8px 10px;
         }
         /* Vùng chạm tối thiểu 24px cho ngón tay (WCAG 2.5.8). */
-        .congcu button {
+        .toolbar button {
           padding: 7px 10px;
           min-height: 32px;
         }
@@ -220,13 +220,13 @@
         display: block;
         margin-bottom: 11px;
       }
-      .nhan {
+      .label {
         display: flex;
         justify-content: space-between;
         align-items: baseline;
         margin-bottom: 4px;
         font-size: 12px;
-        color: var(--mo);
+        color: var(--muted);
         gap: 10px;
       }
       input[type='text'],
@@ -235,8 +235,8 @@
       textarea {
         width: 100%;
         background: var(--bg);
-        color: var(--chu);
-        border: 1px solid var(--vien);
+        color: var(--text);
+        border: 1px solid var(--border);
         border-radius: 6px;
         padding: 7px 9px;
         font: inherit;
@@ -246,98 +246,98 @@
       }
       input:focus,
       textarea:focus {
-        outline: 2px solid var(--xanh);
+        outline: 2px solid var(--blue);
         outline-offset: -1px;
       }
-      .hang {
+      .row {
         display: grid;
         grid-template-columns: 1fr 1fr;
         gap: 11px;
       }
-      .hang3 {
+      .row3 {
         display: grid;
         grid-template-columns: 2fr 1fr 1fr;
         gap: 11px;
       }
       button {
         background: var(--panel);
-        color: var(--chu);
-        border: 1px solid var(--vien);
+        color: var(--text);
+        border: 1px solid var(--border);
         border-radius: 6px;
         padding: 6px 11px;
         font: inherit;
         cursor: pointer;
       }
       button:hover {
-        border-color: var(--xanh);
+        border-color: var(--blue);
       }
-      button.chinh {
+      button.primary {
         background: #1f6feb;
         border-color: #1f6feb;
         font-weight: 600;
       }
-      button.nguyhiem:hover {
-        border-color: var(--do);
-        color: var(--do);
+      button.danger:hover {
+        border-color: var(--red);
+        color: var(--red);
       }
       button:disabled {
         opacity: 0.5;
         cursor: default;
       }
       button[aria-pressed='true'] {
-        border-color: var(--xanh);
-        color: var(--xanh);
+        border-color: var(--blue);
+        color: var(--blue);
       }
-      .dem.ok {
-        color: var(--luc);
+      .counter.ok {
+        color: var(--green);
       }
-      .dem.sai {
-        color: var(--do);
+      .counter.bad {
+        color: var(--red);
       }
-      #loi:not(:empty) {
-        border: 1px solid var(--do);
+      #errors:not(:empty) {
+        border: 1px solid var(--red);
         background: #f8514915;
         border-radius: 6px;
         padding: 9px 11px;
         margin-bottom: 12px;
       }
-      #loi ul {
+      #errors ul {
         margin: 0;
         padding-left: 18px;
       }
-      #tt {
-        color: var(--mo);
+      #toast {
+        color: var(--muted);
         font-size: 12px;
         margin-left: auto;
       }
-      #tt.ok {
-        color: var(--luc);
+      #toast.ok {
+        color: var(--green);
       }
-      #tt.sai {
-        color: var(--do);
+      #toast.bad {
+        color: var(--red);
       }
-      .ghi {
-        color: var(--mo);
+      .note {
+        color: var(--muted);
         font-size: 11px;
         margin-top: 3px;
       }
       fieldset {
-        border: 1px solid var(--vien);
+        border: 1px solid var(--border);
         border-radius: 6px;
         padding: 11px;
         margin: 0 0 11px;
       }
       legend {
         font-size: 12px;
-        color: var(--mo);
+        color: var(--muted);
         padding: 0 6px;
       }
-      .cb {
+      .checks {
         display: flex;
         gap: 16px;
         align-items: center;
       }
-      .cb label {
+      .checks label {
         display: flex;
         gap: 6px;
         align-items: center;
@@ -355,15 +355,15 @@
          <textarea> gốc. Mọi trình soạn "xịn" hơn đều có nguy cơ ăn mất dấu — đánh
          đổi tệ nhất có thể cho một blog tiếng Việt. Đổi lại còn giữ được undo,
          chọn chữ, và kiểm chính tả của trình duyệt. */
-      .khung-soan {
+      .editor-wrap {
         position: relative;
-        border: 1px solid var(--vien);
+        border: 1px solid var(--border);
         border-radius: 6px;
         overflow: hidden;
         background: var(--bg);
       }
-      .khung-soan:focus-within {
-        outline: 2px solid var(--xanh);
+      .editor-wrap:focus-within {
+        outline: 2px solid var(--blue);
         outline-offset: -1px;
       }
       #hl,
@@ -382,7 +382,7 @@
         inset: 0;
         overflow: auto;
         pointer-events: none;
-        color: var(--chu);
+        color: var(--text);
       }
       #content {
         position: relative;
@@ -392,7 +392,7 @@
         min-height: 320px;
         background: transparent;
         color: transparent;
-        caret-color: var(--chu);
+        caret-color: var(--text);
         resize: vertical;
         border-radius: 0;
       }
@@ -400,63 +400,63 @@
         background: #1f6feb55;
       }
       /* Màu cú pháp MDX */
-      .t-heading {
-        color: var(--xanh);
+      .tok-heading {
+        color: var(--blue);
         font-weight: 700;
       }
-      .t-tag {
-        color: var(--tim);
+      .tok-tag {
+        color: var(--purple);
       }
-      .t-code {
-        color: var(--cam);
+      .tok-code {
+        color: var(--orange);
       }
-      .t-fence {
-        color: var(--mo);
+      .tok-fence {
+        color: var(--muted);
       }
-      .t-manh {
-        color: var(--chu);
+      .tok-bold {
+        color: var(--text);
         font-weight: 700;
       }
-      .t-nghieng {
+      .tok-italic {
         font-style: italic;
         color: #c9d1d9;
       }
-      .t-link {
-        color: var(--luc);
+      .tok-link {
+        color: var(--green);
       }
-      .t-trich {
-        color: var(--mo);
+      .tok-quote {
+        color: var(--muted);
         font-style: italic;
       }
-      .t-ds {
-        color: var(--vang);
+      .tok-list {
+        color: var(--yellow);
       }
 
-      .congcu {
+      .toolbar {
         display: flex;
         gap: 5px;
         flex-wrap: wrap;
         margin-bottom: 6px;
       }
-      .congcu button {
+      .toolbar button {
         padding: 4px 8px;
         font-size: 12px;
       }
-      .congcu .cach {
+      .toolbar .cach {
         width: 1px;
-        background: var(--vien);
+        background: var(--border);
         margin: 2px 3px;
       }
 
       /* --- Xem trước ---------------------------------------------------- */
-      .xem-dau {
+      .preview-bar {
         padding: 8px 12px;
-        border-bottom: 1px solid var(--vien);
+        border-bottom: 1px solid var(--border);
         display: flex;
         gap: 8px;
         align-items: center;
         font-size: 12px;
-        color: var(--mo);
+        color: var(--muted);
         flex: none;
       }
       #khung-xem {
@@ -465,20 +465,20 @@
         border: 0;
         background: #fff;
       }
-      .canh {
+      .side {
         padding: 14px;
-        color: var(--vang);
+        color: var(--yellow);
         font-size: 13px;
         line-height: 1.6;
       }
-      .canh code {
+      .side code {
         background: var(--panel);
         padding: 1px 5px;
         border-radius: 4px;
       }
       pre.ketqua {
         background: var(--panel);
-        border: 1px solid var(--vien);
+        border: 1px solid var(--border);
         border-radius: 6px;
         padding: 9px;
         font: 12px/1.5 var(--mono);
@@ -486,85 +486,88 @@
         max-height: 180px;
         overflow: auto;
       }
-      .keo {
-        border: 1px dashed var(--vien);
+      .dropzone {
+        border: 1px dashed var(--border);
         border-radius: 6px;
         padding: 9px;
         text-align: center;
-        color: var(--mo);
+        color: var(--muted);
         font-size: 12px;
         margin-top: 10px;
       }
-      .keo.dangkeo {
-        border-color: var(--xanh);
-        color: var(--xanh);
+      .dropzone.dragging {
+        border-color: var(--blue);
+        color: var(--blue);
       }
     </style>
   </head>
   <body>
     <aside>
       <div class="dau">
-        <button class="chinh" id="nut-moi">+ Bài mới</button>
+        <button class="primary" id="nut-moi">+ Bài mới</button>
         <button id="nut-sync" title="Kéo nội dung từ database ra file MDX">Đồng bộ</button>
       </div>
       <div class="ds" id="ds"></div>
     </aside>
 
     <main>
-      <div class="thanh">
+      <div class="bar">
         <button id="nut-ds" aria-pressed="false" title="Ẩn/hiện danh sách bài">☰</button>
-        <button class="chinh" id="nut-luu">Lưu</button>
+        <button class="primary" id="btn-save">Lưu</button>
         <button id="nut-xem" aria-pressed="false">Xem trước</button>
-        <button id="nut-tai-anh">Tải ảnh lên…</button>
-        <button class="nguyhiem" id="nut-xoa">Xoá bài</button>
-        <span id="tt"></span>
+        <button id="btn-image">Tải ảnh lên…</button>
+        <button class="danger" id="btn-delete">Xoá bài</button>
+        <span id="toast"></span>
       </div>
 
-      <div class="than" id="than">
+      <div class="body" id="body">
         <div class="cot">
-          <div id="loi"></div>
+          <div id="errors"></div>
           <h1 id="tieu">Bài mới</h1>
 
           <fieldset>
             <legend>Bắt buộc</legend>
 
             <label>
-              <span class="nhan"><span>Tiêu đề</span><span class="dem" id="dem-title"></span></span>
+              <span class="label"
+                ><span>Tiêu đề</span><span class="counter" id="count-title"></span
+              ></span>
               <input type="text" id="title" />
             </label>
 
             <label>
-              <span class="nhan"
+              <span class="label"
                 ><span>Slug (chính là URL, không đổi sau khi đã đăng)</span
-                ><span class="dem" id="dem-slug"></span
+                ><span class="counter" id="count-slug"></span
               ></span>
               <input type="text" id="slug" />
-              <span class="ghi" id="ghi-slug"></span>
+              <span class="note" id="slug-note"></span>
             </label>
 
             <label>
-              <span class="nhan"
+              <span class="label"
                 ><span>Mô tả — đây chính là thẻ meta description trên Google</span
-                ><span class="dem" id="dem-description"></span
+                ><span class="counter" id="count-description"></span
               ></span>
               <textarea id="description" rows="3"></textarea>
             </label>
 
-            <div class="hang3">
+            <div class="row3">
               <label>
-                <span class="nhan"
-                  ><span>Tag, cách nhau bằng dấu phẩy</span><span class="dem" id="dem-tags"></span
+                <span class="label"
+                  ><span>Tag, cách nhau bằng dấu phẩy</span
+                  ><span class="counter" id="count-tags"></span
                 ></span>
                 <input type="text" id="tags" />
               </label>
               <label>
                 <!-- Để ngày ở tương lai là ĐẶT LỊCH: bài nằm im tới đúng ngày đó rồi
-                     tự lên. `#hen` nói ra ngay lúc chọn ngày. -->
-                <span class="nhan"><span>Ngày đăng</span><em id="hen"></em></span>
+                     tự lên. `#scheduleHint` nói ra date lúc chọn ngày. -->
+                <span class="label"><span>Ngày đăng</span><em id="scheduleHint"></em></span>
                 <input type="date" id="published_at" />
               </label>
               <label>
-                <span class="nhan"><span>Ngày cập nhật</span></span>
+                <span class="label"><span>Ngày cập nhật</span></span>
                 <input type="date" id="content_updated_at" />
               </label>
             </div>
@@ -574,31 +577,31 @@
             <legend>Tuỳ chọn</legend>
 
             <label>
-              <span class="nhan"
+              <span class="label"
                 ><span>Điểm chính — mỗi dòng một ý, bỏ trống hẳn hoặc 2–4 dòng</span
-                ><span class="dem" id="dem-takeaways"></span
+                ><span class="counter" id="count-takeaways"></span
               ></span>
               <textarea id="takeaways" rows="4"></textarea>
             </label>
 
-            <div class="hang">
+            <div class="row">
               <label>
-                <span class="nhan"><span>Ảnh bìa (URL)</span></span>
+                <span class="label"><span>Ảnh bìa (URL)</span></span>
                 <input type="text" id="cover_image" />
               </label>
               <label>
-                <span class="nhan"><span>Mô tả ảnh bìa (alt)</span></span>
+                <span class="label"><span>Mô tả ảnh bìa (alt)</span></span>
                 <input type="text" id="cover_alt" />
               </label>
             </div>
 
-            <div class="hang">
+            <div class="row">
               <label>
-                <span class="nhan"><span>Tên series</span></span>
+                <span class="label"><span>Tên series</span></span>
                 <input type="text" id="series_name" />
               </label>
               <label>
-                <span class="nhan"><span>Phần thứ</span></span>
+                <span class="label"><span>Phần thứ</span></span>
                 <input type="number" id="series_part" min="1" />
               </label>
             </div>
@@ -609,44 +612,44 @@
             </div>
           </fieldset>
 
-          <div class="nhan">
-            <span>Thân bài (MDX)</span><span class="dem" id="dem-content"></span>
+          <div class="label">
+            <span>Thân bài (MDX)</span><span class="counter" id="count-content"></span>
           </div>
 
-          <div class="congcu" id="congcu">
-            <button data-tt="## " title="Heading cấp 2">H2</button>
-            <button data-tt="### " title="Heading cấp 3">H3</button>
+          <div class="toolbar" id="toolbar">
+            <button data-toast="## " title="Heading cấp 2">H2</button>
+            <button data-toast="### " title="Heading cấp 3">H3</button>
             <div class="cach"></div>
-            <button data-bao="**" title="Đậm — Ctrl+B"><b>B</b></button>
-            <button data-bao="_" title="Nghiêng — Ctrl+I"><i>I</i></button>
-            <button data-bao="`" title="Code trong dòng">code</button>
-            <button data-lam="link" title="Liên kết — Ctrl+K">link</button>
+            <button data-wrap="**" title="Đậm — Ctrl+B"><b>B</b></button>
+            <button data-wrap="_" title="Nghiêng — Ctrl+I"><i>I</i></button>
+            <button data-wrap="`" title="Code trong dòng">code</button>
+            <button data-action="link" title="Liên kết — Ctrl+K">link</button>
             <div class="cach"></div>
-            <button data-tt="- " title="Danh sách">• ds</button>
-            <button data-tt="> " title="Trích dẫn">&gt; trích</button>
-            <button data-lam="fence" title="Khối code">```</button>
+            <button data-toast="- " title="Danh sách">• ds</button>
+            <button data-toast="> " title="Trích dẫn">&gt; trích</button>
+            <button data-action="fence" title="Khối code">```</button>
             <div class="cach"></div>
-            <button data-lam="callout">Callout</button>
-            <button data-lam="steps">Steps</button>
-            <button data-lam="figure">Figure</button>
-            <button data-lam="pullquote">PullQuote</button>
+            <button data-action="callout">Callout</button>
+            <button data-action="steps">Steps</button>
+            <button data-action="figure">Figure</button>
+            <button data-action="pullquote">PullQuote</button>
           </div>
 
-          <div class="khung-soan">
+          <div class="editor-wrap">
             <pre id="hl" aria-hidden="true"><code></code></pre>
             <textarea id="content" spellcheck="false"></textarea>
           </div>
 
-          <div class="keo" id="keo">Kéo ảnh vào đây để tải lên và chèn vào bài</div>
+          <div class="dropzone" id="dropzone">Kéo ảnh vào đây để tải lên và chèn vào bài</div>
           <pre class="ketqua" id="ketqua" hidden></pre>
         </div>
 
         <div class="cot" id="cot-xem" hidden>
-          <div class="xem-dau">
-            <button id="nut-lam-moi">Cập nhật xem trước</button>
-            <span id="xem-tt"></span>
+          <div class="preview-bar">
+            <button id="btn-refresh">Cập nhật xem trước</button>
+            <span id="preview-status"></span>
           </div>
-          <div class="canh" id="canh-dev" hidden>
+          <div class="side" id="side-dev" hidden>
             <b id="ly-do-dev"></b><br /><br />
             Xem trước dùng <b>chính site</b> để render, nên cần dev server chạy song song:
             <br /><br /><code>pnpm dev</code><br /><br />
@@ -658,23 +661,23 @@
         </div>
       </div>
 
-      <input type="file" id="chon-file" accept="image/*" multiple hidden />
+      <input type="file" id="file-input" accept="image/*" multiple hidden />
     </main>
 
     <script type="module">
       // Bộ tô màu và mẫu chèn lấy từ module dùng chung với admin đã deploy — xem
-      // `scripts/lib/to-mau-mdx.mjs`. Giữ bản copy ở đây thì hai admin sẽ trôi lệch.
-      import { toMauMdx, MAU_MDX } from '/lib/to-mau-mdx.mjs';
+      // `scripts/lib/highlight-mdx.mjs`. Giữ bản copy ở đây thì hai admin sẽ trôi lệch.
+      import { highlightMdx, MDX_SNIPPETS } from '/lib/highlight-mdx.mjs';
       // Trạng thái bài (nháp / đặt lịch / đã đăng) cũng lấy từ module dùng chung. Hai
       // admin mà tự tính riêng thì cùng một bài sẽ được gắn hai nhãn khác nhau.
-      import { trangThaiBai, NHAN_TRANG_THAI, ngayHomNay } from '/lib/kiem-bai.mjs';
+      import { postStatus, STATUS_LABELS, today } from '/lib/post.mjs';
 
       const $ = (id) => document.getElementById(id);
-      let cauHinh = { gioiHan: {} };
-      let danhSach = [];
-      let slugDangSua = null;
+      let config = { limits: {} };
+      let posts = [];
+      let editingSlug = null;
 
-      const TRUONG = [
+      const FIELDS = [
         'title',
         'slug',
         'description',
@@ -689,12 +692,12 @@
         'content',
       ];
 
-      function tt(chu, loai = '') {
-        $('tt').textContent = chu;
-        $('tt').className = loai;
+      function toast(chu, loai = '') {
+        $('toast').textContent = chu;
+        $('toast').className = loai;
       }
 
-      function slugHoa(s) {
+      function slugify(s) {
         return s
           .normalize('NFD')
           .replace(/\p{M}/gu, '')
@@ -705,37 +708,37 @@
       }
 
       const hlCode = $('hl').firstElementChild;
-      function veLaiHl() {
-        hlCode.innerHTML = toMauMdx($('content').value);
+      function renderHighlight() {
+        hlCode.innerHTML = highlightMdx($('content').value);
         $('hl').scrollTop = $('content').scrollTop;
         $('hl').scrollLeft = $('content').scrollLeft;
       }
 
       // ===== Thanh công cụ ===================================================
-      const ta = () => $('content');
+      const editor = () => $('content');
 
-      function thayDoan(batDau, ketThuc, chuoi, chonLai) {
-        const t = ta();
+      function replaceRange(batDau, ketThuc, chuoi, chonLai) {
+        const t = editor();
         t.setRangeText(chuoi, batDau, ketThuc, chonLai ?? 'end');
         t.focus();
         t.dispatchEvent(new Event('input', { bubbles: true }));
       }
 
       /** Bọc phần đang chọn bằng cặp ký tự, hoặc bỏ bọc nếu đã có. */
-      function bao(dau, cuoi = dau) {
-        const t = ta();
+      function wrap(dau, cuoi = dau) {
+        const t = editor();
         const { selectionStart: a, selectionEnd: b, value: v } = t;
-        const daBao = v.slice(a - dau.length, a) === dau && v.slice(b, b + cuoi.length) === cuoi;
+        const wrapped = v.slice(a - dau.length, a) === dau && v.slice(b, b + cuoi.length) === cuoi;
 
-        if (daBao) {
+        if (wrapped) {
           const trong = v.slice(a, b);
-          thayDoan(a - dau.length, b + cuoi.length, trong);
+          replaceRange(a - dau.length, b + cuoi.length, trong);
           t.selectionStart = a - dau.length;
           t.selectionEnd = b - dau.length;
           return;
         }
 
-        thayDoan(a, b, `${dau}${v.slice(a, b)}${cuoi}`);
+        replaceRange(a, b, `${dau}${v.slice(a, b)}${cuoi}`);
         // Chưa chọn gì thì đặt con trỏ vào giữa để gõ tiếp.
         if (a === b) t.selectionStart = t.selectionEnd = a + dau.length;
         else {
@@ -745,39 +748,39 @@
       }
 
       /** Thêm tiền tố vào đầu mỗi dòng đang chọn. */
-      function themTienTo(tt2) {
-        const t = ta();
+      function addPrefix(tt2) {
+        const t = editor();
         const v = t.value;
-        const dauDong = v.lastIndexOf('\n', t.selectionStart - 1) + 1;
-        const cuoiDong = (() => {
+        const lineStart = v.lastIndexOf('\n', t.selectionStart - 1) + 1;
+        const lineEnd = (() => {
           const i = v.indexOf('\n', t.selectionEnd);
           return i === -1 ? v.length : i;
         })();
-        const khoi = v.slice(dauDong, cuoiDong);
+        const khoi = v.slice(lineStart, lineEnd);
         const moi = khoi
           .split('\n')
           .map((d) => (d.startsWith(tt2) ? d.slice(tt2.length) : tt2 + d))
           .join('\n');
-        thayDoan(dauDong, cuoiDong, moi);
+        replaceRange(lineStart, lineEnd, moi);
       }
 
-      $('congcu').addEventListener('click', (e) => {
+      $('toolbar').addEventListener('click', (e) => {
         const b = e.target.closest('button');
         if (!b) return;
         e.preventDefault();
 
-        if (b.dataset.tt) return themTienTo(b.dataset.tt);
-        if (b.dataset.bao) return bao(b.dataset.bao);
+        if (b.dataset.toast) return addPrefix(b.dataset.toast);
+        if (b.dataset.wrap) return wrap(b.dataset.wrap);
 
-        const lam = b.dataset.lam;
-        if (lam === 'link') {
-          const t = ta();
-          const chon = t.value.slice(t.selectionStart, t.selectionEnd) || 'chữ hiện ra';
-          thayDoan(t.selectionStart, t.selectionEnd, `[${chon}](https://)`);
+        const action = b.dataset.action;
+        if (action === 'link') {
+          const t = editor();
+          const picked = t.value.slice(t.selectionStart, t.selectionEnd) || 'chữ hiện ra';
+          replaceRange(t.selectionStart, t.selectionEnd, `[${picked}](https://)`);
           return;
         }
-        if (MAU_MDX[lam]) {
-          const t = ta();
+        if (MDX_SNIPPETS[action]) {
+          const t = editor();
 
           /*
             Chèn SAU phần đang chọn, không thay thế nó. Bản trước thay thế, nên chọn
@@ -788,70 +791,70 @@
           // Chèn ở CUỐI DÒNG chứa con trỏ, không phải ngay tại con trỏ: khối MDX phải
           // nằm giữa hai đoạn văn, chèn giữa câu thì cắt đôi câu (và cắt đôi cả cặp
           // `**` nếu con trỏ đang ở trong đó).
-          const xuongDong = t.value.indexOf('\n', t.selectionEnd);
-          const viTri = xuongDong === -1 ? t.value.length : xuongDong;
+          const nextNewline = t.value.indexOf('\n', t.selectionEnd);
+          const pos = nextNewline === -1 ? t.value.length : nextNewline;
 
           // Mẫu đã tự mở đầu bằng '\n'. Thêm đúng MỘT '\n' nữa để có dòng trống trên.
-          const truoc = t.value.slice(0, viTri);
-          const dem = truoc === '' || truoc.endsWith('\n') ? '' : '\n';
+          const before = t.value.slice(0, pos);
+          const counter = before === '' || before.endsWith('\n') ? '' : '\n';
 
-          thayDoan(viTri, viTri, dem + MAU_MDX[lam]);
+          replaceRange(pos, pos, counter + MDX_SNIPPETS[action]);
         }
       });
 
       // ===== Đếm và validate =================================================
-      function demKyTu(id, hienTai, min, max) {
-        const el = $(`dem-${id}`);
+      function countField(id, hienTai, min, max) {
+        const el = $(`counter-${id}`);
         if (!el) return;
         const ok = hienTai >= min && hienTai <= max;
         el.textContent = `${hienTai} / ${min}–${max}`;
-        el.className = `dem ${ok ? 'ok' : 'sai'}`;
+        el.className = `counter ${ok ? 'ok' : 'bad'}`;
       }
 
       /**
        * Nói cho người viết biết cái ngày vừa chọn có nghĩa gì. Giống hệt hàm cùng tên
        * trong `src/pages/admin.astro` — cùng ba câu cho ba trạng thái.
        */
-      function capNhatHen() {
-        const el = $('hen');
+      function updateScheduleHint() {
+        const el = $('scheduleHint');
         if (!el) return;
 
-        const ngay = $('published_at').value;
+        const date = $('published_at').value;
 
         if ($('draft').checked) {
           el.textContent = 'đang là nháp — ngày chưa có tác dụng';
-          el.className = 'nhap';
+          el.className = 'draft';
           return;
         }
-        if (!ngay) {
+        if (!date) {
           el.textContent = '';
           return;
         }
 
-        const homNay = ngayHomNay();
-        if (ngay > homNay) {
-          const soNgay = Math.round(
-            (Date.parse(`${ngay}T00:00:00Z`) - Date.parse(`${homNay}T00:00:00Z`)) / 86400000,
+        const homNay = today();
+        if (date > homNay) {
+          const days = Math.round(
+            (Date.parse(`${date}T00:00:00Z`) - Date.parse(`${homNay}T00:00:00Z`)) / 86400000,
           );
-          el.textContent = `đặt lịch — tự lên sau ${soNgay} ngày, không cần làm gì`;
-          el.className = 'dat_lich';
+          el.textContent = `đặt lịch — tự lên sau ${days} ngày, không cần làm gì`;
+          el.className = 'scheduled';
         } else {
           el.textContent = 'đã tới ngày — bấm Đồng bộ là lên site';
-          el.className = 'dang';
+          el.className = 'published';
         }
       }
 
-      function capNhatDem() {
-        capNhatHen();
-        const g = cauHinh.gioiHan;
-        demKyTu('title', $('title').value.trim().length, 1, g.titleToiDa);
-        demKyTu(
+      function updateCounters() {
+        updateScheduleHint();
+        const g = config.limits;
+        countField('title', $('title').value.trim().length, 1, g.titleToiDa);
+        countField(
           'description',
           $('description').value.trim().length,
           g.descriptionMin,
           g.descriptionMax,
         );
-        demKyTu(
+        countField(
           'tags',
           $('tags')
             .value.split(',')
@@ -865,22 +868,22 @@
           .filter((t) => t.trim());
         const okTk =
           tk.length === 0 || (tk.length >= g.takeawaysMin && tk.length <= g.takeawaysMax);
-        $('dem-takeaways').textContent = `${tk.length} dòng`;
-        $('dem-takeaways').className = `dem ${okTk ? 'ok' : 'sai'}`;
+        $('count-takeaways').textContent = `${tk.length} dòng`;
+        $('count-takeaways').className = `counter ${okTk ? 'ok' : 'bad'}`;
 
         const chu = $('content').value.trim().split(/\s+/).filter(Boolean).length;
         const phut = Math.max(1, Math.round(chu / 200));
-        $('dem-content').textContent = `${chu.toLocaleString('vi-VN')} từ · ~${phut} phút đọc`;
+        $('count-content').textContent = `${chu.toLocaleString('vi-VN')} từ · ~${phut} phút đọc`;
 
         const slug = $('slug').value.trim();
         const hopLe = /^[a-z0-9]+(-[a-z0-9]+)*$/.test(slug);
-        $('dem-slug').textContent = slug ? (hopLe ? 'hợp lệ' : 'sai định dạng') : '';
-        $('dem-slug').className = `dem ${slug && hopLe ? 'ok' : slug ? 'sai' : ''}`;
-        $('ghi-slug').textContent = slug ? `URL: /blog/${slug}` : '';
+        $('count-slug').textContent = slug ? (hopLe ? 'hợp lệ' : 'bad định dạng') : '';
+        $('count-slug').className = `counter ${slug && hopLe ? 'ok' : slug ? 'bad' : ''}`;
+        $('slug-note').textContent = slug ? `URL: /blog/${slug}` : '';
       }
 
       // ===== Đọc / ghi form ==================================================
-      function docForm() {
+      function readForm() {
         return {
           slug: $('slug').value,
           title: $('title').value,
@@ -905,14 +908,14 @@
         };
       }
 
-      function dienForm(b) {
+      function fillForm(b) {
         $('title').value = b?.title ?? '';
         $('slug').value = b?.slug ?? '';
         $('description').value = b?.description ?? '';
         $('content').value = b?.content ?? '';
-        // `ngayHomNay()` chứ không phải `toISOString()`: cái sau cho ra ngày UTC, nên
+        // `today()` chứ không phải `toISOString()`: cái sau cho ra ngày UTC, nên
         // mở form lúc 6 giờ sáng ở Việt Nam sẽ điền lùi mất một ngày.
-        $('published_at').value = b?.published_at ?? ngayHomNay();
+        $('published_at').value = b?.published_at ?? today();
         $('content_updated_at').value = b?.content_updated_at ?? '';
         $('tags').value = (b?.tags ?? []).join(', ');
         $('takeaways').value = (b?.takeaways ?? []).join('\n');
@@ -923,98 +926,98 @@
         $('draft').checked = b ? b.draft : true;
         $('featured').checked = b?.featured ?? false;
 
-        slugDangSua = b?.slug ?? null;
+        editingSlug = b?.slug ?? null;
         $('tieu').textContent = b ? b.title || b.slug : 'Bài mới';
-        $('nut-xoa').disabled = !b;
-        $('loi').innerHTML = '';
-        capNhatDem();
-        veLaiHl();
-        veDanhSach();
+        $('btn-delete').disabled = !b;
+        $('errors').innerHTML = '';
+        updateCounters();
+        renderHighlight();
+        renderList();
       }
 
-      function veDanhSach() {
-        $('ds').innerHTML = danhSach
+      function renderList() {
+        $('ds').innerHTML = posts
           .map(
             (
               b,
-            ) => `<div class="muc" data-slug="${b.slug}" ${b.slug === slugDangSua ? 'aria-current="true"' : ''}>
+            ) => `<div class="item" data-slug="${b.slug}" ${b.slug === editingSlug ? 'aria-current="true"' : ''}>
               <b>${b.title.replace(/</g, '&lt;')}</b>
-              <small><span class="the ${trangThaiBai(b)}">${NHAN_TRANG_THAI[trangThaiBai(b)]}</span>${b.published_at ?? ''}</small>
+              <small><span class="badge ${postStatus(b)}">${STATUS_LABELS[postStatus(b)]}</span>${b.published_at ?? ''}</small>
             </div>`,
           )
           .join('');
-        for (const el of $('ds').querySelectorAll('.muc')) {
+        for (const el of $('ds').querySelectorAll('.item')) {
           el.onclick = () => {
-            const b = danhSach.find((x) => x.slug === el.dataset.slug);
-            if (b) dienForm(b);
-            document.querySelector('.cot').scrollTo(0, 0);
+            const b = posts.find((x) => x.slug === el.dataset.slug);
+            if (b) fillForm(b);
+            document.querySelector('.col').scrollTo(0, 0);
           };
         }
       }
 
-      async function taiDanhSach() {
-        danhSach = await (await fetch('/api/bai')).json();
-        veDanhSach();
+      async function loadPosts() {
+        posts = await (await fetch('/api/posts')).json();
+        renderList();
       }
 
-      async function luu({ imLang = false } = {}) {
-        $('nut-luu').disabled = true;
-        if (!imLang) tt('Đang lưu…');
+      async function save({ silent = false } = {}) {
+        $('btn-save').disabled = true;
+        if (!silent) toast('Đang lưu…');
         try {
-          const r = await fetch('/api/bai', {
+          const r = await fetch('/api/posts', {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             // `slug_goc` cho server biết đây là SỬA bài nào. Thiếu nó thì đổi slug
             // sẽ tạo bài mới và để bài cũ nằm lại — hai bài trùng nội dung.
-            body: JSON.stringify({ ...docForm(), slug_goc: slugDangSua }),
+            body: JSON.stringify({ ...readForm(), slug_goc: editingSlug }),
           });
-          const kq = await r.json();
+          const result = await r.json();
 
-          if (kq.loi) {
-            $('loi').innerHTML =
-              `<b>Chưa lưu được:</b><ul>${kq.loi.map((l) => `<li>${l.thongDiep}</li>`).join('')}</ul>`;
-            tt('Có lỗi cần sửa', 'sai');
+          if (result.errors) {
+            $('errors').innerHTML =
+              `<b>Chưa lưu được:</b><ul>${result.errors.map((l) => `<li>${l.thongDiep}</li>`).join('')}</ul>`;
+            toast('Có lỗi cần sửa', 'bad');
             return false;
           }
 
-          $('loi').innerHTML = '';
-          slugDangSua = kq.slug;
-          await taiDanhSach();
+          $('errors').innerHTML = '';
+          editingSlug = result.slug;
+          await loadPosts();
           $('tieu').textContent = $('title').value;
-          if (!imLang) tt('Đã lưu vào database', 'ok');
+          if (!silent) toast('Đã lưu vào database', 'ok');
           return true;
         } catch (e) {
-          tt(`Lỗi: ${e.message}`, 'sai');
+          toast(`Lỗi: ${e.message}`, 'bad');
           return false;
         } finally {
-          $('nut-luu').disabled = false;
+          $('btn-save').disabled = false;
         }
       }
 
       // ===== Xem trước =======================================================
-      let dangLamMoi = false;
+      let refreshing = false;
       /** Slug mà iframe đang nạp. Đổi bài thì phải gán lại `src`. */
-      let daNap = null;
+      let loaded = null;
 
-      async function lamMoiXem({ imLang = false } = {}) {
+      async function refreshPreview({ silent = false } = {}) {
         // Không cho hai lần cập nhật chồng nhau: `pnpm sync` ghi file, hai lần
-        // chạy song song có thể ghi dở dang lên nhau.
-        if (dangLamMoi) return;
-        dangLamMoi = true;
+        // chạy song song có thể ghi dở đang lên nhau.
+        if (refreshing) return;
+        refreshing = true;
 
         try {
-          const { song, lyDo } = await (await fetch('/api/dev-song')).json();
-          $('canh-dev').hidden = song;
+          const { song, lyDo } = await (await fetch('/api/dev-alive')).json();
+          $('side-dev').hidden = song;
           $('khung-xem').hidden = !song;
           $('ly-do-dev').textContent = lyDo ?? '';
           if (!song) {
-            $('xem-tt').textContent = '';
+            $('preview-status').textContent = '';
             return;
           }
 
-          $('xem-tt').textContent = 'đang cập nhật…';
-          if (!(await luu({ imLang: true }))) {
-            $('xem-tt').textContent = 'bài chưa hợp lệ — xem lỗi bên trên';
+          $('preview-status').textContent = 'đang cập nhật…';
+          if (!(await save({ silent: true }))) {
+            $('preview-status').textContent = 'bài chưa hợp lệ — xem lỗi bên trên';
             return;
           }
 
@@ -1029,39 +1032,40 @@
           // không gán lại `src` mỗi lần cập nhật.
           let co = false;
           for (let i = 0; i < 10 && !co; i += 1) {
-            ({ co } = await (
-              await fetch(`/api/dev-trang?slug=${encodeURIComponent(slug)}`)
-            ).json());
+            ({ co } = await (await fetch(`/api/dev-page?slug=${encodeURIComponent(slug)}`)).json());
             if (!co) await new Promise((r) => setTimeout(r, 700));
           }
 
           if (!co) {
-            $('xem-tt').textContent = 'dev server chưa sinh trang này — thử lại sau vài giây';
+            $('preview-status').textContent =
+              'dev server chưa sinh trang này — thử lại sau vài giây';
             return;
           }
 
           // Chỉ gán `src` khi CHƯA nạp đúng bài này. Các lần cập nhật sau để HMR
           // của Astro tự lo — gán lại `src` sẽ kéo iframe về đầu trang, mà đang
           // đọc đoạn giữa bài bị kéo lên đầu thì rất khó chịu.
-          if (daNap !== slug) {
+          if (loaded !== slug) {
             $('khung-xem').src = dich;
-            daNap = slug;
+            loaded = slug;
           }
 
-          $('xem-tt').textContent = imLang ? `đã cập nhật · /blog/${slug}` : `/blog/${slug}`;
+          $('preview-status').textContent = silent
+            ? `đã cập nhật · /blog/${slug}`
+            : `/blog/${slug}`;
         } finally {
-          dangLamMoi = false;
+          refreshing = false;
         }
       }
 
       $('nut-xem').onclick = async () => {
         const hien = $('cot-xem').hidden;
         $('cot-xem').hidden = !hien;
-        $('than').classList.toggle('co-xem', hien);
+        $('body').classList.toggle('co-xem', hien);
         $('nut-xem').setAttribute('aria-pressed', String(hien));
-        if (hien) await lamMoiXem();
+        if (hien) await refreshPreview();
       };
-      $('nut-lam-moi').onclick = () => lamMoiXem();
+      $('btn-refresh').onclick = () => refreshPreview();
 
       /**
        * Preview tự cập nhật: gõ xong ngừng 1,5 giây thì lưu + sync, và Astro dev
@@ -1077,96 +1081,102 @@
        * Tác dụng phụ có lợi: bài được lưu liên tục, nên đóng tab giữa lúc viết
        * cũng không mất gì.
        */
-      let hen = null;
-      function henLamMoi() {
+      let scheduleHint = null;
+      function scheduleRefresh() {
         if ($('cot-xem').hidden) return;
-        clearTimeout(hen);
-        $('xem-tt').textContent = 'sẽ cập nhật…';
-        hen = setTimeout(() => lamMoiXem({ imLang: true }), 1500);
+        clearTimeout(scheduleHint);
+        $('preview-status').textContent = 'sẽ cập nhật…';
+        scheduleHint = setTimeout(() => refreshPreview({ silent: true }), 1500);
       }
 
       // ===== Ảnh =============================================================
-      async function taiAnh(files) {
+      async function uploadImages(files) {
         for (const f of files) {
-          tt(`Đang tải ${f.name}…`);
+          toast(`Đang tải ${f.name}…`);
           const r = await fetch(
-            `/api/anh?ten=${encodeURIComponent(f.name)}&thu-muc=${new Date().getFullYear()}`,
+            `/api/images?ten=${encodeURIComponent(f.name)}&thu-item=${new Date().getFullYear()}`,
             { method: 'POST', body: await f.arrayBuffer() },
           );
-          const kq = await r.json();
-          if (kq.loi) {
-            tt(kq.loi, 'sai');
+          const result = await r.json();
+          if (result.errors) {
+            toast(result.errors, 'bad');
             continue;
           }
 
           const kb = (n) => `${(n / 1024).toFixed(1)}KB`;
           if (!$('cover_image').value) {
-            $('cover_image').value = kq.url;
-            tt(`Đặt làm ảnh bìa · ${kb(kq.goc)} → ${kb(kq.cuoi)}. Nhớ điền alt.`, 'ok');
+            $('cover_image').value = result.url;
+            toast(
+              `Đặt làm ảnh bìa · ${kb(result.originalBytes)} → ${kb(result.finalBytes)}. Nhớ điền alt.`,
+              'ok',
+            );
             $('cover_alt').focus();
           } else {
-            const t = ta();
-            thayDoan(
+            const t = editor();
+            replaceRange(
               t.selectionStart,
               t.selectionEnd,
-              `\n<Figure\n  src="${kq.url}"\n  alt=""\n  caption=""\n/>\n`,
+              `\n<Figure\n  src="${result.url}"\n  alt=""\n  caption=""\n/>\n`,
             );
-            tt(`Đã chèn <Figure> · ${kb(kq.goc)} → ${kb(kq.cuoi)}. Nhớ điền alt.`, 'ok');
+            toast(
+              `Đã chèn <Figure> · ${kb(result.originalBytes)} → ${kb(result.finalBytes)}. Nhớ điền alt.`,
+              'ok',
+            );
           }
         }
       }
 
       // ===== Gắn sự kiện =====================================================
-      $('nut-luu').onclick = () => luu();
-      $('nut-xoa').onclick = async () => {
-        if (!slugDangSua) return;
-        if (!confirm(`Xoá hẳn bài "${slugDangSua}" khỏi database?\n\nKhông hoàn lại được.`)) return;
-        await fetch(`/api/bai/${encodeURIComponent(slugDangSua)}`, { method: 'DELETE' });
-        await taiDanhSach();
-        dienForm(null);
-        tt('Đã xoá', 'ok');
+      $('btn-save').onclick = () => save();
+      $('btn-delete').onclick = async () => {
+        if (!editingSlug) return;
+        if (!confirm(`Xoá hẳn bài "${editingSlug}" khỏi database?\n\nKhông hoàn lại được.`)) return;
+        await fetch(`/api/posts/${encodeURIComponent(editingSlug)}`, { method: 'DELETE' });
+        await loadPosts();
+        fillForm(null);
+        toast('Đã xoá', 'ok');
       };
       $('nut-moi').onclick = () => {
-        dienForm(null);
+        fillForm(null);
         $('title').focus();
       };
       $('nut-sync').onclick = async () => {
         $('nut-sync').disabled = true;
-        tt('Đang đồng bộ ra file…');
-        const kq = await (await fetch('/api/sync', { method: 'POST' })).json();
+        toast('Đang đồng bộ ra file…');
+        const result = await (await fetch('/api/sync', { method: 'POST' })).json();
         $('ketqua').hidden = false;
-        $('ketqua').textContent = kq.ra;
-        tt(
-          kq.ma === 0 ? 'Đồng bộ xong — giờ commit và push' : 'Đồng bộ lỗi',
-          kq.ma === 0 ? 'ok' : 'sai',
+        $('ketqua').textContent = result.ra;
+        toast(
+          result.ma === 0 ? 'Đồng bộ xong — giờ commit và push' : 'Đồng bộ lỗi',
+          result.ma === 0 ? 'ok' : 'bad',
         );
         $('nut-sync').disabled = false;
       };
-      $('nut-tai-anh').onclick = () => $('chon-file').click();
-      $('chon-file').onchange = (e) => taiAnh([...e.target.files]);
+      $('btn-image').onclick = () => $('file-input').click();
+      $('file-input').onchange = (e) => uploadImages([...e.target.files]);
 
-      const keo = $('keo');
+      const dropzone = $('dropzone');
       for (const su of ['dragenter', 'dragover'])
-        keo.addEventListener(su, (e) => {
+        dropzone.addEventListener(su, (e) => {
           e.preventDefault();
-          keo.classList.add('dangkeo');
+          dropzone.classList.add('dragging');
         });
       for (const su of ['dragleave', 'drop'])
-        keo.addEventListener(su, () => keo.classList.remove('dangkeo'));
-      keo.addEventListener('drop', (e) => {
+        dropzone.addEventListener(su, () => dropzone.classList.remove('dragging'));
+      dropzone.addEventListener('drop', (e) => {
         e.preventDefault();
-        taiAnh([...e.dataTransfer.files].filter((f) => f.type.startsWith('image/')));
+        uploadImages([...e.dataTransfer.files].filter((f) => f.type.startsWith('image/')));
       });
 
-      for (const id of TRUONG) {
-        $(id).addEventListener('input', capNhatDem);
-        $(id).addEventListener('input', henLamMoi);
+      for (const id of FIELDS) {
+        $(id).addEventListener('input', updateCounters);
+        $(id).addEventListener('input', scheduleRefresh);
       }
 
-      // Ô nháp không nằm trong TRUONG (nó là checkbox, không phải ô chữ) nhưng nó đổi
-      // câu ở `#hen`: bỏ tick nháp thì cái ngày mới bắt đầu có nghĩa.
-      $('draft').addEventListener('change', capNhatDem);
-      $('content').addEventListener('input', veLaiHl);
+      // Ô nháp không nằm trong FIELDS (nó là checkbox, không phải ô chữ) nhưng nó đổi
+      // câu ở `#scheduleHint`: bỏ tick nháp thì cái ngày mới bắt đầu có nghĩa.
+      $('draft').addEventListener('change', updateCounters);
+      $('content').addEventListener('input', renderHighlight);
 
       $('nut-ds').onclick = () => {
         const a = document.querySelector('aside');
@@ -1179,44 +1189,44 @@
       });
 
       $('title').addEventListener('input', () => {
-        if (!slugDangSua) $('slug').value = slugHoa($('title').value);
-        capNhatDem();
+        if (!editingSlug) $('slug').value = slugify($('title').value);
+        updateCounters();
       });
 
       // Phím tắt trong ô soạn
       $('content').addEventListener('keydown', (e) => {
         if (e.key === 'Tab') {
           e.preventDefault();
-          const t = ta();
-          thayDoan(t.selectionStart, t.selectionEnd, '  ');
+          const t = editor();
+          replaceRange(t.selectionStart, t.selectionEnd, '  ');
           return;
         }
         if (!(e.ctrlKey || e.metaKey)) return;
         const k = e.key.toLowerCase();
         if (k === 'b') {
           e.preventDefault();
-          bao('**');
+          wrap('**');
         } else if (k === 'i') {
           e.preventDefault();
-          bao('_');
+          wrap('_');
         } else if (k === 'k') {
           e.preventDefault();
-          const t = ta();
-          const chon = t.value.slice(t.selectionStart, t.selectionEnd) || 'chữ hiện ra';
-          thayDoan(t.selectionStart, t.selectionEnd, `[${chon}](https://)`);
+          const t = editor();
+          const picked = t.value.slice(t.selectionStart, t.selectionEnd) || 'chữ hiện ra';
+          replaceRange(t.selectionStart, t.selectionEnd, `[${picked}](https://)`);
         }
       });
 
       document.addEventListener('keydown', (e) => {
         if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
           e.preventDefault();
-          luu();
+          save();
         }
       });
 
-      cauHinh = await (await fetch('/api/cau-hinh')).json();
-      await taiDanhSach();
-      dienForm(null);
+      config = await (await fetch('/api/config')).json();
+      await loadPosts();
+      fillForm(null);
     </script>
   </body>
 </html>

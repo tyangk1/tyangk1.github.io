@@ -6,10 +6,10 @@ name: Deploy
 # request cũng chạy qua các bước deploy (dù bị `if` chặn lại), còn tách ra thì
 # quan hệ rõ ràng — CI xanh trên main mới có deploy, ngoài ra thì không.
 #
-# Các bước build và đẩy lên Pages nằm ở `dung-va-deploy.yml` vì workflow "Tự động
+# Các bước build và đẩy lên Pages nằm ở `build-and-deploy.yml` vì workflow "Tự động
 # publish" cũng cần đúng các bước đó — nó không kích hoạt được CI (GitHub không
 # chạy workflow cho push tạo bởi GITHUB_TOKEN), nên nó gọi thẳng workflow kia.
-# Xem chú thích đầy đủ trong `dung-va-deploy.yml`.
+# Xem chú thích đầy đủ trong `build-and-deploy.yml`.
 on:
   workflow_run:
     workflows: [CI]
@@ -32,6 +32,6 @@ jobs:
       pages: write
       id-token: write
 
-    uses: ./.github/workflows/dung-va-deploy.yml
+    uses: ./.github/workflows/build-and-deploy.yml
     with:
       ref: ${{ github.event.workflow_run.head_sha || github.ref }}

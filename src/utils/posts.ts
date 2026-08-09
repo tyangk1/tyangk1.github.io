@@ -20,23 +20,23 @@ export type Post = CollectionEntry<'blog'>;
  * `src/content/blog/` mà không đi qua database.
  */
 export async function getPublishedPosts(): Promise<Post[]> {
-  const homNay = ngayHomNay();
+  const today = todayInSiteZone();
 
   const posts = await getCollection(
     'blog',
-    ({ data }) => import.meta.env.DEV || (!data.draft && ngayCuaBai(data.publishedAt) <= homNay),
+    ({ data }) => import.meta.env.DEV || (!data.draft && postDate(data.publishedAt) <= today),
   );
 
   return posts.sort((a, b) => b.data.publishedAt.valueOf() - a.data.publishedAt.valueOf());
 }
 
 /** Hôm nay theo múi giờ blog, dạng `YYYY-MM-DD`. Xem chú thích ở `SITE.timeZone`. */
-function ngayHomNay(): string {
+function todayInSiteZone(): string {
   return new Intl.DateTimeFormat('en-CA', { timeZone: SITE.timeZone }).format(new Date());
 }
 
 /**
- * Ngày đăng của bài dưới dạng `YYYY-MM-DD` để so chuỗi với `ngayHomNay()`.
+ * Ngày đăng của bài dưới dạng `YYYY-MM-DD` để so chuỗi với `todayInSiteZone()`.
  *
  * Frontmatter `publishedAt: 2026-08-10` được Zod đổi thành Date lúc nửa đêm UTC,
  * nên `toISOString()` trả lại đúng ngày đã viết. KHÔNG dùng `Intl` với
@@ -44,7 +44,7 @@ function ngayHomNay(): string {
  * múi giờ âm sẽ lùi mất một ngày — hai giá trị đang so không cùng bản chất, một
  * cái là ngày người viết gõ ra, cái kia là thời điểm thật.
  */
-function ngayCuaBai(publishedAt: Date): string {
+function postDate(publishedAt: Date): string {
   return publishedAt.toISOString().slice(0, 10);
 }
 

@@ -5,12 +5,12 @@
  * trọn, lưới sáu thẻ, danh sách gọn phía dưới, và trang thứ hai của /blog.
  * Với bốn bài thì ba khối cuối không bao giờ hiện ra.
  *
- * Chạy: node scripts/seed-noi-dung-mau.mjs
+ * Chạy: node scripts/seed-content.mjs
  * Chạy lại nhiều lần không tạo bản trùng (upsert theo slug).
  */
-import { taoClient } from './lib/supabase.mjs';
+import { createSupabaseClient } from './lib/supabase.mjs';
 
-const baiViet = [
+const posts = [
   {
     slug: 'cache-http-ba-tang',
     title: 'Cache HTTP ba tầng: trình duyệt, CDN, và máy chủ',
@@ -266,10 +266,10 @@ Nếu câu trả lời là "chắc họ sẽ hỏi vì sao chỗ này làm vậy
   },
 ];
 
-const supabase = taoClient();
+const supabase = createSupabaseClient();
 
 const { error } = await supabase.from('posts').upsert(
-  baiViet.map((b) => ({ ...b, draft: false })),
+  posts.map((b) => ({ ...b, draft: false })),
   { onConflict: 'slug' },
 );
 
@@ -279,4 +279,4 @@ if (error) {
   process.exit(1);
 }
 
-console.log(`✓ Đã nạp ${baiViet.length} bài mẫu vào database.`);
+console.log(`✓ Đã nạp ${posts.length} bài mẫu vào database.`);

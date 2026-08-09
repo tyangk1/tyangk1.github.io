@@ -50,7 +50,7 @@ const blog = defineCollection({
          * Nhận HAI dạng:
          *  - `image()`  — file cục bộ trong `src/assets/`. Astro tối ưu lúc build.
          *  - `z.url()`  — URL tuyệt đối, ví dụ ảnh trong Supabase Storage
-         *                 (`pnpm anh:upload` in ra URL này).
+         *                 (`pnpm image:upload` in ra URL này).
          *
          * Thứ tự trong union quan trọng: `image()` phải đứng trước. Nó chỉ khớp
          * đường dẫn cục bộ giải được, nên một URL `https://…` sẽ rơi xuống nhánh

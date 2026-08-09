@@ -18,12 +18,12 @@
  */
 import { mkdir, readdir, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { daCauHinh, taoClient, SUPABASE_URL, laKhoaCongKhai } from './lib/supabase.mjs';
-import { ngayHomNay } from './lib/kiem-bai.mjs';
+import { isConfigured, createSupabaseClient, SUPABASE_URL, isPublicKey } from './lib/supabase.mjs';
+import { today } from './lib/post.mjs';
 
-const THU_MUC_BLOG = 'src/content/blog';
-const THU_MUC_PROJECTS = 'src/content/projects';
-const FILE_LUOT_XEM = 'src/data/luot-xem.json';
+const BLOG_DIR = 'src/content/blog';
+const PROJECTS_DIR = 'src/content/projects';
+const VIEWS_FILE = 'src/data/views.json';
 
 /**
  * Ghi một giá trị thành YAML.
@@ -33,7 +33,7 @@ const FILE_LUOT_XEM = 'src/data/luot-xem.json';
  * Nhờ vậy không cần thư viện YAML nào cho phần GHI, và không có nguy cơ tự viết
  * escape sai.
  */
-function yamlGiaTri(value) {
+function yamlValue(value) {
   if (value instanceof Date) return value.toISOString().slice(0, 10);
   if (typeof value === 'boolean' || typeof value === 'number') return String(value);
   // Ngày dạng 'YYYY-MM-DD' để nguyên, không cần nháy.
@@ -41,25 +41,25 @@ function yamlGiaTri(value) {
   return JSON.stringify(value);
 }
 
-function dungFrontmatter(fields) {
-  const dong = [];
+function buildFrontmatter(fields) {
+  const lines = [];
   for (const [key, value] of Object.entries(fields)) {
     if (value === null || value === undefined) continue;
     if (Array.isArray(value) && value.length === 0) continue;
-    dong.push(`${key}: ${yamlGiaTri(value)}`);
+    lines.push(`${key}: ${yamlValue(value)}`);
   }
-  return `---\n${dong.join('\n')}\n---\n`;
+  return `---\n${lines.join('\n')}\n---\n`;
 }
 
 /** Xoá các file cũ trong thư mục để bài đã xoá ở DB cũng biến mất khỏi site. */
-async function donThuMuc(dir, duoi) {
+async function clearDir(dir, exts) {
   await mkdir(dir, { recursive: true });
   for (const name of await readdir(dir)) {
-    if (duoi.some((d) => name.endsWith(d))) await rm(join(dir, name));
+    if (exts.some((d) => name.endsWith(d))) await rm(join(dir, name));
   }
 }
 
-async function dongBoBaiViet(supabase, layCaNhap) {
+async function syncPosts(supabase, includeDrafts) {
   let query = supabase.from('posts').select('*').order('published_at', { ascending: false });
 
   /*
@@ -72,15 +72,15 @@ async function dongBoBaiViet(supabase, layCaNhap) {
     ĐI XUYÊN RLS. Chỉ dựa vào policy thì lệnh sync ở máy mình lại là đường duy
     nhất làm rò bài chưa tới hạn.
   */
-  if (!layCaNhap) query = query.eq('draft', false).lte('published_at', ngayHomNay());
+  if (!includeDrafts) query = query.eq('draft', false).lte('published_at', today());
 
   const { data, error } = await query;
   if (error) throw new Error(`Đọc bảng posts thất bại: ${error.message}`);
 
-  await donThuMuc(THU_MUC_BLOG, ['.mdx', '.md']);
+  await clearDir(BLOG_DIR, ['.mdx', '.md']);
 
   for (const row of data) {
-    const frontmatter = dungFrontmatter({
+    const frontmatter = buildFrontmatter({
       title: row.title,
       description: row.description,
       publishedAt: row.published_at,
@@ -96,20 +96,20 @@ async function dongBoBaiViet(supabase, layCaNhap) {
     });
 
     const body = row.content.replace(/\s*$/, '') + '\n';
-    await writeFile(join(THU_MUC_BLOG, `${row.slug}.mdx`), `${frontmatter}\n${body}`, 'utf8');
+    await writeFile(join(BLOG_DIR, `${row.slug}.mdx`), `${frontmatter}\n${body}`, 'utf8');
   }
 
   return data.length;
 }
 
-async function dongBoDuAn(supabase) {
+async function syncProjects(supabase) {
   const { data, error } = await supabase
     .from('projects')
     .select('*')
     .order('year', { ascending: false });
   if (error) throw new Error(`Đọc bảng projects thất bại: ${error.message}`);
 
-  await donThuMuc(THU_MUC_PROJECTS, ['.json']);
+  await clearDir(PROJECTS_DIR, ['.json']);
 
   for (const row of data) {
     const obj = {
@@ -124,7 +124,7 @@ async function dongBoDuAn(supabase) {
     if (row.repo) obj.repo = row.repo;
 
     await writeFile(
-      join(THU_MUC_PROJECTS, `${row.slug}.json`),
+      join(PROJECTS_DIR, `${row.slug}.json`),
       `${JSON.stringify(obj, null, 2)}\n`,
       'utf8',
     );
@@ -143,7 +143,7 @@ async function dongBoDuAn(supabase) {
  * Số này dùng cho khối "Đọc nhiều nhất" ở trang chủ — nó chốt tại thời điểm
  * build. Con số hiện trên từng trang bài là số trực tiếp, lấy từ trình duyệt.
  */
-async function dongBoLuotXem(supabase) {
+async function syncViews(supabase) {
   const { data, error } = await supabase
     .from('post_views')
     .select('slug, views')
@@ -155,18 +155,18 @@ async function dongBoLuotXem(supabase) {
     // Bảng lượt xem chưa có (chưa chạy migration) thì đừng làm hỏng build —
     // khối "Đọc nhiều nhất" chỉ đơn giản là không hiện.
     console.warn(`⚠ Không đọc được lượt xem (${error.message}). Ghi file rỗng.`);
-    await writeFile(FILE_LUOT_XEM, '{}\n', 'utf8');
+    await writeFile(VIEWS_FILE, '{}\n', 'utf8');
     return 0;
   }
 
   const map = Object.fromEntries(data.map((row) => [row.slug, Number(row.views)]));
-  await writeFile(FILE_LUOT_XEM, `${JSON.stringify(map, null, 2)}\n`, 'utf8');
+  await writeFile(VIEWS_FILE, `${JSON.stringify(map, null, 2)}\n`, 'utf8');
   return data.length;
 }
 
 // --- Chạy ------------------------------------------------------------------
 
-const layCaNhap = process.argv.includes('--drafts');
+const includeDrafts = process.argv.includes('--drafts');
 
 /**
  * `--allow-offline` chỉ dùng cho `pnpm dev`.
@@ -178,23 +178,23 @@ const layCaNhap = process.argv.includes('--drafts');
  *   - `pnpm build` — PHẢI vỡ. Deploy âm thầm bằng nội dung cũ là loại lỗi tệ
  *                    nhất: site vẫn xanh, không ai biết bài mới chưa lên.
  */
-const choPhepOffline = process.argv.includes('--allow-offline');
+const allowOffline = process.argv.includes('--allow-offline');
 
 /** Có nội dung sẵn trên đĩa để dùng tạm hay không. */
-async function coNoiDungSan() {
+async function hasExistingContent() {
   try {
-    return (await readdir(THU_MUC_BLOG)).some((f) => /\.mdx?$/.test(f));
+    return (await readdir(BLOG_DIR)).some((f) => /\.mdx?$/.test(f));
   } catch {
     return false;
   }
 }
 
-function boQua(lyDo) {
+function skip(lyDo) {
   console.warn(`⚠ ${lyDo}\n  Bỏ qua bước đồng bộ, dùng nội dung đang có trong src/content/.`);
 }
 
 /** Project trên supabase.co, không phải stack chạy bằng Docker ở máy. */
-function laHosted() {
+function isHosted() {
   return /^https:\/\/[a-z0-9-]+\.supabase\./i.test(SUPABASE_URL);
 }
 
@@ -205,10 +205,10 @@ function laHosted() {
  * hosted mà chưa chạy migration, câu đó dẫn người đọc đi sai hoàn toàn: database
  * vẫn sống, chỉ là không có bảng nào. Đã mất một lượt debug vì nó.
  */
-function goiYSua(thongDiep) {
-  const thieuBang = /Could not find the table|does not exist|schema cache/i.test(thongDiep);
+function fixHint(message) {
+  const missingTables = /Could not find the table|does not exist|schema cache/i.test(message);
 
-  if (thieuBang && laHosted()) {
+  if (missingTables && isHosted()) {
     return [
       '  Database kết nối được nhưng CHƯA CÓ BẢNG — chưa chạy migration lần nào.',
       '',
@@ -222,11 +222,11 @@ function goiYSua(thongDiep) {
     ].join('\n');
   }
 
-  if (thieuBang) {
+  if (missingTables) {
     return '  Database chưa có bảng. Dựng lại từ migration: pnpm db:reset';
   }
 
-  if (laHosted()) {
+  if (isHosted()) {
     return [
       '  Kiểm SUPABASE_URL và SUPABASE_SERVICE_ROLE_KEY trong .env.',
       '  Khoá secret bị chặn nếu request trông như đến từ trình duyệt.',
@@ -247,9 +247,9 @@ function goiYSua(thongDiep) {
  * assertion in chồng lên đúng phần hướng dẫn cần đọc.
  */
 async function main() {
-  if (!daCauHinh) {
-    if (choPhepOffline || (await coNoiDungSan())) {
-      return boQua('Chưa cấu hình Supabase (thiếu SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY).');
+  if (!isConfigured) {
+    if (allowOffline || (await hasExistingContent())) {
+      return skip('Chưa cấu hình Supabase (thiếu SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY).');
     }
     console.error(
       '✗ Chưa cấu hình Supabase và cũng không có nội dung nào trong src/content/.\n' +
@@ -262,7 +262,7 @@ async function main() {
 
   // Khoá công khai không thấy bài nháp vì RLS lọc. Với CI thì đúng; với `pnpm dev`
   // ở máy thì người viết sẽ tưởng bài nháp bị mất, nên phải nói rõ.
-  if (laKhoaCongKhai && layCaNhap) {
+  if (isPublicKey && includeDrafts) {
     console.warn(
       '⚠ Đang dùng khoá CÔNG KHAI, nên `--drafts` không lấy được bài nháp (RLS lọc).\n' +
         '  Muốn xem bài nháp ở máy thì điền SUPABASE_SERVICE_ROLE_KEY vào .env.',
@@ -270,24 +270,24 @@ async function main() {
   }
 
   try {
-    const supabase = taoClient();
-    const soBai = await dongBoBaiViet(supabase, layCaNhap);
-    const soDuAn = await dongBoDuAn(supabase);
-    const soLuotXem = await dongBoLuotXem(supabase);
+    const supabase = createSupabaseClient();
+    const postCount = await syncPosts(supabase, includeDrafts);
+    const projectCount = await syncProjects(supabase);
+    const soLuotXem = await syncViews(supabase);
 
     console.log(
-      `✓ Đồng bộ từ Supabase: ${soBai} bài viết${layCaNhap ? ' (kể cả nháp)' : ''}, ` +
-        `${soDuAn} dự án, lượt xem của ${soLuotXem} bài.`,
+      `✓ Đồng bộ từ Supabase: ${postCount} bài viết${includeDrafts ? ' (kể cả nháp)' : ''}, ` +
+        `${projectCount} dự án, lượt xem của ${soLuotXem} bài.`,
     );
   } catch (error) {
-    const thongDiep = error instanceof Error ? error.message : String(error);
+    const message = error instanceof Error ? error.message : String(error);
 
-    if (choPhepOffline && (await coNoiDungSan())) {
-      return boQua(`Không đọc được database (${thongDiep}).`);
+    if (allowOffline && (await hasExistingContent())) {
+      return skip(`Không đọc được database (${message}).`);
     }
 
-    console.error(`✗ Không đồng bộ được nội dung từ database.\n  ${thongDiep}\n`);
-    console.error(goiYSua(thongDiep));
+    console.error(`✗ Không đồng bộ được nội dung từ database.\n  ${message}\n`);
+    console.error(fixHint(message));
     process.exitCode = 1;
   }
 }

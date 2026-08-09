@@ -49,14 +49,14 @@ export const SUPABASE_SERVICE_KEY = process.env['SUPABASE_SERVICE_ROLE_KEY'] ?? 
 export const SUPABASE_ANON_KEY = process.env['PUBLIC_SUPABASE_ANON_KEY'] ?? '';
 
 /** Khoá thực sự đang dùng, và nó là loại nào. */
-export const KHOA = SUPABASE_SERVICE_KEY || SUPABASE_ANON_KEY;
-export const laKhoaCongKhai = !SUPABASE_SERVICE_KEY && Boolean(SUPABASE_ANON_KEY);
+export const KEY = SUPABASE_SERVICE_KEY || SUPABASE_ANON_KEY;
+export const isPublicKey = !SUPABASE_SERVICE_KEY && Boolean(SUPABASE_ANON_KEY);
 
 /** Đã cấu hình đủ để nói chuyện với database chưa. */
-export const daCauHinh = Boolean(SUPABASE_URL && KHOA);
+export const isConfigured = Boolean(SUPABASE_URL && KEY);
 
-export function taoClient() {
-  if (!daCauHinh) {
+export function createSupabaseClient() {
+  if (!isConfigured) {
     throw new Error(
       'Thiếu SUPABASE_URL, và cả SUPABASE_SERVICE_ROLE_KEY lẫn PUBLIC_SUPABASE_ANON_KEY.\n' +
         'Chép .env.example thành .env rồi điền.\n' +
@@ -64,7 +64,7 @@ export function taoClient() {
     );
   }
 
-  return createClient(SUPABASE_URL, KHOA, {
+  return createClient(SUPABASE_URL, KEY, {
     auth: { persistSession: false, autoRefreshToken: false },
   });
 }

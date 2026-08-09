@@ -9,7 +9,7 @@ import type { Post } from '~/utils/posts';
  * (repo mới clone, chưa cấu hình database). `import` một file không có là build
  * hỏng ngay; đọc bằng fs thì bắt được lỗi và trả về rỗng.
  */
-const FILE = 'src/data/luot-xem.json';
+const FILE = 'src/data/views.json';
 
 export type BangLuotXem = Record<string, number>;
 

@@ -48,7 +48,7 @@ pnpm db:start          # chỉ khi muốn xem trước ở máy (cần Docker)
 
 # 1. Soạn bài trong Supabase Studio (bảng `posts`)
 # 2. Có ảnh thì:
-pnpm anh:upload "./anh/Sơ đồ cache.png"     # in ra URL, dán vào bài
+pnpm image:upload "./anh/Sơ đồ cache.png"     # in ra URL, dán vào bài
 
 # 3. Kéo nội dung từ database ra file MDX
 pnpm sync
@@ -233,7 +233,7 @@ thành khó đọc trên điện thoại. Bảng đã được tự bọc trong 
 Cách khuyên dùng — **Supabase Storage**, một lệnh:
 
 ```bash
-pnpm anh:upload "./anh/Sơ đồ cache.png"
+pnpm image:upload "./anh/Sơ đồ cache.png"
 ```
 
 Nó bỏ dấu tên file, thu nhỏ về 1600px, chuyển WebP nếu nhỏ hơn, đặt cache một

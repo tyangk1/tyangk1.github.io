@@ -1,5 +1,5 @@
 /**
- * Xử lý và tải ảnh lên Supabase Storage — dùng chung cho `pnpm anh:upload` và
+ * Xử lý và tải ảnh lên Supabase Storage — dùng chung cho `pnpm image:upload` và
  * cho trang admin.
  *
  * Tách ra đây vì hai chỗ gọi phải cho ra ĐÚNG một kết quả. Nếu mỗi bên tự xử lý
@@ -8,7 +8,7 @@
  */
 import sharp from 'sharp';
 
-export const BUCKET = 'anh-blog';
+export const BUCKET = 'image-blog';
 
 /**
  * Cache một năm.
@@ -17,7 +17,7 @@ export const BUCKET = 'anh-blog';
  * ảnh từ đầu — đã đo trên bucket này. Một năm an toàn vì tên file mang nội dung:
  * sửa ảnh thì đổi tên, không ghi đè.
  */
-export const CACHE_GIAY = 31_536_000;
+export const CACHE_SECONDS = 31_536_000;
 
 export const MIME = {
   '.png': 'image/png',
@@ -30,7 +30,7 @@ export const MIME = {
 };
 
 /** Bỏ dấu tiếng Việt và mọi ký tự không an toàn cho URL. */
-export function slugTenFile(ten) {
+export function slugifyFileName(ten) {
   return ten
     .normalize('NFD')
     .replace(/\p{M}/gu, '')
@@ -43,16 +43,21 @@ export function slugTenFile(ten) {
 /**
  * Nén và thu nhỏ một ảnh.
  *
- * Trả về `{ noiDung, duoi, rongGoc }`. SVG được đẩy nguyên bản: nó là văn bản,
+ * Trả về `{ content, duoi, originalWidth }`. SVG được đẩy nguyên bản: nó là văn bản,
  * sharp không xử lý được như ảnh raster.
  */
-export async function xuLyAnh(gocBuffer, duoi, { rongToiDa = 1600, giuGoc = false } = {}) {
-  if (giuGoc || duoi === '.svg') return { noiDung: gocBuffer, duoi, rongGoc: null };
+export async function processImage(
+  originalBuffer,
+  duoi,
+  { rongToiDa = 1600, keepOriginal = false } = {},
+) {
+  if (keepOriginal || duoi === '.svg')
+    return { content: originalBuffer, duoi, originalWidth: null };
 
-  const anh = sharp(gocBuffer);
-  const meta = await anh.metadata();
+  const image = sharp(originalBuffer);
+  const meta = await image.metadata();
 
-  const daXuLy = await anh
+  const processed = await image
     // `withoutEnlargement` để ảnh nhỏ hơn ngưỡng không bị kéo giãn thành mờ.
     .resize({ width: rongToiDa, withoutEnlargement: true })
     // Áp EXIF orientation rồi bỏ EXIF — ảnh điện thoại hay bị quay.
@@ -62,26 +67,33 @@ export async function xuLyAnh(gocBuffer, duoi, { rongToiDa = 1600, giuGoc = fals
 
   // Chỉ nhận bản WebP nếu nó THẬT SỰ nhỏ hơn. Với ảnh đã tối ưu sẵn hoặc ảnh rất
   // nhỏ, WebP đôi khi phình ra.
-  return daXuLy.length < gocBuffer.length
-    ? { noiDung: daXuLy, duoi: '.webp', rongGoc: meta.width ?? null }
-    : { noiDung: gocBuffer, duoi, rongGoc: meta.width ?? null };
+  return processed.length < originalBuffer.length
+    ? { content: processed, duoi: '.webp', originalWidth: meta.width ?? null }
+    : { content: originalBuffer, duoi, originalWidth: meta.width ?? null };
 }
 
 /**
- * Xử lý rồi tải lên Storage. Trả về `{ key, url, goc, cuoi, rongGoc }`.
+ * Xử lý rồi tải lên Storage. Trả về `{ key, url, originalBytes, finalBytes, originalWidth }`.
  * Ném lỗi nếu Storage từ chối.
  */
-export async function taiAnhLen(supabase, { ten, buffer, duoi, thuMuc, rongToiDa, giuGoc, ghiDe }) {
+export async function uploadImage(
+  supabase,
+  { ten, buffer, duoi, thuMuc, rongToiDa, keepOriginal, ghiDe },
+) {
   if (!MIME[duoi]) {
     throw new Error(`Định dạng ${duoi} không nhận. Chỉ nhận: ${Object.keys(MIME).join(' ')}`);
   }
 
-  const { noiDung, duoi: duoiCuoi, rongGoc } = await xuLyAnh(buffer, duoi, { rongToiDa, giuGoc });
-  const key = `${slugTenFile(thuMuc)}/${slugTenFile(ten) || 'anh'}${duoiCuoi}`;
+  const {
+    content,
+    duoi: duoiCuoi,
+    originalWidth,
+  } = await processImage(buffer, duoi, { rongToiDa, keepOriginal });
+  const key = `${slugifyFileName(thuMuc)}/${slugifyFileName(ten) || 'image'}${duoiCuoi}`;
 
-  const { error } = await supabase.storage.from(BUCKET).upload(key, noiDung, {
+  const { error } = await supabase.storage.from(BUCKET).upload(key, content, {
     contentType: MIME[duoiCuoi],
-    cacheControl: String(CACHE_GIAY),
+    cacheControl: String(CACHE_SECONDS),
     upsert: Boolean(ghiDe),
   });
 
@@ -94,5 +106,11 @@ export async function taiAnhLen(supabase, { ten, buffer, duoi, thuMuc, rongToiDa
   }
 
   const { data } = supabase.storage.from(BUCKET).getPublicUrl(key);
-  return { key, url: data.publicUrl, goc: buffer.length, cuoi: noiDung.length, rongGoc };
+  return {
+    key,
+    url: data.publicUrl,
+    originalBytes: buffer.length,
+    finalBytes: content.length,
+    originalWidth,
+  };
 }

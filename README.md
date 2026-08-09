@@ -52,34 +52,34 @@ pnpm build && pnpm preview
 
 ## Lệnh
 
-| Lệnh                       | Việc                                                                    |
-| -------------------------- | ----------------------------------------------------------------------- |
-| `pnpm db:start`            | Bật Supabase cục bộ (cần Docker). In ra URL và khoá để dán vào `.env`   |
-| `pnpm db:stop`             | Tắt Supabase cục bộ                                                     |
-| `pnpm db:push`             | **Một lần**: đẩy nội dung dạng file hiện có vào database                |
-| `pnpm db:reset`            | Dựng lại database từ migration (xoá sạch dữ liệu)                       |
-| `pnpm db:gop`              | Gộp migration thành 1 file dán được vào SQL Editor, chạy lại được       |
-| `pnpm admin`               | **Trang viết và quản lý bài**, chạy cục bộ ở `127.0.0.1:4322`           |
-| `pnpm db:subscribers`      | Xem danh sách đăng ký newsletter (`--csv` để xuất file)                 |
-| `pnpm newsletter:xac-nhan` | Gửi thư xác nhận cho người mới đăng ký. **Mặc định chạy thử**           |
-| `pnpm newsletter:gui`      | Gửi thông báo bài mới: `--bai=<slug>`. **Mặc định chạy thử**            |
-| `pnpm giscus:setup`        | Lấy tự động 4 giá trị cấu hình giscus: `pnpm giscus:setup owner/repo`   |
-| `pnpm giscus:bat`          | Bật bình luận trên bản deploy: đặt Actions variables + chạy Deploy      |
-| `pnpm anh:upload`          | Ảnh ở máy → Supabase Storage, in ra URL để dán vào bài                  |
-| `pnpm format:check`        | Prettier ở chế độ chỉ kiểm — CI chạy lệnh này, đỏ là chặn merge         |
-| `pnpm sync`                | Database → file, chỉ bài đã đăng                                        |
-| `pnpm sync:drafts`         | Database → file, kể cả bài nháp                                         |
-| `pnpm dev`                 | `sync:drafts` rồi chạy máy chủ dev                                      |
-| `pnpm build`               | `sync` → `astro build` → Pagefind. **Vỡ nếu không nối được database**   |
-| `pnpm build:ci`            | Như trên nhưng **bỏ** bước `sync` — dùng trong CI, build thẳng từ file  |
-| `pnpm preview`             | Phục vụ `dist/` — **luôn đo hiệu năng trên bản này**, không đo trên dev |
-| `pnpm typecheck`           | `astro check` — phải sạch 0 lỗi, 0 cảnh báo                             |
-| `pnpm check:content`       | Kiểm độ dài `title`/`description` của mọi bài cùng lúc                  |
-| `pnpm check:html`          | Quét `dist/`: id trùng, ảnh thiếu alt, link gãy, thẻ meta thiếu         |
-| `pnpm check:all`           | Chạy tuần tự cả bốn lệnh trên — dùng trước khi deploy                   |
-| `pnpm lighthouse`          | Sinh `lighthouse-report.html` (cần `pnpm preview` chạy ở cửa sổ khác)   |
-| `pnpm format`              | Prettier                                                                |
-| `pnpm icons`               | Sinh lại PNG icon từ `public/favicon.svg`                               |
+| Lệnh                      | Việc                                                                    |
+| ------------------------- | ----------------------------------------------------------------------- |
+| `pnpm db:start`           | Bật Supabase cục bộ (cần Docker). In ra URL và khoá để dán vào `.env`   |
+| `pnpm db:stop`            | Tắt Supabase cục bộ                                                     |
+| `pnpm db:push`            | **Một lần**: đẩy nội dung dạng file hiện có vào database                |
+| `pnpm db:reset`           | Dựng lại database từ migration (xoá sạch dữ liệu)                       |
+| `pnpm db:bundle`          | Gộp migration thành 1 file dán được vào SQL Editor, chạy lại được       |
+| `pnpm admin`              | **Trang viết và quản lý bài**, chạy cục bộ ở `127.0.0.1:4322`           |
+| `pnpm db:subscribers`     | Xem danh sách đăng ký newsletter (`--csv` để xuất file)                 |
+| `pnpm newsletter:confirm` | Gửi thư xác nhận cho người mới đăng ký. **Mặc định chạy thử**           |
+| `pnpm newsletter:send`    | Gửi thông báo bài mới: `--bai=<slug>`. **Mặc định chạy thử**            |
+| `pnpm giscus:setup`       | Lấy tự động 4 giá trị cấu hình giscus: `pnpm giscus:setup owner/repo`   |
+| `pnpm giscus:enable`      | Bật bình luận trên bản deploy: đặt Actions variables + chạy Deploy      |
+| `pnpm image:upload`       | Ảnh ở máy → Supabase Storage, in ra URL để dán vào bài                  |
+| `pnpm format:check`       | Prettier ở chế độ chỉ kiểm — CI chạy lệnh này, đỏ là chặn merge         |
+| `pnpm sync`               | Database → file, chỉ bài đã đăng                                        |
+| `pnpm sync:drafts`        | Database → file, kể cả bài nháp                                         |
+| `pnpm dev`                | `sync:drafts` rồi chạy máy chủ dev                                      |
+| `pnpm build`              | `sync` → `astro build` → Pagefind. **Vỡ nếu không nối được database**   |
+| `pnpm build:ci`           | Như trên nhưng **bỏ** bước `sync` — dùng trong CI, build thẳng từ file  |
+| `pnpm preview`            | Phục vụ `dist/` — **luôn đo hiệu năng trên bản này**, không đo trên dev |
+| `pnpm typecheck`          | `astro check` — phải sạch 0 lỗi, 0 cảnh báo                             |
+| `pnpm check:content`      | Kiểm độ dài `title`/`description` của mọi bài cùng lúc                  |
+| `pnpm check:html`         | Quét `dist/`: id trùng, ảnh thiếu alt, link gãy, thẻ meta thiếu         |
+| `pnpm check:all`          | Chạy tuần tự cả bốn lệnh trên — dùng trước khi deploy                   |
+| `pnpm lighthouse`         | Sinh `lighthouse-report.html` (cần `pnpm preview` chạy ở cửa sổ khác)   |
+| `pnpm format`             | Prettier                                                                |
+| `pnpm icons`              | Sinh lại PNG icon từ `public/favicon.svg`                               |
 
 ---
 
@@ -147,8 +147,8 @@ Mỗi bài tự có một ảnh bìa sinh bằng code (`src/lib/cover-image.ts`)
 Ảnh nằm trong bucket **`anh-blog`** (public, giới hạn 5MB, chỉ nhận png/jpeg/webp/avif/gif/svg).
 
 ```bash
-pnpm anh:upload ./anh/so-do.png
-pnpm anh:upload ./anh/*.jpg --thu-muc=cache-http --rong=1600
+pnpm image:upload ./anh/so-do.png
+pnpm image:upload ./anh/*.jpg --thu-muc=cache-http --rong=1600
 ```
 
 Script làm bốn việc trước khi tải lên:
@@ -282,7 +282,7 @@ pnpm db:push                  # đẩy nội dung lên
 
 | Việc                                                            | Trạng thái                                    |
 | --------------------------------------------------------------- | --------------------------------------------- |
-| Bucket `anh-blog` + script `pnpm anh:upload`                    | ✅ chạy được, đã kiểm upload/đọc/cache/tối ưu |
+| Bucket `anh-blog` + script `pnpm image:upload`                  | ✅ chạy được, đã kiểm upload/đọc/cache/tối ưu |
 | `astro.config.ts` cho phép host Storage                         | ✅                                            |
 | **Bảng** posts / projects / post_views / newsletter_subscribers | ❌ **chưa có**                                |
 
@@ -302,7 +302,7 @@ chủ project có:
 2. Dán toàn bộ [`supabase/migrate-mot-lan.sql`](./supabase/migrate-mot-lan.sql)
 3. Bấm **Run**
 
-File đó do `pnpm db:gop` sinh từ `supabase/migrations/`. Nó không chỉ nối file —
+File đó do `pnpm db:bundle` sinh từ `supabase/migrations/`. Nó không chỉ nối file —
 `create table`/`create index` được đổi thành `if not exists`, còn
 `create trigger`/`create policy` được chèn `drop ... if exists` ngay trước, vì
 Postgres không có `or replace` cho hai loại đó. **Đã kiểm bằng cách chạy thật**
@@ -426,8 +426,8 @@ Có **hai** trang admin, mỗi trang một việc. Chúng không trùng nhau:
 | Nút Đồng bộ    | Có                                | Không — cron làm việc đó                        |
 | Khoá dùng      | `service_role`, không ra khỏi máy | Khoá công khai + Supabase Auth                  |
 
-Dùng chung [`to-mau-mdx.mjs`](scripts/lib/to-mau-mdx.mjs) (tô màu, mẫu chèn) và
-[`kiem-bai.mjs`](scripts/lib/kiem-bai.mjs) (validate, trạng thái bài). Hai admin
+Dùng chung [`highlight-mdx.mjs`](scripts/lib/highlight-mdx.mjs) (tô màu, mẫu chèn) và
+[`post.mjs`](scripts/lib/post.mjs) (validate, trạng thái bài). Hai admin
 mà kiểm khác nhau thì cùng một bài sẽ được nơi này nhận nơi kia từ chối.
 
 #### Trang công khai thì bảo mật nằm ở đâu
@@ -496,7 +496,7 @@ token khi gặp 401 rồi thử lại.
 ### Đăng bài = build lại, và việc đó đã tự động
 
 Site tĩnh nên sửa DB xong phải build lại mới thấy. Việc đó do workflow
-[`tu-dong-publish.yml`](.github/workflows/tu-dong-publish.yml) làm, **mỗi 20 phút**:
+[`auto-publish.yml`](.github/workflows/auto-publish.yml) làm, **mỗi 20 phút**:
 
 ```
 sync từ DB  →  check:content  →  có gì đổi thì commit  →  build  →  deploy
@@ -513,7 +513,7 @@ bằng cách chạy thật đến cuối: bài đầu tiên đi qua đường cr
 404 trên site, và commit đó không có workflow run nào.
 
 Cách sửa là tách các bước build + đẩy lên Pages ra
-[`dung-va-deploy.yml`](.github/workflows/dung-va-deploy.yml), một workflow
+[`build-and-deploy.yml`](.github/workflows/build-and-deploy.yml), một workflow
 `workflow_call`. Cả `Deploy` và `Tự động publish` đều gọi nó, nên hai đường dùng
 **cùng một** bộ bước chứ không phải hai bản copy sẽ trôi lệch. Hai cách sửa đã
 loại: đẩy bằng PAT (thêm một credential phải giữ và phải xoay, chỉ để lách một cơ
@@ -536,11 +536,11 @@ theo giờ Việt Nam rồi tự lên. Không cần bấm gì, không cần mở
 Chặn ở **ba tầng**, mỗi tầng gác một đường khác nhau — không phải một tầng lặp ba
 lần:
 
-| Tầng                                                                                     | Gác đường nào                                                       |
-| ---------------------------------------------------------------------------------------- | ------------------------------------------------------------------- |
-| RLS policy ([`dat_lich_dang.sql`](supabase/migrations/20260810000000_dat_lich_dang.sql)) | Cron ở trên, chạy bằng khoá công khai                               |
-| `.lte()` trong [`db-sync.mjs`](scripts/db-sync.mjs)                                      | `pnpm sync` / `pnpm build` ở máy — service key **đi xuyên RLS**     |
-| `getPublishedPosts()` trong [`posts.ts`](src/utils/posts.ts)                             | `build:ci` đọc file đã commit (kể cả file do `pnpm dev` ghi ra đĩa) |
+| Tầng                                                                                            | Gác đường nào                                                       |
+| ----------------------------------------------------------------------------------------------- | ------------------------------------------------------------------- |
+| RLS policy ([`dat_lich_dang.sql`](supabase/migrations/20260810000000_scheduled_publishing.sql)) | Cron ở trên, chạy bằng khoá công khai                               |
+| `.lte()` trong [`db-sync.mjs`](scripts/db-sync.mjs)                                             | `pnpm sync` / `pnpm build` ở máy — service key **đi xuyên RLS**     |
+| `getPublishedPosts()` trong [`posts.ts`](src/utils/posts.ts)                                    | `build:ci` đọc file đã commit (kể cả file do `pnpm dev` ghi ra đĩa) |
 
 Tầng RLS là tầng quan trọng nhất, vì nó chặn cả việc **đọc trước**: không có nó,
 ai lấy khoá công khai trong bundle cũng gọi REST API đọc được toàn văn bài chưa
@@ -578,10 +578,10 @@ Sửa ràng buộc thì phải sửa **cả hai chỗ** cho khớp.
 Đây là tín hiệu social proof mạnh nhất một blog có thể có, và nó dùng đúng
 database ở trên.
 
-| Chỗ hiện                          | Nguồn số                                                           | Vì sao                                                                     |
-| --------------------------------- | ------------------------------------------------------------------ | -------------------------------------------------------------------------- |
-| Dòng meta trên trang bài          | **Trực tiếp** — trình duyệt gọi database sau khi trang đã vẽ       | Số lúc build là số của lần deploy trước, có thể cũ hàng tuần               |
-| Khối "Đọc nhiều nhất" ở trang chủ | **Lúc build** — từ `src/data/luot-xem.json` do `pnpm sync` sinh ra | Khối này để chỉ đường cho người mới tới, không cần chính xác tới từng lượt |
+| Chỗ hiện                          | Nguồn số                                                        | Vì sao                                                                     |
+| --------------------------------- | --------------------------------------------------------------- | -------------------------------------------------------------------------- |
+| Dòng meta trên trang bài          | **Trực tiếp** — trình duyệt gọi database sau khi trang đã vẽ    | Số lúc build là số của lần deploy trước, có thể cũ hàng tuần               |
+| Khối "Đọc nhiều nhất" ở trang chủ | **Lúc build** — từ `src/data/views.json` do `pnpm sync` sinh ra | Khối này để chỉ đường cho người mới tới, không cần chính xác tới từng lượt |
 
 Cách hoạt động, và vì sao site vẫn tĩnh 100%:
 
@@ -648,7 +648,7 @@ bình luận, vì `commentsEnabled` để trống thì khối tự ẩn sạch s
 
 ```powershell
 $env:GH_TOKEN="ghp_..."   # scope repo + workflow
-pnpm giscus:bat
+pnpm giscus:enable
 ```
 
 Script tự làm ba việc: kiểm app đã cài chưa, tra 4 giá trị rồi đặt thành Actions
@@ -683,7 +683,7 @@ bạn. Thiếu bước này thì bình luận chạy ở máy mà **im lặng t�
 Dùng `variables` chứ không phải `secrets`: đây là giá trị công khai, giscus in
 thẳng chúng vào HTML.
 
-`gh` chưa cài trên máy này — dùng `pnpm giscus:bat` ở trên thì không cần nó.
+`gh` chưa cài trên máy này — dùng `pnpm giscus:enable` ở trên thì không cần nó.
 
 </details>
 
@@ -734,8 +734,8 @@ pnpm db:subscribers --csv        # xuất CSV để nạp vào nhà cung cấp m
 #### Gửi thư
 
 ```bash
-pnpm newsletter:xac-nhan                    # thư xác nhận cho người mới đăng ký
-pnpm newsletter:gui --bai=<slug>            # thông báo bài mới
+pnpm newsletter:confirm                    # thư xác nhận cho người mới đăng ký
+pnpm newsletter:send --bai=<slug>            # thông báo bài mới
 ```
 
 **Mặc định là CHẠY THỬ** — in đúng nội dung sẽ gửi rồi dừng. Thêm `--that` mới

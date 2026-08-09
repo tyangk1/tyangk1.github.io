@@ -92,7 +92,7 @@ import BaseLayout from '~/layouts/BaseLayout.astro';
 
         void (async () => {
           try {
-            const res = await fetch(`${url}/rest/v1/rpc/huy_newsletter`, {
+            const res = await fetch(`${url}/rest/v1/rpc/unsubscribe_newsletter`, {
               method: 'POST',
               headers: {
                 apikey: key,
@@ -109,9 +109,9 @@ import BaseLayout from '~/layouts/BaseLayout.astro';
               return;
             }
 
-            const ketQua: unknown = await res.json();
+            const result: unknown = await res.json();
 
-            if (ketQua === 'xong') {
+            if (result === 'unsubscribed') {
               hien(
                 'Đã huỷ. Bạn sẽ không nhận thêm email nào. Muốn quay lại thì đăng ký lại ở cuối bài viết bất kỳ.',
                 true,

@@ -5,7 +5,7 @@ import BaseLayout from '~/layouts/BaseLayout.astro';
 /**
  * Đích của link xác nhận trong email: /newsletter/xac-nhan?token=<uuid>
  *
- * Trang này TỰ chạy khi tải xong, không cần bấm gì. Xác nhận là hành động người
+ * Trang này TỰ chạy khi tải confirmed, không cần bấm gì. Xác nhận là hành động người
  * đọc đã chủ động yêu cầu bằng cách bấm link, nên tự chạy là đúng ý họ.
  *
  * Ngược lại với trang huỷ đăng ký — ở đó bắt buộc phải bấm nút, xem chú thích
@@ -37,7 +37,7 @@ import BaseLayout from '~/layouts/BaseLayout.astro';
             Đang xác nhận…
           </p>
 
-          <div class="mt-8 hidden" data-xong>
+          <div class="mt-8 hidden" data-confirmed>
             <a
               href="/blog"
               class="inline-block rounded-lg bg-accent px-5 py-2.5 font-bold text-on-accent transition-colors hover:bg-accent-hover"
@@ -62,11 +62,11 @@ import BaseLayout from '~/layouts/BaseLayout.astro';
     const url = el.dataset['supabaseUrl'] ?? '';
     const key = el.dataset['supabaseKey'] ?? '';
     const oTrangThai = el.querySelector<HTMLElement>('[data-trang-thai]');
-    const khoiXong = el.querySelector<HTMLElement>('[data-xong]');
+    const khoiXong = el.querySelector<HTMLElement>('[data-confirmed]');
 
-    function hien(thongDiep: string, xong = false) {
+    function hien(thongDiep: string, confirmed = false) {
       if (oTrangThai) oTrangThai.textContent = thongDiep;
-      if (xong && khoiXong) khoiXong.classList.remove('hidden');
+      if (confirmed && khoiXong) khoiXong.classList.remove('hidden');
     }
 
     const token = new URLSearchParams(window.location.search).get('token') ?? '';
@@ -81,7 +81,7 @@ import BaseLayout from '~/layouts/BaseLayout.astro';
     } else {
       void (async () => {
         try {
-          const res = await fetch(`${url}/rest/v1/rpc/xac_nhan_newsletter`, {
+          const res = await fetch(`${url}/rest/v1/rpc/confirm_newsletter`, {
             method: 'POST',
             headers: {
               apikey: key,
@@ -96,17 +96,17 @@ import BaseLayout from '~/layouts/BaseLayout.astro';
             return;
           }
 
-          const ketQua: unknown = await res.json();
+          const result: unknown = await res.json();
 
           // Ba mã trạng thái, xem migration 20260809010000.
           //
-          // Bấm lại link khi đang còn đăng ký vẫn trả `xong` — token không hết
+          // Bấm lại link khi đang còn đăng ký vẫn trả `confirmed` — token không hết
           // hạn sau lần dùng đầu. Vô hại: xác nhận hai lần cũng chỉ là đã xác
-          // nhận. Nhưng `da_huy` thì phải nói khác hẳn, vì lúc đó link CỐ TÌNH
+          // nhận. Nhưng `unsubscribed` thì phải nói khác hẳn, vì lúc đó link CỐ TÌNH
           // không còn tác dụng.
-          if (ketQua === 'xong') {
+          if (result === 'confirmed') {
             hien('Xong. Từ giờ mỗi khi có bài mới bạn sẽ nhận được một email.', true);
-          } else if (ketQua === 'da_huy') {
+          } else if (result === 'unsubscribed') {
             hien(
               'Trước đó bạn đã huỷ đăng ký, nên link này không còn tác dụng. ' +
                 'Muốn nhận lại thì đăng ký lại ở khối cuối bài viết bất kỳ.',

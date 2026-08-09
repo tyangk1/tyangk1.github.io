@@ -19,7 +19,7 @@
 -- "sáng ngày 10" mà bài nằm im tới lúc đi làm.
 --
 -- Chuỗi 'Asia/Ho_Chi_Minh' dưới đây PHẢI khớp `SITE.timeZone` trong
--- `src/site.config.ts` và `MUI_GIO` trong `scripts/lib/kiem-bai.mjs`. SQL không
+-- `src/site.config.ts` và `TIME_ZONE` trong `scripts/lib/post.mjs`. SQL không
 -- import được từ TypeScript nên đây là bản chép tay; `pnpm check:content` so cả
 -- ba và fail nếu lệch.
 --

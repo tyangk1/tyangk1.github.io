@@ -21,12 +21,12 @@ import { createServer } from 'node:http';
 import { readFile } from 'node:fs/promises';
 import { extname, join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { taoClient, daCauHinh, SUPABASE_URL } from '../lib/supabase.mjs';
-import { MIME, taiAnhLen } from '../lib/anh.mjs';
-import { kiemBai, chuanHoaBai, GIOI_HAN } from '../lib/kiem-bai.mjs';
+import { createSupabaseClient, isConfigured, SUPABASE_URL } from '../lib/supabase.mjs';
+import { MIME, uploadImage } from '../lib/images.mjs';
+import { validatePost, normalizePost, LIMITS } from '../lib/post.mjs';
 
-const THU_MUC = dirname(fileURLToPath(import.meta.url));
-const CONG = Number(process.env['ADMIN_PORT'] ?? 4322);
+const DIR = dirname(fileURLToPath(import.meta.url));
+const PORT = Number(process.env['ADMIN_PORT'] ?? 4322);
 
 /**
  * CHỈ nghe trên loopback.
@@ -37,19 +37,19 @@ const CONG = Number(process.env['ADMIN_PORT'] ?? 4322);
  */
 const HOST = '127.0.0.1';
 
-if (!daCauHinh) {
+if (!isConfigured) {
   console.error('✗ Thiếu SUPABASE_URL hoặc SUPABASE_SERVICE_ROLE_KEY trong .env.');
   process.exit(1);
 }
 
-const supabase = taoClient();
+const supabase = createSupabaseClient();
 
-const CAC_TRUONG =
+const FIELDS =
   'slug, title, description, content, published_at, content_updated_at, tags, takeaways, series_name, series_part, cover_image, cover_alt, draft, featured, updated_at';
 
-function json(res, ma, dulieu) {
-  const body = JSON.stringify(dulieu);
-  res.writeHead(ma, {
+function json(res, code, data) {
+  const body = JSON.stringify(data);
+  res.writeHead(code, {
     'Content-Type': 'application/json; charset=utf-8',
     'Content-Length': Buffer.byteLength(body),
     // Trang admin không bao giờ được cache, kể cả bởi trình duyệt.
@@ -58,106 +58,108 @@ function json(res, ma, dulieu) {
   res.end(body);
 }
 
-async function docBody(req, gioiHan = 12 * 1024 * 1024) {
-  const phan = [];
-  let tong = 0;
+async function readBody(req, limits = 12 * 1024 * 1024) {
+  const chunks = [];
+  let total = 0;
   for await (const c of req) {
-    tong += c.length;
-    if (tong > gioiHan) throw new Error('Nội dung gửi lên quá lớn.');
-    phan.push(c);
+    total += c.length;
+    if (total > limits) throw new Error('Nội dung gửi lên quá lớn.');
+    chunks.push(c);
   }
-  return Buffer.concat(phan);
+  return Buffer.concat(chunks);
 }
 
 // --- API -------------------------------------------------------------------
 
-async function danhSachBai() {
+async function listPosts() {
   const { data, error } = await supabase
     .from('posts')
-    .select(CAC_TRUONG)
+    .select(FIELDS)
     .order('published_at', { ascending: false });
   if (error) throw new Error(error.message);
   return data;
 }
 
 /**
- * `slugGoc` là slug bài đang mở, gửi kèm từ trang admin. Nó khác `bai.slug` khi
+ * `originalSlug` là slug bài đang mở, gửi kèm từ trang admin. Nó khác `post.slug` khi
  * người viết vừa đổi slug.
  *
  * Có nó thì UPDATE theo slug gốc — đổi slug là đổi TÊN. Không có nó thì INSERT.
  *
- * Bản trước dùng `upsert(bai, { onConflict: 'slug' })` cho cả hai trường hợp. Nó
+ * Bản trước dùng `upsert(post, { onConflict: 'slug' })` cho cả hai trường hợp. Nó
  * không lỗi 409 (SDK gắn đúng header `resolution=merge-duplicates`), nhưng đổi slug
  * của một bài cũ thì tạo ra bài MỚI và để bài cũ nằm lại — hai bài trùng nội dung,
  * không có gì báo. Trang admin đã deploy từng có bản lỗi nặng hơn của cùng chỗ này.
  */
-async function luuBai(thoBai, slugGoc) {
-  const bai = chuanHoaBai(thoBai);
-  const loi = kiemBai(bai);
-  if (loi.length > 0) return { loi };
+async function savePost(rawPost, originalSlug) {
+  const post = normalizePost(rawPost);
+  const errors = validatePost(post);
+  if (errors.length > 0) return { errors };
 
-  // Postgres vẫn là lớp chặn cuối. Nếu nó từ chối thì nghĩa là `kiemBai` bỏ sót một
+  // Postgres vẫn là lớp chặn cuối. Nếu nó từ chối thì nghĩa là `validatePost` bỏ sót một
   // ràng buộc — trả nguyên văn để còn lần ra được.
-  const thatBai = (error) => ({
-    loi: [
+  const failure = (error) => ({
+    errors: [
       {
-        truong: '',
-        thongDiep: error.message.includes('posts_slug_key')
-          ? `Slug "${bai.slug}" đã có bài khác dùng.`
+        field: '',
+        message: error.message.includes('posts_slug_key')
+          ? `Slug "${post.slug}" đã có bài khác dùng.`
           : `Database từ chối: ${error.message}`,
       },
     ],
   });
 
-  if (slugGoc) {
+  if (originalSlug) {
     const { data, error } = await supabase
       .from('posts')
-      .update(bai)
-      .eq('slug', slugGoc)
+      .update(post)
+      .eq('slug', originalSlug)
       .select('slug');
-    if (error) return thatBai(error);
+    if (error) return failure(error);
     if (!data || data.length === 0) {
       return {
-        loi: [{ truong: '', thongDiep: `Không thấy bài "${slugGoc}" để sửa — có thể đã bị xoá.` }],
+        errors: [
+          { field: '', message: `Không thấy bài "${originalSlug}" để sửa — có thể đã bị xoá.` },
+        ],
       };
     }
   } else {
-    const { error } = await supabase.from('posts').insert(bai);
-    if (error) return thatBai(error);
+    const { error } = await supabase.from('posts').insert(post);
+    if (error) return failure(error);
   }
 
-  return { ok: true, slug: bai.slug };
+  return { ok: true, slug: post.slug };
 }
 
-async function xoaBai(slug) {
+async function deletePost(slug) {
   const { error } = await supabase.from('posts').delete().eq('slug', slug);
   if (error) throw new Error(error.message);
 }
 
-async function chayLenh(lenh, doiSo) {
+async function runCommand(cmd, args) {
   const { spawn } = await import('node:child_process');
   return new Promise((resolve) => {
-    const p = spawn(lenh, doiSo, {
-      cwd: join(THU_MUC, '..', '..'),
+    const p = spawn(cmd, args, {
+      cwd: join(DIR, '..', '..'),
       shell: process.platform === 'win32',
     });
-    let ra = '';
-    p.stdout.on('data', (d) => (ra += d));
-    p.stderr.on('data', (d) => (ra += d));
-    p.on('close', (ma) => resolve({ ma, ra: ra.trim() }));
+    let out = '';
+    p.stdout.on('data', (d) => (out += d));
+    p.stderr.on('data', (d) => (out += d));
+    p.on('close', (code) => resolve({ code, out: out.trim() }));
   });
 }
 
 // --- Định tuyến ------------------------------------------------------------
 
 const server = createServer(async (req, res) => {
-  const url = new URL(req.url ?? '/', `http://${HOST}:${CONG}`);
-  const duong = url.pathname;
+  const url = new URL(req.url ?? '/', `http://${HOST}:${PORT}`);
+  const path = url.pathname;
 
   try {
     // Trang và tài nguyên tĩnh
-    if (req.method === 'GET' && (duong === '/' || duong === '/index.html')) {
-      const html = await readFile(join(THU_MUC, 'trang.html'), 'utf8');
+    if (req.method === 'GET' && (path === '/' || path === '/index.html')) {
+      const html = await readFile(join(DIR, 'index.html'), 'utf8');
       res.writeHead(200, {
         'Content-Type': 'text/html; charset=utf-8',
         'Cache-Control': 'no-store',
@@ -168,19 +170,19 @@ const server = createServer(async (req, res) => {
     /**
      * Phục vụ các module dùng chung trong `scripts/lib/`.
      *
-     * Nhờ vậy `trang.html` `import` được đúng bộ tô màu mà admin đã deploy dùng,
+     * Nhờ vậy `index.html` `import` được đúng bộ tô màu mà admin đã deploy dùng,
      * thay vì giữ một bản copy — hai bản sẽ trôi lệch, và lúc đó người viết thấy
      * `<Callout>` được tô ở chỗ này mà không tô ở chỗ kia rồi tưởng mình gõ sai.
      *
      * Chỉ nhận đúng tên file dạng `[a-z-]+.mjs`, không cho đi lên thư mục cha.
      */
-    if (req.method === 'GET' && duong.startsWith('/lib/')) {
-      const ten = duong.slice('/lib/'.length);
-      if (!/^[a-z0-9-]+\.mjs$/.test(ten)) {
+    if (req.method === 'GET' && path.startsWith('/lib/')) {
+      const name = path.slice('/lib/'.length);
+      if (!/^[a-z0-9-]+\.mjs$/.test(name)) {
         res.writeHead(400).end('Tên file không hợp lệ');
         return;
       }
-      const js = await readFile(join(THU_MUC, '..', 'lib', ten), 'utf8');
+      const js = await readFile(join(DIR, '..', 'lib', name), 'utf8');
       res.writeHead(200, {
         'Content-Type': 'text/javascript; charset=utf-8',
         'Cache-Control': 'no-store',
@@ -188,10 +190,10 @@ const server = createServer(async (req, res) => {
       return res.end(js);
     }
 
-    if (req.method === 'GET' && duong === '/api/cau-hinh') {
+    if (req.method === 'GET' && path === '/api/config') {
       return json(res, 200, {
-        gioiHan: GIOI_HAN,
-        duoiAnh: Object.keys(MIME),
+        limits: LIMITS,
+        imageExts: Object.keys(MIME),
         supabaseHost: (() => {
           try {
             return new URL(SUPABASE_URL).host;
@@ -202,49 +204,49 @@ const server = createServer(async (req, res) => {
       });
     }
 
-    if (req.method === 'GET' && duong === '/api/bai') {
-      return json(res, 200, await danhSachBai());
+    if (req.method === 'GET' && path === '/api/posts') {
+      return json(res, 200, await listPosts());
     }
 
-    if (req.method === 'PUT' && duong === '/api/bai') {
-      const tho = JSON.parse((await docBody(req)).toString('utf8'));
+    if (req.method === 'PUT' && path === '/api/posts') {
+      const raw = JSON.parse((await readBody(req)).toString('utf8'));
       // `slug_goc` đi kèm trong body chứ không phải query, để route khỏi phụ thuộc
-      // vào việc `duong` có giữ query string hay không. `chuanHoaBai` dựng object
+      // vào việc `path` có giữ query string hay không. `normalizePost` dựng object
       // theo danh sách trường cố định nên khoá lạ này không lọt xuống database.
-      const ketQua = await luuBai(tho, tho.slug_goc || null);
-      return json(res, ketQua.loi ? 422 : 200, ketQua);
+      const result = await savePost(raw, raw.slug_goc || null);
+      return json(res, result.errors ? 422 : 200, result);
     }
 
-    if (req.method === 'DELETE' && duong.startsWith('/api/bai/')) {
-      await xoaBai(decodeURIComponent(duong.slice('/api/bai/'.length)));
+    if (req.method === 'DELETE' && path.startsWith('/api/posts/')) {
+      await deletePost(decodeURIComponent(path.slice('/api/posts/'.length)));
       return json(res, 200, { ok: true });
     }
 
-    if (req.method === 'POST' && duong === '/api/anh') {
-      const ten = url.searchParams.get('ten') ?? 'anh';
-      const duoi = extname(ten).toLowerCase();
-      const thuMuc = url.searchParams.get('thu-muc') || String(new Date().getFullYear());
+    if (req.method === 'POST' && path === '/api/images') {
+      const name = url.searchParams.get('name') ?? 'anh';
+      const ext = extname(name).toLowerCase();
+      const dir = url.searchParams.get('thu-muc') || String(new Date().getFullYear());
 
       try {
-        const r = await taiAnhLen(supabase, {
-          ten: ten.slice(0, ten.length - duoi.length),
-          buffer: await docBody(req),
-          duoi,
-          thuMuc,
+        const r = await uploadImage(supabase, {
+          name: name.slice(0, name.length - ext.length),
+          buffer: await readBody(req),
+          ext,
+          dir,
           rongToiDa: Number(url.searchParams.get('rong') ?? 1600),
           ghiDe: url.searchParams.get('ghi-de') === '1',
         });
         return json(res, 200, r);
       } catch (e) {
-        return json(res, 422, { loi: e instanceof Error ? e.message : String(e) });
+        return json(res, 422, { errors: e instanceof Error ? e.message : String(e) });
       }
     }
 
-    if (req.method === 'POST' && duong === '/api/sync') {
+    if (req.method === 'POST' && path === '/api/sync') {
       // `?drafts=1` cho phần xem trước: bài đang viết gần như luôn là nháp, mà
       // `pnpm sync` thường thì loại hẳn bài nháp — xem trước sẽ ra 404.
-      const caNhap = url.searchParams.get('drafts') === '1';
-      return json(res, 200, await chayLenh('pnpm', [caNhap ? 'sync:drafts' : 'sync']));
+      const withDrafts = url.searchParams.get('drafts') === '1';
+      return json(res, 200, await runCommand('pnpm', [withDrafts ? 'sync:drafts' : 'sync']));
     }
 
     /**
@@ -258,17 +260,17 @@ const server = createServer(async (req, res) => {
      * Dấu hiệu chắc chắn: dev server của Astro chèn `/@vite/client` vào HTML để
      * chạy HMR. Bản build tĩnh thì không bao giờ có chuỗi đó.
      */
-    if (req.method === 'GET' && duong === '/api/dev-song') {
+    if (req.method === 'GET' && path === '/api/dev-alive') {
       try {
         const r = await fetch('http://localhost:4321/', { signal: AbortSignal.timeout(3000) });
         if (!r.ok) return json(res, 200, { song: false, lyDo: `HTTP ${r.status}` });
 
         const html = await r.text();
-        const laDev = html.includes('/@vite/client');
+        const isDev = html.includes('/@vite/client');
 
         return json(res, 200, {
-          song: laDev,
-          lyDo: laDev
+          song: isDev,
+          lyDo: isDev
             ? ''
             : 'Cổng 4321 đang là `astro preview` (bản build tĩnh), không phải dev server.',
         });
@@ -283,7 +285,7 @@ const server = createServer(async (req, res) => {
      * Cần vì Astro phải sinh route cho file MDX mới, và việc đó mất một nhịp.
      * Gán `src` cho iframe trước lúc đó là nhận 404 và mắc ở đấy.
      */
-    if (req.method === 'GET' && duong === '/api/dev-trang') {
+    if (req.method === 'GET' && path === '/api/dev-page') {
       const slug = url.searchParams.get('slug') ?? '';
       try {
         const r = await fetch(`http://localhost:4321/blog/${encodeURIComponent(slug)}`, {
@@ -298,12 +300,12 @@ const server = createServer(async (req, res) => {
     res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' });
     res.end('Không có đường dẫn này');
   } catch (e) {
-    json(res, 500, { loi: e instanceof Error ? e.message : String(e) });
+    json(res, 500, { errors: e instanceof Error ? e.message : String(e) });
   }
 });
 
-server.listen(CONG, HOST, () => {
-  console.log(`\n  Admin đang chạy:  http://${HOST}:${CONG}`);
+server.listen(PORT, HOST, () => {
+  console.log(`\n  Admin đang chạy:  http://${HOST}:${PORT}`);
   console.log(`  Database:         ${SUPABASE_URL}`);
   console.log('\n  Chỉ nghe trên 127.0.0.1 — máy khác trong mạng không mở được.');
   console.log('  Ctrl+C để dừng.\n');

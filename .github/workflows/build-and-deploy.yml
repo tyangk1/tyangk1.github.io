@@ -1,4 +1,4 @@
-name: Dựng và deploy
+name: Build and deploy
 
 # Workflow GỌI LẠI ĐƯỢC. Không tự chạy — chỉ chạy khi workflow khác `uses:` nó.
 #
