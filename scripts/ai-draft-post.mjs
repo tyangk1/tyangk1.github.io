@@ -31,6 +31,7 @@
  */
 import { readFile } from 'node:fs/promises';
 import { loadEnv, env } from './lib/env.mjs';
+import { resolveAuth, makeRest, SUPABASE_URL } from './lib/db-auth.mjs';
 import { LIMITS, validatePost, normalizePost, slugify, today } from './lib/post.mjs';
 import { systemPrompt, userPrompt, fixPrompt } from './lib/draft-prompt.mjs';
 
@@ -42,12 +43,6 @@ await loadEnv();
 const AI_BASE_URL = env('AI_BASE_URL').replace(/\/+$/, '');
 const AI_MODEL = env('AI_MODEL');
 const AI_API_KEY = env('AI_API_KEY');
-
-const SUPABASE_URL = env('SUPABASE_URL') || env('PUBLIC_SUPABASE_URL');
-const SERVICE_KEY = env('SUPABASE_SERVICE_ROLE_KEY');
-const PUBLIC_KEY = env('PUBLIC_SUPABASE_ANON_KEY');
-const BOT_EMAIL = env('SUPABASE_BOT_EMAIL');
-const BOT_PASSWORD = env('SUPABASE_BOT_PASSWORD');
 
 /** Soạn trước ngày đăng bao nhiêu ngày, để còn thời gian duyệt. */
 const LEAD_DAYS = Number(env('AI_LEAD_DAYS', '3'));
@@ -72,70 +67,6 @@ const DO_ALL = flag('all');
 function exitWithError(message) {
   console.error(message);
   process.exitCode = 1;
-}
-
-// --- Truy cập database ------------------------------------------------------
-
-/**
- * Hai đường xác thực, chọn theo thứ có sẵn:
- *
- *   Ở MÁY  — service key trong `.env`. Tiện, và khoá không rời khỏi máy.
- *   TRÊN CI — tài khoản bot có tên trong bảng `admins`, đăng nhập lấy JWT.
- *
- * Vì sao CI KHÔNG dùng service key: service key đi xuyên toàn bộ RLS, tức là đọc
- * được cả bảng email người đăng ký. Tài khoản bot thì vẫn bị RLS ràng, và thu hồi
- * bằng cách xoá một dòng trong `admins`.
- */
-async function getAuth() {
-  if (SERVICE_KEY) {
-    return { apikey: SERVICE_KEY, bearer: SERVICE_KEY, how: 'service key (ở máy)' };
-  }
-
-  if (!PUBLIC_KEY || !BOT_EMAIL || !BOT_PASSWORD) {
-    throw new Error(
-      'Thiếu cách xác thực. Cần SUPABASE_SERVICE_ROLE_KEY (ở máy), hoặc\n' +
-        'PUBLIC_SUPABASE_ANON_KEY + SUPABASE_BOT_EMAIL + SUPABASE_BOT_PASSWORD (trên CI).',
-    );
-  }
-
-  const r = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=password`, {
-    method: 'POST',
-    headers: { apikey: PUBLIC_KEY, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email: BOT_EMAIL, password: BOT_PASSWORD }),
-  });
-  const j = await r.json();
-  if (!j.access_token) {
-    throw new Error(`Đăng nhập tài khoản bot thất bại: ${JSON.stringify(j).slice(0, 200)}`);
-  }
-  return { apikey: PUBLIC_KEY, bearer: j.access_token, how: `tài khoản bot ${BOT_EMAIL}` };
-}
-
-function makeDb(auth) {
-  const base = {
-    apikey: auth.apikey,
-    Authorization: `Bearer ${auth.bearer}`,
-    'Content-Type': 'application/json',
-  };
-
-  return async function db(path, { method = 'GET', body, prefer } = {}) {
-    const headers = prefer ? { ...base, Prefer: prefer } : base;
-    const r = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
-      method,
-      headers,
-      body: body === undefined ? undefined : JSON.stringify(body),
-    });
-    const text = await r.text();
-    let json = null;
-    try {
-      json = text ? JSON.parse(text) : null;
-    } catch {
-      json = text;
-    }
-    if (!r.ok) {
-      throw new Error(`${method} ${path} → ${r.status}: ${String(text).slice(0, 300)}`);
-    }
-    return json;
-  };
 }
 
 // --- Gọi model -------------------------------------------------------------
@@ -387,8 +318,8 @@ async function main() {
     );
   }
 
-  const auth = await getAuth();
-  const db = makeDb(auth);
+  const auth = await resolveAuth();
+  const db = makeRest(auth);
   const log = (s) => console.log(s);
 
   log(`Soạn bài tự động · ${MOCK_FILE ? `mock ${MOCK_FILE}` : `${AI_MODEL} @ ${AI_BASE_URL}`}`);

@@ -559,6 +559,126 @@ thì bài hẹn ngày 10 chỉ lên lúc 7 giờ sáng ngày 10. Chuỗi múi gi
 chỗ không import được từ nhau (TypeScript, module chạy cả trong trình duyệt, và
 SQL) — `pnpm check:content` so cả ba và fail nếu lệch.
 
+### Soạn bài tự động
+
+Đặt trước chủ đề và ngày, máy soạn thành bài, cơ chế đặt lịch ở trên đưa lên site.
+
+```
+content_queue  →  ai:draft  →  posts (nháp hoặc đặt lịch)  →  Auto publish  →  site
+```
+
+Quản lý chủ đề ở màn hình **Chủ đề** trong cả hai trang admin. Màn hình đó viết một
+lần ở [`lib/queue-ui.mjs`](scripts/lib/queue-ui.mjs), hai admin cùng gắn vào và tiêm
+cách truy cập dữ liệu riêng — bản deploy gọi REST, bản cục bộ gọi `/api/queue`.
+
+#### Ô "Tư liệu thật" là ô quan trọng nhất
+
+Blog này đứng tên thật, viết ngôi thứ nhất, các bài hiện có đều có số đo thật. Một mô
+hình ngôn ngữ không có buổi chiều nào bị mất vì cache CDN — nên nếu để nó tự do viết
+"tôi từng mất một buổi chiều" thì đó là **kinh nghiệm bịa dưới tên người thật**.
+
+Vì vậy prompt có hai chế độ, chọn theo ô đó:
+
+| `source_material` | Prompt làm gì                                                                               |
+| ----------------- | ------------------------------------------------------------------------------------------- |
+| Có                | Được viết "tôi", nhưng mọi câu ngôi thứ nhất và mọi con số **phải truy được** về tư liệu đó |
+| Trống             | **Cấm** ngôi thứ nhất, cấm bịa số. Viết giọng khách quan: giải thích cơ chế, nêu đánh đổi   |
+
+Giao diện nói ra điều này ngay dưới ô, và câu nhắc đổi theo nội dung — đây là chỗ duy
+nhất trong toàn bộ giao diện nói ra luật đó.
+
+Bài do máy soạn vẫn đi qua **đúng** `validatePost()` mà hai admin dùng, và vẫn chịu
+CHECK constraint của Postgres. Sai thì danh sách lỗi được đưa lại cho model sửa, tối đa
+`AI_MAX_FIXES` lượt. Không có đường nào để bài máy lọt qua chỗ bài viết tay bị chặn.
+
+#### Không khoá vào nhà cung cấp AI nào
+
+Ba biến: `AI_BASE_URL`, `AI_MODEL`, `AI_API_KEY`. Mọi chỗ dưới đây nói chuẩn OpenAI
+`chat/completions` nên đổi nhà cung cấp là đổi biến, không sửa code:
+
+Google AI Studio · Groq · Mistral · OpenRouter · Ollama ở máy · OpenAI
+
+Lý do quan trọng hơn sự tiện: chất lượng văn tiếng Việt giữa các model chênh rất nhiều.
+Một bài 2000 từ tốn khoảng 3–4k token đầu ra, tức cỡ nghìn đồng — free tier có thật
+(Google AI Studio, Groq) nhưng thử rồi đổi ý phải rẻ.
+
+Cố ý **không** dùng `response_format: json_schema`: chuẩn đó chỉ một phần nhà cung cấp
+hỗ trợ, và nơi không hỗ trợ thì trả 400 chứ không bỏ qua.
+
+#### Chạy
+
+```bash
+pnpm ai:draft                  # soạn một bài tới hạn
+pnpm ai:draft --all            # soạn hết mọi bài tới hạn
+pnpm ai:draft --dry            # soạn nhưng không ghi database
+pnpm ai:draft --mock=<file>    # không gọi API, đọc bài mẫu từ file JSON
+```
+
+`--dry` **không để lại dấu vết**: nó trả chủ đề về hàng đợi và hoàn `attempts`, nên
+sửa prompt rồi thử lại được ngay.
+
+Trên CI: workflow [`ai-draft.yml`](.github/workflows/ai-draft.yml) chạy 01:00 giờ Việt
+Nam mỗi ngày, **một bài mỗi lần**. Cron ngày một lần + một bài mỗi lần = tối đa một bài
+mỗi ngày, đúng nhịp một blog cá nhân cần.
+
+#### Ba tham số bịt ba lỗ thật
+
+|                      |                                                                                                                                        |
+| -------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| `lead_days` (3)      | Soạn TRƯỚC ngày đăng để còn thời gian duyệt. Soạn sớm không rò gì: bài mang `published_at = publish_on` và RLS đã ẩn bài chưa tới ngày |
+| `stale_minutes` (30) | Job bị kill giữa lúc soạn để lại một dòng `drafting` mãi mãi. Không nhận lại thì chủ đề đó chết vĩnh viễn                              |
+| `max_attempts` (3)   | Chặn một chủ đề lỗi vĩnh viễn ngốn lượt gọi API mỗi ngày. Nút **Thử lại** trong admin đặt lại `attempts` về 0                          |
+
+`claim_content_queue_item()` dùng `for update skip locked` để hai lần chạy chồng nhau
+không cùng nhận một chủ đề rồi tạo hai bài trùng — cron chỉ một job, nhưng bấm "Run
+workflow" giữa lúc cron đang chạy là chuyện có thật.
+
+### Bản tin: tự động nhưng mặc định tắt
+
+```
+Deploy xanh  →  Newsletter  →  tìm bài chưa gửi  →  gửi  →  đánh dấu
+```
+
+Gửi email là việc **duy nhất** trong dự án này không thu hồi được. Bài sai thì sửa rồi
+deploy lại; thư sai thì nằm trong hộp thư người khác mãi mãi. Nên:
+
+- `--that` là hành động tường minh, mặc định mọi chế độ đều **chạy thử và in ra thư**
+- Workflow chỉ gửi thật khi biến `NEWSLETTER_AUTO_SEND` bằng đúng chuỗi `true`
+- Chưa bật thì mỗi lần deploy vẫn có một lần chạy thử miễn phí trong step summary
+
+Chống gửi trùng nằm ở **database**, không ở git diff: cột `posts.newsletter_sent_at`.
+Git diff sai theo ba cách rất bình thường — chạy lại workflow, sửa chính tả một bài cũ,
+revert rồi commit lại. Một cột thì không có cách nào sai như vậy.
+
+Đánh dấu chỉ xảy ra khi **có ít nhất một thư đi được**. Gửi 8/10 mà không đánh dấu thì
+lần sau gửi lại cho cả 10 — thà thiếu hai người còn hơn trùng tám: người thiếu không
+biết mình thiếu, người nhận trùng thì biết.
+
+```bash
+pnpm newsletter:confirm            # thư xác nhận cho người mới đăng ký
+pnpm newsletter:send --post=<slug> # thông báo một bài
+pnpm newsletter:auto               # mọi bài đã lên mà chưa gửi
+```
+
+### Ba tài khoản, ba bộ quyền
+
+Trên CI **không** dùng `service_role`: khoá đó đi xuyên toàn bộ RLS, tức đọc được cả
+bảng email người đăng ký, mọi bài nháp, mọi bucket và schema `auth`. Thay vào đó mỗi
+việc một tài khoản bot, quyền do cột trong bảng `admins` quyết định:
+
+| Tài khoản        | `can_read_subscribers` | Làm được gì                            |
+| ---------------- | ---------------------- | -------------------------------------- |
+| Chủ blog         | `true`                 | Mọi thứ                                |
+| `bot-soan-bai`   | **`false`**            | Ghi bài. **Không** thấy địa chỉ của ai |
+| `bot-newsletter` | `true`                 | Gửi thư — buộc phải biết địa chỉ       |
+
+Cột `can_read_subscribers` tồn tại vì nếu không có nó thì lý lẽ trên tự mâu thuẫn:
+policy cũ cho **mọi** admin đọc bảng email, nên đổi service key thành bot mà không sửa
+gì thì chỗ rò rỉ chỉ đổi tên, không nhỏ đi.
+
+Đã kiểm bằng JWT thật của bot soạn bài: bảng có 2 dòng, chủ blog thấy 2, **bot thấy 0**,
+và xoá thì 403. Thu hồi một bot: xoá một dòng trong `admins`.
+
 ### Ràng buộc nằm ở HAI tầng
 
 Đây là thứ đáng giá nhất khi chuyển sang database:

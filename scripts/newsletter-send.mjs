@@ -1,25 +1,38 @@
 /**
- * Gửi email newsletter. Chạy Ở MÁY, không phải trên CI.
+ * Gửi email newsletter.
  *
- * Vì sao ở máy: gửi thư cần đọc danh sách email, tức cần
- * `SUPABASE_SERVICE_ROLE_KEY`. Đặt khoá đó vào GitHub Actions là mở rộng chỗ nó
- * có thể rò rỉ, mà chẳng được gì — bản tin gửi tay mỗi khi có bài mới, không phải
- * việc cần tự động theo mỗi commit.
+ * Ba chế độ:
  *
- * Hai loại thư:
+ *   pnpm newsletter:confirm              Thư xác nhận cho người mới đăng ký. Phải gửi,
+ *                                        nếu không họ mãi ở trạng thái chưa xác nhận và
+ *                                        không bao giờ nhận bản tin.
  *
- *   pnpm newsletter:xac-recipient            Thư xác nhận cho người mới đăng ký.
- *                                       Phải gửi, nếu không họ mãi ở trạng thái
- *                                       chưa xác nhận và không bao giờ nhận bản tin.
+ *   pnpm newsletter:send --post=<slug>   Thông báo một bài cụ thể, cho người ĐÃ xác nhận.
  *
- *   pnpm newsletter:send --post=<slug>    Thông báo bài mới cho người ĐÃ xác nhận.
+ *   pnpm newsletter:auto                 Tìm MỌI bài đã lên site mà chưa gửi bản tin,
+ *                                        gửi lần lượt, rồi đánh dấu. Đây là chế độ
+ *                                        workflow dùng.
  *
- * MẶC ĐỊNH LÀ CHẠY THỬ. Phải thêm `--that` mới gửi thật. Gửi thư là việc không
- * email hồi được — không có Ctrl+Z cho một nghìn hộp thư.
+ * MẶC ĐỊNH LÀ CHẠY THỬ ở cả ba. Phải thêm `--that` mới gửi thật.
+ *
+ * VÌ SAO MẶC ĐỊNH LÀ THỬ, VÀ VÌ SAO CHẠY TỰ ĐỘNG PHẢI BẬT RIÊNG
+ *
+ * Gửi thư là việc không thu hồi được — không có Ctrl+Z cho một nghìn hộp thư. Mọi thứ
+ * khác trong dự án này đều sửa lại được: bài sai thì sửa rồi deploy lại, slug sai thì
+ * đổi tên. Thư đã bay thì không.
+ *
+ * Nên `--that` là một hành động tường minh, và workflow chỉ gửi khi biến
+ * `NEWSLETTER_AUTO_SEND` được đặt thành `true`. Tự động hoàn toàn NHƯNG mặc định tắt.
+ *
+ * XÁC THỰC
+ *
+ * Ở máy dùng service key trong `.env`. Trên CI dùng tài khoản bot riêng cho việc gửi —
+ * bot đó là admin duy nhất có `can_read_subscribers = true` ngoài chủ blog, vì gửi thư
+ * thì buộc phải biết địa chỉ. Bot soạn bài KHÔNG có quyền đó.
  */
 import { readFile, readdir } from 'node:fs/promises';
 import { join } from 'node:path';
-import { createSupabaseClient, isConfigured } from './lib/supabase.mjs';
+import { resolveAuth, makeClient } from './lib/db-auth.mjs';
 
 const BLOG_DIR = 'src/content/blog';
 
@@ -45,15 +58,29 @@ async function readSiteUrl() {
 }
 
 const reallySend = process.argv.includes('--that');
-const confirmMode = process.argv.includes('--xac-recipient');
+const confirmMode = process.argv.includes('--xac-nhan');
+const autoMode = process.argv.includes('--auto');
 
-function readEnv(ten) {
-  const found = process.argv.find((a) => a.startsWith(`--${ten}=`));
-  return found ? found.slice(ten.length + 3) : '';
+/*
+  Giải quyết xác thực MỘT LẦN ở đầu file.
+
+  Ở máy: service key. Trên CI: tài khoản bot RIÊNG cho việc gửi — bot đó là admin duy
+  nhất ngoài chủ blog có `can_read_subscribers = true`, vì gửi thư thì buộc phải biết
+  địa chỉ. Bot soạn bài dùng biến khác và KHÔNG có quyền đó.
+*/
+const auth = await resolveAuth({
+  emailVar: 'NEWSLETTER_BOT_EMAIL',
+  passwordVar: 'NEWSLETTER_BOT_PASSWORD',
+});
+const supabase = await makeClient(auth);
+
+function readEnv(name) {
+  const found = process.argv.find((a) => a.startsWith(`--${name}=`));
+  return found ? found.slice(name.length + 3) : '';
 }
 
-function exitWithError(...dong) {
-  for (const d of dong) console.error(d);
+function exitWithError(...lines) {
+  for (const l of lines) console.error(l);
   process.exitCode = 1;
 }
 
@@ -77,14 +104,14 @@ async function readPost(slug) {
       const fm = raw.match(/^---\r?\n([\s\S]*?)\r?\n---/);
       if (!fm) return null;
 
-      const field = (khoa) => {
-        const m = fm[1].match(new RegExp(`^${khoa}:\\s*(.*)$`, 'm'));
+      const field = (key) => {
+        const m = fm[1].match(new RegExp(`^${key}:\\s*(.*)$`, 'm'));
         if (!m) return '';
         return m[1].trim().replace(/^["']|["']$/g, '');
       };
 
-      const nhap = /^draft:\s*true\s*$/m.test(fm[1]);
-      return { slug, title: field('title'), description: field('description'), nhap };
+      const isDraft = /^draft:\s*true\s*$/m.test(fm[1]);
+      return { slug, title: field('title'), description: field('description'), isDraft };
     } catch {
       // thử đuôi kế tiếp
     }
@@ -92,9 +119,17 @@ async function readPost(slug) {
   return null;
 }
 
-/** Email thư xác nhận. Text + HTML, vì nhiều hộp thư vẫn chặn HTML. */
-function confirmEmail(recipients, siteUrl) {
-  const link = `${siteUrl}/newsletter/xac-recipient?token=${recipients.confirm_token}`;
+/**
+ * Email thư xác nhận. Text + HTML, vì nhiều hộp thư vẫn chặn HTML.
+ *
+ * `/newsletter/xac-nhan` là URL THẬT và không được đổi: nó đã nằm trong những thư đã
+ * gửi cho người đăng ký, và thư đã gửi thì không sửa lại được. Lượt đổi tên định danh
+ * sang tiếng Anh từng biến nó thành `/newsletter/xac-recipient` — một route không tồn
+ * tại — nên mọi link xác nhận sẽ 404. Đó là loại lỗi không ai báo: người nhận chỉ im
+ * lặng bỏ qua.
+ */
+function confirmEmail(recipient, siteUrl) {
+  const link = `${siteUrl}/newsletter/xac-nhan?token=${recipient.confirm_token}`;
 
   return {
     subject: 'Xác nhận đăng ký nhận bài mới',
@@ -118,10 +153,10 @@ function confirmEmail(recipients, siteUrl) {
   };
 }
 
-/** Email thông báo bài mới. */
-function newPostEmail(recipients, post, siteUrl) {
+/** Email thông báo bài mới. `/newsletter/huy` cũng là URL thật, xem chú thích trên. */
+function newPostEmail(recipient, post, siteUrl) {
   const postUrl = `${siteUrl}/blog/${post.slug}`;
-  const linkHuy = `${siteUrl}/newsletter/huy?token=${recipients.unsubscribe_token}`;
+  const linkHuy = `${siteUrl}/newsletter/huy?token=${recipient.unsubscribe_token}`;
 
   return {
     subject: post.title,
@@ -152,7 +187,7 @@ function newPostEmail(recipients, post, siteUrl) {
   };
 }
 
-async function sendViaResend(den, email) {
+async function sendViaResend(to, email) {
   const res = await fetch('https://api.resend.com/emails', {
     method: 'POST',
     headers: {
@@ -161,7 +196,7 @@ async function sendViaResend(den, email) {
     },
     body: JSON.stringify({
       from: NEWSLETTER_FROM,
-      to: [den],
+      to: [to],
       subject: email.subject,
       text: email.text,
       html: email.html,
@@ -170,25 +205,18 @@ async function sendViaResend(den, email) {
   });
 
   if (!res.ok) {
-    const chiTiet = await res.text();
-    throw new Error(`Resend trả ${res.status}: ${chiTiet.slice(0, 200)}`);
+    const detail = await res.text();
+    throw new Error(`Resend trả ${res.status}: ${detail.slice(0, 200)}`);
   }
 }
 
-async function main() {
-  if (!isConfigured) {
-    return exitWithError(
-      '✗ Thiếu SUPABASE_URL hoặc SUPABASE_SERVICE_ROLE_KEY trong .env.',
-      '  Không đọc được danh sách người đăng ký.',
-    );
-  }
-
-  const slug = readEnv('post');
+async function main(slugTuAuto) {
+  const slug = slugTuAuto ?? readEnv('post');
 
   if (!confirmMode && !slug) {
     return exitWithError(
       'Cách dùng:',
-      '  pnpm newsletter:xac-recipient            gửi thư xác nhận cho người mới đăng ký',
+      '  pnpm newsletter:confirm            gửi thư xác nhận cho người mới đăng ký',
       '  pnpm newsletter:send --post=<slug>    gửi thông báo bài mới',
       '',
       'Mặc định là CHẠY THỬ. Thêm --that để gửi thật.',
@@ -214,7 +242,6 @@ async function main() {
   }
 
   const siteUrl = await readSiteUrl();
-  const supabase = createSupabaseClient();
 
   // Chọn người nhận theo loại thư.
   //
@@ -235,17 +262,17 @@ async function main() {
   if (!confirmMode) {
     post = await readPost(slug);
     if (!post) {
-      const co = (await readdir(BLOG_DIR).catch(() => []))
+      const slugsCoSan = (await readdir(BLOG_DIR).catch(() => []))
         .filter((f) => /\.mdx?$/.test(f))
         .map((f) => f.replace(/\.mdx?$/, ''));
       return exitWithError(
         `✗ Không thấy bài "${slug}".`,
         '',
         'Các slug đang có:',
-        ...co.map((c) => `  ${c}`),
+        ...slugsCoSan.map((c) => `  ${c}`),
       );
     }
-    if (post.nhap) {
+    if (post.isDraft) {
       return exitWithError(
         `✗ Bài "${slug}" đang là draft — nó chưa có trên site.`,
         '  Gửi thư dẫn tới một trang 404 thì tệ hơn là không gửi.',
@@ -253,15 +280,15 @@ async function main() {
     }
   }
 
-  const recipient = confirmMode ? 'thư xác nhận' : `thông báo bài "${post.title}"`;
+  const kindOfEmail = confirmMode ? 'thư xác nhận' : `thông báo bài "${post.title}"`;
 
   if (recipients.length === 0) {
-    console.log(`Không có ai cần nhận ${recipient}. Không gửi gì.`);
+    console.log(`Không có ai cần nhận ${kindOfEmail}. Không gửi gì.`);
     return;
   }
 
   console.log(
-    `${reallySend ? 'GỬI THẬT' : 'CHẠY THỬ'} — ${recipients.length} người nhận ${recipient}.\n`,
+    `${reallySend ? 'GỬI THẬT' : 'CHẠY THỬ'} — ${recipients.length} người nhận ${kindOfEmail}.\n`,
   );
 
   // Ở chế độ thử: in đúng nội dung sẽ gửi cho người đầu tiên, rồi liệt kê phần còn
@@ -320,6 +347,79 @@ async function main() {
     for (const l of failures) console.error(`  ${l}`);
     process.exitCode = 1;
   }
+
+  /*
+    Đánh dấu ĐÃ GỬI, và chỉ khi có ít nhất một thư đi được.
+
+    Đánh dấu là thứ chặn gửi trùng, nên nó phải xảy ra sau khi gửi — nhưng cũng KHÔNG
+    được bỏ qua chỉ vì vài người nhận lỗi. Nếu gửi được 8/10 mà không đánh dấu thì lần
+    chạy sau gửi lại cho cả 10, tức 8 người nhận thư hai lần. Thà thiếu hai người còn
+    hơn trùng tám người: người thiếu không biết mình thiếu, người nhận trùng thì biết.
+  */
+  if (!confirmMode && post && sent > 0) {
+    const { error: markError } = await supabase
+      .from('posts')
+      .update({ newsletter_sent_at: new Date().toISOString() })
+      .eq('slug', post.slug);
+
+    if (markError) {
+      console.error(
+        `\n⚠ Đã gửi nhưng KHÔNG đánh dấu được: ${markError.message}`,
+        '\n  Lần chạy tự động sau sẽ gửi lại bài này. Đánh dấu tay:',
+        `\n  update posts set newsletter_sent_at = now() where slug = '${post.slug}';`,
+      );
+      process.exitCode = 1;
+    } else {
+      console.log(`Đã đánh dấu "${post.slug}" là đã gửi bản tin.`);
+    }
+  }
 }
 
-await main();
+/**
+ * Chế độ `--auto`: tìm mọi bài đã lên site mà CHƯA gửi bản tin, rồi gửi lần lượt.
+ *
+ * Đây là chế độ workflow dùng. Nó không nhận slug từ đâu cả — danh sách đến từ chính
+ * database, nên chạy lại bao nhiêu lần cũng không gửi trùng: bài nào gửi rồi thì có
+ * `newsletter_sent_at` và không còn được chọn.
+ *
+ * Vì sao KHÔNG suy ra từ git diff: chạy lại workflow cho cùng một commit, sửa chính tả
+ * một bài cũ, hay revert rồi commit lại — cả ba đều làm diff nói sai. Xem chú thích ở
+ * migration `newsletter_sent_marker`.
+ */
+async function auto() {
+  const todayVn = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Ho_Chi_Minh' }).format(
+    new Date(),
+  );
+
+  const { data, error } = await supabase
+    .from('posts')
+    .select('slug, title, published_at')
+    .eq('draft', false)
+    .lte('published_at', todayVn)
+    .is('newsletter_sent_at', null)
+    .order('published_at', { ascending: true });
+
+  if (error) return exitWithError(`✗ Không đọc được danh sách bài: ${error.message}`);
+
+  if (!data.length) {
+    console.log('Không có bài nào đã lên mà chưa gửi bản tin. Không làm gì.');
+    return;
+  }
+
+  console.log(`${data.length} bài chưa gửi bản tin:`);
+  for (const p of data) console.log(`  ${p.published_at}  ${p.slug}`);
+  console.log('');
+
+  for (const p of data) {
+    console.log(`\n─── ${p.slug} ─────────────────────────────`);
+    // Đi qua đúng `main()` để không có đường gửi thứ hai: mọi lớp kiểm (bài còn nháp,
+    // thiếu khoá Resend, chưa xác nhận) chỉ tồn tại ở một chỗ.
+    await main(p.slug);
+  }
+}
+
+if (autoMode) {
+  await auto();
+} else {
+  await main();
+}

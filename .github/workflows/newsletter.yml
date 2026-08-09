@@ -1,0 +1,157 @@
+name: Newsletter
+
+# Gửi bản tin cho bài vừa lên site.
+#
+# CHẠY SAU DEPLOY, KHÔNG PHẢI THEO LỊCH
+#
+# Bản tin chỉ có nghĩa khi bài đã đọc được. Chạy theo cron thì có lúc gửi thư dẫn tới
+# một trang chưa deploy — và thư đã bay thì không sửa lại được. `workflow_run` sau
+# Deploy đảm bảo thứ tự: bài lên site trước, thư đi sau.
+#
+# MẶC ĐỊNH KHÔNG GỬI GÌ CẢ
+#
+# Gửi email là việc duy nhất trong toàn bộ dự án này KHÔNG thu hồi được. Bài sai thì sửa
+# rồi deploy lại; thư sai thì nằm trong hộp thư người khác mãi mãi.
+#
+# Nên tự động gửi chỉ xảy ra khi biến `NEWSLETTER_AUTO_SEND` được đặt đúng chuỗi `true`.
+# Thiếu nó thì workflow vẫn chạy, vẫn IN RA đúng những thư sẽ gửi, nhưng không gửi —
+# tức là một lần chạy thử miễn phí sau mỗi lần deploy.
+#
+# CHỐNG GỬI TRÙNG NẰM Ở DATABASE
+#
+# Không suy ra "bài nào mới" từ git diff. Cột `posts.newsletter_sent_at` là thứ quyết
+# định: gửi rồi là có mốc thời gian và không bao giờ được chọn lại. Chạy lại workflow bao
+# nhiêu lần cũng không gửi trùng. Xem chú thích ở migration `newsletter_sent_marker`.
+on:
+  workflow_run:
+    workflows: [Deploy]
+    types: [completed]
+    branches: [main]
+
+  workflow_dispatch:
+    inputs:
+      post:
+        description: Slug một bài cụ thể. Để trống thì tìm mọi bài chưa gửi.
+        type: string
+        required: false
+      send:
+        description: GỬI THẬT. Bỏ trống là chỉ chạy thử và in ra thư.
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: newsletter
+  cancel-in-progress: false
+
+jobs:
+  send:
+    # Deploy đỏ thì đừng gửi: bài có thể chưa lên site.
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      github.event.workflow_run.conclusion == 'success'
+
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    env:
+      PUBLIC_SUPABASE_URL: ${{ vars.PUBLIC_SUPABASE_URL }}
+      PUBLIC_SUPABASE_ANON_KEY: ${{ vars.PUBLIC_SUPABASE_ANON_KEY }}
+
+      # Tài khoản bot RIÊNG cho việc gửi. Đây là admin duy nhất ngoài chủ blog có
+      # `can_read_subscribers = true` — gửi thư thì buộc phải biết địa chỉ. Bot soạn bài
+      # dùng biến khác và KHÔNG đọc được bảng đó (đã kiểm bằng JWT thật: bảng có 2 dòng,
+      # chủ blog thấy 2, bot soạn bài thấy 0).
+      NEWSLETTER_BOT_EMAIL: ${{ secrets.NEWSLETTER_BOT_EMAIL }}
+      NEWSLETTER_BOT_PASSWORD: ${{ secrets.NEWSLETTER_BOT_PASSWORD }}
+
+      RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+      NEWSLETTER_FROM: ${{ vars.NEWSLETTER_FROM }}
+
+      # Chuỗi `true`, không phải boolean. Đặt ở Variables để còn đọc được trong log —
+      # người ta cần thấy vì sao thư không gửi, và giá trị này không phải bí mật.
+      NEWSLETTER_AUTO_SEND: ${{ vars.NEWSLETTER_AUTO_SEND }}
+
+    steps:
+      # Chưa cấu hình thì thoát XANH. Cùng lý do với workflow AI draft: một dấu X đỏ
+      # xuất hiện sau mỗi lần deploy sẽ dạy người ta bỏ qua CI đỏ.
+      - name: Kiểm cấu hình
+        id: check
+        run: |
+          missing=""
+          [ -z "$RESEND_API_KEY" ]           && missing="$missing RESEND_API_KEY(secret)"
+          [ -z "$NEWSLETTER_FROM" ]          && missing="$missing NEWSLETTER_FROM(vars)"
+          [ -z "$NEWSLETTER_BOT_EMAIL" ]     && missing="$missing NEWSLETTER_BOT_EMAIL(secret)"
+          [ -z "$NEWSLETTER_BOT_PASSWORD" ]  && missing="$missing NEWSLETTER_BOT_PASSWORD(secret)"
+
+          if [ -n "$missing" ]; then
+            {
+              echo "### Newsletter: chưa bật"
+              echo ""
+              echo "Còn thiếu:$missing"
+              echo ""
+              echo "Trước hết phải xác minh tên miền gửi ở https://resend.com/domains —"
+              echo "chưa xác minh thì Resend chỉ cho gửi tới chính email đã đăng ký."
+              echo ""
+              echo "Mật khẩu bot nằm trong \`.env\` ở máy (NEWSLETTER_BOT_PASSWORD)."
+            } >> "$GITHUB_STEP_SUMMARY"
+            echo "Chưa cấu hình:$missing — bỏ qua, không coi là lỗi."
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/checkout@v5
+        if: steps.check.outputs.ready == 'true'
+
+      - uses: pnpm/action-setup@v4
+        if: steps.check.outputs.ready == 'true'
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v5
+        if: steps.check.outputs.ready == 'true'
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Cài dependency
+        if: steps.check.outputs.ready == 'true'
+        run: pnpm install --frozen-lockfile
+
+      # Trình gửi đọc tiêu đề và mô tả từ file MDX trong `src/content/blog/`.
+      #
+      # Những file đó CÓ trong repo (workflow Auto publish commit chúng), nên checkout là
+      # đủ — không cần sync lại từ database. Sync ở đây còn sai hơn: nó sẽ kéo cả bài vừa
+      # mới đăng mà Deploy chưa kịp đưa lên site.
+      - name: Gửi
+        if: steps.check.outputs.ready == 'true'
+        run: |
+          args=""
+          if [ -n "${{ inputs.post }}" ]; then
+            args="--post=${{ inputs.post }}"
+          else
+            args="--auto"
+          fi
+
+          # Gửi thật khi: bấm tay và tick `send`, HOẶC chạy tự động và biến đã bật.
+          if [ "${{ inputs.send }}" = "true" ] || \
+             { [ "${{ github.event_name }}" = "workflow_run" ] && [ "$NEWSLETTER_AUTO_SEND" = "true" ]; }; then
+            args="$args --that"
+            echo "GỬI THẬT"
+          else
+            echo "CHẠY THỬ — không gửi gì. Bật bằng vars.NEWSLETTER_AUTO_SEND=true, hoặc tick 'send' khi bấm tay."
+          fi
+
+          echo "node scripts/newsletter-send.mjs $args"
+          node scripts/newsletter-send.mjs $args | tee newsletter.log
+
+          {
+            echo "### Newsletter"
+            echo ""
+            echo '```'
+            cat newsletter.log
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"

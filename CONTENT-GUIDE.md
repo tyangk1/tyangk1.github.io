@@ -423,6 +423,27 @@ Cách giữ nhịp mà tôi thấy hiệu quả:
 
 Bước 3 là bước hay bị bỏ, và cũng là bước tạo khác biệt lớn nhất.
 
+### Để máy soạn nháp, mình viết lại
+
+Màn hình **Chủ đề** trong admin là hàng đợi: điền chủ đề, góc nhìn, ngày đăng, và máy
+soạn thành bài nháp trước ngày đó 3 ngày.
+
+Điều quan trọng nhất trên màn hình đó là ô **Tư liệu thật**, và nên hiểu đúng nó:
+
+- **Có tư liệu** — điền số đo, lỗi đã gặp, thứ mình đã thử. Bài ra sẽ viết ngôi thứ
+  nhất, và mọi con số trong bài đều lấy từ đây.
+- **Bỏ trống** — bài ra viết giọng khách quan, không có "tôi đã thử". Cố ý như vậy:
+  một mô hình ngôn ngữ không có buổi chiều nào bị mất vì cache CDN, nên để nó viết
+  "tôi từng mất một buổi chiều" là bịa trải nghiệm dưới tên bạn.
+
+Cách dùng tôi thấy hợp lý nhất: **coi bản máy soạn là bản nháp xấu ở bước 2** của quy
+trình phía trên. Nó lo phần cấu trúc, heading, và bộ khung MDX — thứ tốn thời gian mà
+không tốn suy nghĩ. Phần cạm bẫy, số đo, và câu "tôi từng tin điều này và hoá ra sai"
+thì vẫn phải là bạn viết, vì đó là phần duy nhất người đọc không tìm được ở chỗ khác.
+
+Chế độ **tự đăng** có sẵn nhưng mặc định tắt. Bật nó nghĩa là bài lên site mà không ai
+đọc trước — với blog đứng tên thật thì đó là quyết định của bạn, không phải mặc định.
+
 ### Dùng đặt lịch để giữ nhịp
 
 Cảm hứng đến theo cụm, không đến đều. Viết được ba bài trong một cuối tuần thì đừng
