@@ -17,6 +17,9 @@
         --luc: #3fb950;
         --do: #f85149;
         --vang: #d29922;
+        --tim: #a371f7;
+        --cam: #ffa657;
+        --mono: ui-monospace, 'Cascadia Code', Consolas, monospace;
       }
       * {
         box-sizing: border-box;
@@ -31,7 +34,8 @@
         color: var(--chu);
         height: 100vh;
         display: grid;
-        grid-template-columns: 300px 1fr;
+        grid-template-columns: 270px 1fr;
+        overflow: hidden;
       }
       aside {
         border-right: 1px solid var(--vien);
@@ -40,17 +44,17 @@
         min-height: 0;
       }
       .dau {
-        padding: 12px;
+        padding: 10px;
         border-bottom: 1px solid var(--vien);
         display: flex;
-        gap: 8px;
+        gap: 6px;
       }
       .ds {
         overflow-y: auto;
         flex: 1;
       }
       .muc {
-        padding: 10px 12px;
+        padding: 9px 11px;
         border-bottom: 1px solid var(--vien);
         cursor: pointer;
         display: grid;
@@ -88,17 +92,49 @@
       }
 
       main {
-        overflow-y: auto;
-        padding: 16px 20px 60px;
+        display: flex;
+        flex-direction: column;
+        min-height: 0;
+        min-width: 0;
+      }
+      .thanh {
+        padding: 9px 14px;
+        display: flex;
+        gap: 7px;
+        align-items: center;
+        border-bottom: 1px solid var(--vien);
+        flex-wrap: wrap;
+        flex: none;
+      }
+      .than {
+        flex: 1;
+        display: grid;
+        grid-template-columns: 1fr;
         min-height: 0;
       }
+      .than.co-xem {
+        grid-template-columns: 1fr 1fr;
+      }
+      .cot {
+        overflow-y: auto;
+        min-width: 0;
+        padding: 14px 16px 50px;
+      }
+      .cot + .cot {
+        border-left: 1px solid var(--vien);
+        padding: 0;
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+      }
+
       h1 {
-        font-size: 17px;
-        margin: 0 0 14px;
+        font-size: 16px;
+        margin: 0 0 12px;
       }
       label {
         display: block;
-        margin-bottom: 12px;
+        margin-bottom: 11px;
       }
       .nhan {
         display: flex;
@@ -107,12 +143,12 @@
         margin-bottom: 4px;
         font-size: 12px;
         color: var(--mo);
+        gap: 10px;
       }
       input[type='text'],
       input[type='date'],
       input[type='number'],
-      textarea,
-      select {
+      textarea {
         width: 100%;
         background: var(--bg);
         color: var(--chu);
@@ -124,14 +160,6 @@
       textarea {
         resize: vertical;
       }
-      #content {
-        font:
-          13px/1.65 ui-monospace,
-          'Cascadia Code',
-          Consolas,
-          monospace;
-        min-height: 460px;
-      }
       input:focus,
       textarea:focus {
         outline: 2px solid var(--xanh);
@@ -140,19 +168,19 @@
       .hang {
         display: grid;
         grid-template-columns: 1fr 1fr;
-        gap: 12px;
+        gap: 11px;
       }
       .hang3 {
         display: grid;
         grid-template-columns: 2fr 1fr 1fr;
-        gap: 12px;
+        gap: 11px;
       }
       button {
         background: var(--panel);
         color: var(--chu);
         border: 1px solid var(--vien);
         border-radius: 6px;
-        padding: 7px 12px;
+        padding: 6px 11px;
         font: inherit;
         cursor: pointer;
       }
@@ -172,18 +200,9 @@
         opacity: 0.5;
         cursor: default;
       }
-      .thanh {
-        position: sticky;
-        top: 0;
-        background: var(--bg);
-        padding: 10px 0 12px;
-        display: flex;
-        gap: 8px;
-        align-items: center;
-        border-bottom: 1px solid var(--vien);
-        margin-bottom: 14px;
-        z-index: 2;
-        flex-wrap: wrap;
+      button[aria-pressed='true'] {
+        border-color: var(--xanh);
+        color: var(--xanh);
       }
       .dem.ok {
         color: var(--luc);
@@ -195,8 +214,8 @@
         border: 1px solid var(--do);
         background: #f8514915;
         border-radius: 6px;
-        padding: 10px 12px;
-        margin-bottom: 14px;
+        padding: 9px 11px;
+        margin-bottom: 12px;
       }
       #loi ul {
         margin: 0;
@@ -218,33 +237,11 @@
         font-size: 11px;
         margin-top: 3px;
       }
-      pre.ketqua {
-        background: var(--panel);
-        border: 1px solid var(--vien);
-        border-radius: 6px;
-        padding: 10px;
-        font-size: 12px;
-        white-space: pre-wrap;
-        max-height: 220px;
-        overflow: auto;
-      }
-      .keo {
-        border: 1px dashed var(--vien);
-        border-radius: 6px;
-        padding: 10px;
-        text-align: center;
-        color: var(--mo);
-        font-size: 12px;
-      }
-      .keo.dangkeo {
-        border-color: var(--xanh);
-        color: var(--xanh);
-      }
       fieldset {
         border: 1px solid var(--vien);
         border-radius: 6px;
-        padding: 12px;
-        margin: 0 0 12px;
+        padding: 11px;
+        margin: 0 0 11px;
       }
       legend {
         font-size: 12px;
@@ -263,6 +260,161 @@
         margin: 0;
         font-size: 13px;
       }
+
+      /* --- Ô soạn có tô màu ---------------------------------------------
+         Kỹ thuật: một <pre> tô màu nằm DƯỚI, một <textarea> chữ trong suốt nằm
+         TRÊN. Hai lớp dùng đúng cùng font, cùng padding, cùng line-height nên
+         từng ký tự trùng khít.
+
+         Vì sao không dùng CodeMirror hay contenteditable: gõ tiếng Việt bằng
+         Telex/VNI đi qua IME của hệ điều hành, và IME chỉ hoạt động đáng tin trên
+         <textarea> gốc. Mọi trình soạn "xịn" hơn đều có nguy cơ ăn mất dấu — đánh
+         đổi tệ nhất có thể cho một blog tiếng Việt. Đổi lại còn giữ được undo,
+         chọn chữ, và kiểm chính tả của trình duyệt. */
+      .khung-soan {
+        position: relative;
+        border: 1px solid var(--vien);
+        border-radius: 6px;
+        overflow: hidden;
+        background: var(--bg);
+      }
+      .khung-soan:focus-within {
+        outline: 2px solid var(--xanh);
+        outline-offset: -1px;
+      }
+      #hl,
+      #content {
+        margin: 0;
+        padding: 10px 12px;
+        font: 13px/1.7 var(--mono);
+        tab-size: 2;
+        white-space: pre-wrap;
+        word-break: break-word;
+        overflow-wrap: break-word;
+        border: 0;
+      }
+      #hl {
+        position: absolute;
+        inset: 0;
+        overflow: auto;
+        pointer-events: none;
+        color: var(--chu);
+      }
+      #content {
+        position: relative;
+        display: block;
+        width: 100%;
+        height: 62vh;
+        min-height: 320px;
+        background: transparent;
+        color: transparent;
+        caret-color: var(--chu);
+        resize: vertical;
+        border-radius: 0;
+      }
+      #content::selection {
+        background: #1f6feb55;
+      }
+      /* Màu cú pháp MDX */
+      .t-heading {
+        color: var(--xanh);
+        font-weight: 700;
+      }
+      .t-tag {
+        color: var(--tim);
+      }
+      .t-code {
+        color: var(--cam);
+      }
+      .t-fence {
+        color: var(--mo);
+      }
+      .t-manh {
+        color: var(--chu);
+        font-weight: 700;
+      }
+      .t-nghieng {
+        font-style: italic;
+        color: #c9d1d9;
+      }
+      .t-link {
+        color: var(--luc);
+      }
+      .t-trich {
+        color: var(--mo);
+        font-style: italic;
+      }
+      .t-ds {
+        color: var(--vang);
+      }
+
+      .congcu {
+        display: flex;
+        gap: 5px;
+        flex-wrap: wrap;
+        margin-bottom: 6px;
+      }
+      .congcu button {
+        padding: 4px 8px;
+        font-size: 12px;
+      }
+      .congcu .cach {
+        width: 1px;
+        background: var(--vien);
+        margin: 2px 3px;
+      }
+
+      /* --- Xem trước ---------------------------------------------------- */
+      .xem-dau {
+        padding: 8px 12px;
+        border-bottom: 1px solid var(--vien);
+        display: flex;
+        gap: 8px;
+        align-items: center;
+        font-size: 12px;
+        color: var(--mo);
+        flex: none;
+      }
+      #khung-xem {
+        flex: 1;
+        width: 100%;
+        border: 0;
+        background: #fff;
+      }
+      .canh {
+        padding: 14px;
+        color: var(--vang);
+        font-size: 13px;
+        line-height: 1.6;
+      }
+      .canh code {
+        background: var(--panel);
+        padding: 1px 5px;
+        border-radius: 4px;
+      }
+      pre.ketqua {
+        background: var(--panel);
+        border: 1px solid var(--vien);
+        border-radius: 6px;
+        padding: 9px;
+        font: 12px/1.5 var(--mono);
+        white-space: pre-wrap;
+        max-height: 180px;
+        overflow: auto;
+      }
+      .keo {
+        border: 1px dashed var(--vien);
+        border-radius: 6px;
+        padding: 9px;
+        text-align: center;
+        color: var(--mo);
+        font-size: 12px;
+        margin-top: 10px;
+      }
+      .keo.dangkeo {
+        border-color: var(--xanh);
+        color: var(--xanh);
+      }
     </style>
   </head>
   <body>
@@ -277,106 +429,145 @@
     <main>
       <div class="thanh">
         <button class="chinh" id="nut-luu">Lưu</button>
+        <button id="nut-xem" aria-pressed="false">Xem trước</button>
         <button id="nut-tai-anh">Tải ảnh lên…</button>
         <button class="nguyhiem" id="nut-xoa">Xoá bài</button>
         <span id="tt"></span>
       </div>
 
-      <div id="loi"></div>
-      <h1 id="tieu">Bài mới</h1>
+      <div class="than" id="than">
+        <div class="cot">
+          <div id="loi"></div>
+          <h1 id="tieu">Bài mới</h1>
 
-      <fieldset>
-        <legend>Bắt buộc</legend>
+          <fieldset>
+            <legend>Bắt buộc</legend>
 
-        <label>
-          <span class="nhan"><span>Tiêu đề</span><span class="dem" id="dem-title"></span></span>
-          <input type="text" id="title" />
-        </label>
+            <label>
+              <span class="nhan"><span>Tiêu đề</span><span class="dem" id="dem-title"></span></span>
+              <input type="text" id="title" />
+            </label>
 
-        <label>
-          <span class="nhan"
-            ><span>Slug (chính là URL, không đổi sau khi đã đăng)</span
-            ><span class="dem" id="dem-slug"></span
-          ></span>
-          <input type="text" id="slug" />
-          <span class="ghi" id="ghi-slug"></span>
-        </label>
+            <label>
+              <span class="nhan"
+                ><span>Slug (chính là URL, không đổi sau khi đã đăng)</span
+                ><span class="dem" id="dem-slug"></span
+              ></span>
+              <input type="text" id="slug" />
+              <span class="ghi" id="ghi-slug"></span>
+            </label>
 
-        <label>
-          <span class="nhan"
-            ><span>Mô tả — đây chính là thẻ meta description trên Google</span
-            ><span class="dem" id="dem-description"></span
-          ></span>
-          <textarea id="description" rows="3"></textarea>
-        </label>
+            <label>
+              <span class="nhan"
+                ><span>Mô tả — đây chính là thẻ meta description trên Google</span
+                ><span class="dem" id="dem-description"></span
+              ></span>
+              <textarea id="description" rows="3"></textarea>
+            </label>
 
-        <div class="hang3">
-          <label>
-            <span class="nhan"
-              ><span>Tag, cách nhau bằng dấu phẩy</span><span class="dem" id="dem-tags"></span
-            ></span>
-            <input type="text" id="tags" />
-          </label>
-          <label>
-            <span class="nhan"><span>Ngày đăng</span></span>
-            <input type="date" id="published_at" />
-          </label>
-          <label>
-            <span class="nhan"><span>Ngày cập nhật nội dung</span></span>
-            <input type="date" id="content_updated_at" />
-          </label>
+            <div class="hang3">
+              <label>
+                <span class="nhan"
+                  ><span>Tag, cách nhau bằng dấu phẩy</span><span class="dem" id="dem-tags"></span
+                ></span>
+                <input type="text" id="tags" />
+              </label>
+              <label>
+                <span class="nhan"><span>Ngày đăng</span></span>
+                <input type="date" id="published_at" />
+              </label>
+              <label>
+                <span class="nhan"><span>Ngày cập nhật</span></span>
+                <input type="date" id="content_updated_at" />
+              </label>
+            </div>
+          </fieldset>
+
+          <fieldset>
+            <legend>Tuỳ chọn</legend>
+
+            <label>
+              <span class="nhan"
+                ><span>Điểm chính — mỗi dòng một ý, bỏ trống hẳn hoặc 2–4 dòng</span
+                ><span class="dem" id="dem-takeaways"></span
+              ></span>
+              <textarea id="takeaways" rows="4"></textarea>
+            </label>
+
+            <div class="hang">
+              <label>
+                <span class="nhan"><span>Ảnh bìa (URL)</span></span>
+                <input type="text" id="cover_image" />
+              </label>
+              <label>
+                <span class="nhan"><span>Mô tả ảnh bìa (alt)</span></span>
+                <input type="text" id="cover_alt" />
+              </label>
+            </div>
+
+            <div class="hang">
+              <label>
+                <span class="nhan"><span>Tên series</span></span>
+                <input type="text" id="series_name" />
+              </label>
+              <label>
+                <span class="nhan"><span>Phần thứ</span></span>
+                <input type="number" id="series_part" min="1" />
+              </label>
+            </div>
+
+            <div class="cb">
+              <label><input type="checkbox" id="draft" /> Bài nháp (không lên site)</label>
+              <label><input type="checkbox" id="featured" /> Nổi bật ở trang chủ</label>
+            </div>
+          </fieldset>
+
+          <div class="nhan">
+            <span>Thân bài (MDX)</span><span class="dem" id="dem-content"></span>
+          </div>
+
+          <div class="congcu" id="congcu">
+            <button data-tt="## " title="Heading cấp 2">H2</button>
+            <button data-tt="### " title="Heading cấp 3">H3</button>
+            <div class="cach"></div>
+            <button data-bao="**" title="Đậm — Ctrl+B"><b>B</b></button>
+            <button data-bao="_" title="Nghiêng — Ctrl+I"><i>I</i></button>
+            <button data-bao="`" title="Code trong dòng">code</button>
+            <button data-lam="link" title="Liên kết — Ctrl+K">link</button>
+            <div class="cach"></div>
+            <button data-tt="- " title="Danh sách">• ds</button>
+            <button data-tt="> " title="Trích dẫn">&gt; trích</button>
+            <button data-lam="fence" title="Khối code">```</button>
+            <div class="cach"></div>
+            <button data-lam="callout">Callout</button>
+            <button data-lam="steps">Steps</button>
+            <button data-lam="figure">Figure</button>
+            <button data-lam="pullquote">PullQuote</button>
+          </div>
+
+          <div class="khung-soan">
+            <pre id="hl" aria-hidden="true"><code></code></pre>
+            <textarea id="content" spellcheck="false"></textarea>
+          </div>
+
+          <div class="keo" id="keo">Kéo ảnh vào đây để tải lên và chèn vào bài</div>
+          <pre class="ketqua" id="ketqua" hidden></pre>
         </div>
-      </fieldset>
 
-      <fieldset>
-        <legend>Tuỳ chọn</legend>
-
-        <label>
-          <span class="nhan"
-            ><span>Điểm chính — mỗi dòng một ý, bỏ trống hẳn hoặc 2–4 dòng</span
-            ><span class="dem" id="dem-takeaways"></span
-          ></span>
-          <textarea id="takeaways" rows="4"></textarea>
-        </label>
-
-        <div class="hang">
-          <label>
-            <span class="nhan"><span>Ảnh bìa (URL)</span></span>
-            <input type="text" id="cover_image" />
-          </label>
-          <label>
-            <span class="nhan"><span>Mô tả ảnh bìa (alt) — bắt buộc nếu có ảnh</span></span>
-            <input type="text" id="cover_alt" />
-          </label>
+        <div class="cot" id="cot-xem" hidden>
+          <div class="xem-dau">
+            <button id="nut-lam-moi">Cập nhật xem trước</button>
+            <span id="xem-tt"></span>
+          </div>
+          <div class="canh" id="canh-dev" hidden>
+            Chưa thấy dev server. Xem trước dùng <b>chính site</b> để render, nên cần chạy song
+            song: <br /><br /><code>pnpm dev</code><br /><br />
+            Cách này chính xác hơn một bộ render tự viết — nó dùng đúng component, đúng CSS, đúng
+            font của bài thật.
+          </div>
+          <iframe id="khung-xem" title="Xem trước bài viết"></iframe>
         </div>
-
-        <div class="hang">
-          <label>
-            <span class="nhan"><span>Tên series</span></span>
-            <input type="text" id="series_name" />
-          </label>
-          <label>
-            <span class="nhan"><span>Phần thứ</span></span>
-            <input type="number" id="series_part" min="1" />
-          </label>
-        </div>
-
-        <div class="cb">
-          <label><input type="checkbox" id="draft" /> Bài nháp (không lên site)</label>
-          <label><input type="checkbox" id="featured" /> Nổi bật ở trang chủ</label>
-        </div>
-      </fieldset>
-
-      <label>
-        <span class="nhan"
-          ><span>Thân bài (MDX — dùng được Callout, PullQuote, Steps, Figure, và ảnh)</span
-          ><span class="dem" id="dem-content"></span
-        ></span>
-        <textarea id="content" spellcheck="false"></textarea>
-      </label>
-
-      <div class="keo" id="keo">Kéo ảnh vào đây để tải lên và chèn vào bài</div>
-      <pre class="ketqua" id="ketqua" hidden></pre>
+      </div>
 
       <input type="file" id="chon-file" accept="image/*" multiple hidden />
     </main>
@@ -385,7 +576,7 @@
       const $ = (id) => document.getElementById(id);
       let cauHinh = { gioiHan: {} };
       let danhSach = [];
-      let slugDangSua = null; // null = bài mới
+      let slugDangSua = null;
 
       const TRUONG = [
         'title',
@@ -407,7 +598,6 @@
         $('tt').className = loai;
       }
 
-      /** Cùng công thức với `slugify()` trong src/utils/format.ts. */
       function slugHoa(s) {
         return s
           .normalize('NFD')
@@ -418,11 +608,157 @@
           .replace(/^-+|-+$/g, '');
       }
 
+      // ===== Tô màu cú pháp MDX ==============================================
+      const esc = (s) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+      /** Các quy tắc trong dòng, áp trên chuỗi ĐÃ escape. */
+      function toTrongDong(s) {
+        return (
+          s
+            // Thẻ component: <Callout ...>, </Steps>, <Figure … />
+            .replace(/&lt;\/?[A-Z][\w]*[^&]*?\/?&gt;/g, (m) => `<span class="t-tag">${m}</span>`)
+            // `code` — làm trước đậm/nghiêng để dấu * bên trong code không bị hiểu sai
+            .replace(/`[^`\n]+`/g, (m) => `<span class="t-code">${m}</span>`)
+            .replace(/\*\*[^*\n]+\*\*/g, (m) => `<span class="t-manh">${m}</span>`)
+            .replace(/(^|[\s(])_[^_\n]+_/g, (m) => `<span class="t-nghieng">${m}</span>`)
+            .replace(/\[[^\]\n]*\]\([^)\n]*\)/g, (m) => `<span class="t-link">${m}</span>`)
+        );
+      }
+
+      function toMau(vanBan) {
+        const dong = vanBan.split('\n');
+        let trongFence = false;
+        const ra = [];
+
+        for (const d of dong) {
+          const e = esc(d);
+
+          if (/^\s*```/.test(d)) {
+            trongFence = !trongFence;
+            ra.push(`<span class="t-fence">${e}</span>`);
+            continue;
+          }
+          if (trongFence) {
+            ra.push(`<span class="t-code">${e}</span>`);
+            continue;
+          }
+          if (/^#{1,6}\s/.test(d)) {
+            ra.push(`<span class="t-heading">${e}</span>`);
+            continue;
+          }
+          if (/^\s*&gt;/.test(e)) {
+            ra.push(`<span class="t-trich">${toTrongDong(e)}</span>`);
+            continue;
+          }
+
+          const ds = e.match(/^(\s*(?:[-*+]|\d+[.)])\s)/);
+          if (ds) {
+            ra.push(`<span class="t-ds">${ds[1]}</span>${toTrongDong(e.slice(ds[1].length))}`);
+            continue;
+          }
+
+          ra.push(toTrongDong(e));
+        }
+
+        // Thêm một dòng trắng ở cuối: nếu không, khi văn bản kết thúc bằng \n thì
+        // lớp <pre> thấp hơn <textarea> một dòng và con trỏ lệch khỏi chữ.
+        return ra.join('\n') + '\n';
+      }
+
+      const hlCode = $('hl').firstElementChild;
+      function veLaiHl() {
+        hlCode.innerHTML = toMau($('content').value);
+        $('hl').scrollTop = $('content').scrollTop;
+        $('hl').scrollLeft = $('content').scrollLeft;
+      }
+
+      // ===== Thanh công cụ ===================================================
+      const ta = () => $('content');
+
+      function thayDoan(batDau, ketThuc, chuoi, chonLai) {
+        const t = ta();
+        t.setRangeText(chuoi, batDau, ketThuc, chonLai ?? 'end');
+        t.focus();
+        t.dispatchEvent(new Event('input', { bubbles: true }));
+      }
+
+      /** Bọc phần đang chọn bằng cặp ký tự, hoặc bỏ bọc nếu đã có. */
+      function bao(dau, cuoi = dau) {
+        const t = ta();
+        const { selectionStart: a, selectionEnd: b, value: v } = t;
+        const daBao = v.slice(a - dau.length, a) === dau && v.slice(b, b + cuoi.length) === cuoi;
+
+        if (daBao) {
+          const trong = v.slice(a, b);
+          thayDoan(a - dau.length, b + cuoi.length, trong);
+          t.selectionStart = a - dau.length;
+          t.selectionEnd = b - dau.length;
+          return;
+        }
+
+        thayDoan(a, b, `${dau}${v.slice(a, b)}${cuoi}`);
+        // Chưa chọn gì thì đặt con trỏ vào giữa để gõ tiếp.
+        if (a === b) t.selectionStart = t.selectionEnd = a + dau.length;
+        else {
+          t.selectionStart = a + dau.length;
+          t.selectionEnd = b + dau.length;
+        }
+      }
+
+      /** Thêm tiền tố vào đầu mỗi dòng đang chọn. */
+      function themTienTo(tt2) {
+        const t = ta();
+        const v = t.value;
+        const dauDong = v.lastIndexOf('\n', t.selectionStart - 1) + 1;
+        const cuoiDong = (() => {
+          const i = v.indexOf('\n', t.selectionEnd);
+          return i === -1 ? v.length : i;
+        })();
+        const khoi = v.slice(dauDong, cuoiDong);
+        const moi = khoi
+          .split('\n')
+          .map((d) => (d.startsWith(tt2) ? d.slice(tt2.length) : tt2 + d))
+          .join('\n');
+        thayDoan(dauDong, cuoiDong, moi);
+      }
+
+      const MAU = {
+        callout:
+          '\n<Callout type="info" title="Tiêu đề hộp">\nNội dung. type nhận: info | warning | success | tip\n</Callout>\n',
+        steps: '\n<Steps>\n1. Bước một.\n2. Bước hai.\n3. Bước ba.\n</Steps>\n',
+        figure:
+          '\n<Figure\n  src=""\n  alt="Mô tả ảnh cho người dùng screen reader"\n  caption="Chú thích hiện dưới ảnh"\n/>\n',
+        pullquote: '\n<PullQuote>\nCâu đáng nhớ nhất của bài.\n</PullQuote>\n',
+        fence: '\n```ts\n\n```\n',
+      };
+
+      $('congcu').addEventListener('click', (e) => {
+        const b = e.target.closest('button');
+        if (!b) return;
+        e.preventDefault();
+
+        if (b.dataset.tt) return themTienTo(b.dataset.tt);
+        if (b.dataset.bao) return bao(b.dataset.bao);
+
+        const lam = b.dataset.lam;
+        if (lam === 'link') {
+          const t = ta();
+          const chon = t.value.slice(t.selectionStart, t.selectionEnd) || 'chữ hiện ra';
+          thayDoan(t.selectionStart, t.selectionEnd, `[${chon}](https://)`);
+          return;
+        }
+        if (MAU[lam]) {
+          const t = ta();
+          thayDoan(t.selectionStart, t.selectionEnd, MAU[lam]);
+        }
+      });
+
+      // ===== Đếm và validate =================================================
       function demKyTu(id, hienTai, min, max) {
         const el = $(`dem-${id}`);
         if (!el) return;
         const ok = hienTai >= min && hienTai <= max;
-        el.textContent = min === max ? `${hienTai}` : `${hienTai} / ${min}–${max}`;
+        el.textContent = `${hienTai} / ${min}–${max}`;
         el.className = `dem ${ok ? 'ok' : 'sai'}`;
       }
 
@@ -435,26 +771,26 @@
           g.descriptionMin,
           g.descriptionMax,
         );
-
-        const tags = $('tags')
-          .value.split(',')
-          .map((t) => t.trim())
-          .filter(Boolean);
-        demKyTu('tags', tags.length, g.tagsMin, g.tagsMax);
+        demKyTu(
+          'tags',
+          $('tags')
+            .value.split(',')
+            .filter((t) => t.trim()).length,
+          g.tagsMin,
+          g.tagsMax,
+        );
 
         const tk = $('takeaways')
           .value.split('\n')
-          .map((t) => t.trim())
-          .filter(Boolean);
-        const elTk = $('dem-takeaways');
+          .filter((t) => t.trim());
         const okTk =
           tk.length === 0 || (tk.length >= g.takeawaysMin && tk.length <= g.takeawaysMax);
-        elTk.textContent = `${tk.length} dòng`;
-        elTk.className = `dem ${okTk ? 'ok' : 'sai'}`;
+        $('dem-takeaways').textContent = `${tk.length} dòng`;
+        $('dem-takeaways').className = `dem ${okTk ? 'ok' : 'sai'}`;
 
         const chu = $('content').value.trim().split(/\s+/).filter(Boolean).length;
-        $('dem-content').textContent = `${chu.toLocaleString('vi-VN')} từ`;
-        $('dem-content').className = 'dem';
+        const phut = Math.max(1, Math.round(chu / 200));
+        $('dem-content').textContent = `${chu.toLocaleString('vi-VN')} từ · ~${phut} phút đọc`;
 
         const slug = $('slug').value.trim();
         const hopLe = /^[a-z0-9]+(-[a-z0-9]+)*$/.test(slug);
@@ -463,6 +799,7 @@
         $('ghi-slug').textContent = slug ? `URL: /blog/${slug}` : '';
       }
 
+      // ===== Đọc / ghi form ==================================================
       function docForm() {
         return {
           slug: $('slug').value,
@@ -501,7 +838,7 @@
         $('series_part').value = b?.series_part ?? '';
         $('cover_image').value = b?.cover_image ?? '';
         $('cover_alt').value = b?.cover_alt ?? '';
-        $('draft').checked = b ? b.draft : true; // bài mới mặc định là nháp
+        $('draft').checked = b ? b.draft : true;
         $('featured').checked = b?.featured ?? false;
 
         slugDangSua = b?.slug ?? null;
@@ -509,6 +846,7 @@
         $('nut-xoa').disabled = !b;
         $('loi').innerHTML = '';
         capNhatDem();
+        veLaiHl();
         veDanhSach();
       }
 
@@ -519,19 +857,15 @@
               b,
             ) => `<div class="muc" data-slug="${b.slug}" ${b.slug === slugDangSua ? 'aria-current="true"' : ''}>
               <b>${b.title.replace(/</g, '&lt;')}</b>
-              <small>
-                <span class="the ${b.draft ? 'nhap' : 'dang'}">${b.draft ? 'nháp' : 'đã đăng'}</span>
-                ${b.published_at ?? ''}
-              </small>
+              <small><span class="the ${b.draft ? 'nhap' : 'dang'}">${b.draft ? 'nháp' : 'đã đăng'}</span>${b.published_at ?? ''}</small>
             </div>`,
           )
           .join('');
-
         for (const el of $('ds').querySelectorAll('.muc')) {
           el.onclick = () => {
             const b = danhSach.find((x) => x.slug === el.dataset.slug);
             if (b) dienForm(b);
-            window.scrollTo(0, 0);
+            document.querySelector('.cot').scrollTo(0, 0);
           };
         }
       }
@@ -541,9 +875,9 @@
         veDanhSach();
       }
 
-      async function luu() {
+      async function luu({ imLang = false } = {}) {
         $('nut-luu').disabled = true;
-        tt('Đang lưu…');
+        if (!imLang) tt('Đang lưu…');
         try {
           const r = await fetch('/api/bai', {
             method: 'PUT',
@@ -553,44 +887,59 @@
           const kq = await r.json();
 
           if (kq.loi) {
-            $('loi').innerHTML = `<b>Chưa lưu được:</b><ul>${kq.loi
-              .map((l) => `<li>${l.thongDiep}</li>`)
-              .join('')}</ul>`;
+            $('loi').innerHTML =
+              `<b>Chưa lưu được:</b><ul>${kq.loi.map((l) => `<li>${l.thongDiep}</li>`).join('')}</ul>`;
             tt('Có lỗi cần sửa', 'sai');
-            return;
+            return false;
           }
 
           $('loi').innerHTML = '';
           slugDangSua = kq.slug;
           await taiDanhSach();
           $('tieu').textContent = $('title').value;
-          tt('Đã lưu vào database', 'ok');
+          if (!imLang) tt('Đã lưu vào database', 'ok');
+          return true;
         } catch (e) {
           tt(`Lỗi: ${e.message}`, 'sai');
+          return false;
         } finally {
           $('nut-luu').disabled = false;
         }
       }
 
-      async function xoa() {
-        if (!slugDangSua) return;
-        if (!confirm(`Xoá hẳn bài "${slugDangSua}" khỏi database?\n\nKhông hoàn lại được.`)) return;
-        await fetch(`/api/bai/${encodeURIComponent(slugDangSua)}`, { method: 'DELETE' });
-        await taiDanhSach();
-        dienForm(null);
-        tt('Đã xoá', 'ok');
+      // ===== Xem trước =======================================================
+      async function lamMoiXem() {
+        const { song } = await (await fetch('/api/dev-song')).json();
+        $('canh-dev').hidden = song;
+        $('khung-xem').hidden = !song;
+        if (!song) {
+          $('xem-tt').textContent = '';
+          return;
+        }
+
+        $('xem-tt').textContent = 'Đang lưu và đồng bộ…';
+        if (!(await luu({ imLang: true }))) {
+          $('xem-tt').textContent = 'Bài chưa hợp lệ — sửa lỗi bên trái rồi thử lại.';
+          return;
+        }
+
+        // `sync:drafts` vì bài đang viết gần như luôn là nháp.
+        await fetch('/api/sync?drafts=1', { method: 'POST' });
+        const slug = $('slug').value.trim();
+        $('khung-xem').src = `http://localhost:4321/blog/${slug}?t=${Date.now()}`;
+        $('xem-tt').textContent = `/blog/${slug}`;
       }
 
-      /** Chèn chuỗi vào ô thân bài tại vị trí con trỏ. */
-      function chenVaoBai(chuoi) {
-        const ta = $('content');
-        const i = ta.selectionStart ?? ta.value.length;
-        ta.value = `${ta.value.slice(0, i)}${chuoi}${ta.value.slice(ta.selectionEnd ?? i)}`;
-        ta.focus();
-        ta.selectionStart = ta.selectionEnd = i + chuoi.length;
-        capNhatDem();
-      }
+      $('nut-xem').onclick = async () => {
+        const hien = $('cot-xem').hidden;
+        $('cot-xem').hidden = !hien;
+        $('than').classList.toggle('co-xem', hien);
+        $('nut-xem').setAttribute('aria-pressed', String(hien));
+        if (hien) await lamMoiXem();
+      };
+      $('nut-lam-moi').onclick = lamMoiXem;
 
+      // ===== Ảnh =============================================================
       async function taiAnh(files) {
         for (const f of files) {
           tt(`Đang tải ${f.name}…`);
@@ -599,33 +948,42 @@
             { method: 'POST', body: await f.arrayBuffer() },
           );
           const kq = await r.json();
-
           if (kq.loi) {
             tt(kq.loi, 'sai');
             continue;
           }
 
           const kb = (n) => `${(n / 1024).toFixed(1)}KB`;
-          // Chưa có ảnh bìa thì ảnh đầu tiên dùng luôn làm bìa — đỡ một bước dán.
           if (!$('cover_image').value) {
             $('cover_image').value = kq.url;
             tt(`Đặt làm ảnh bìa · ${kb(kq.goc)} → ${kb(kq.cuoi)}. Nhớ điền alt.`, 'ok');
             $('cover_alt').focus();
           } else {
-            chenVaoBai(`\n<Figure\n  src="${kq.url}"\n  alt=""\n  caption=""\n/>\n`);
+            const t = ta();
+            thayDoan(
+              t.selectionStart,
+              t.selectionEnd,
+              `\n<Figure\n  src="${kq.url}"\n  alt=""\n  caption=""\n/>\n`,
+            );
             tt(`Đã chèn <Figure> · ${kb(kq.goc)} → ${kb(kq.cuoi)}. Nhớ điền alt.`, 'ok');
           }
         }
       }
 
-      // --- Gắn sự kiện ---
-      $('nut-luu').onclick = luu;
-      $('nut-xoa').onclick = xoa;
+      // ===== Gắn sự kiện =====================================================
+      $('nut-luu').onclick = () => luu();
+      $('nut-xoa').onclick = async () => {
+        if (!slugDangSua) return;
+        if (!confirm(`Xoá hẳn bài "${slugDangSua}" khỏi database?\n\nKhông hoàn lại được.`)) return;
+        await fetch(`/api/bai/${encodeURIComponent(slugDangSua)}`, { method: 'DELETE' });
+        await taiDanhSach();
+        dienForm(null);
+        tt('Đã xoá', 'ok');
+      };
       $('nut-moi').onclick = () => {
         dienForm(null);
         $('title').focus();
       };
-
       $('nut-sync').onclick = async () => {
         $('nut-sync').disabled = true;
         tt('Đang đồng bộ ra file…');
@@ -638,35 +996,58 @@
         );
         $('nut-sync').disabled = false;
       };
-
       $('nut-tai-anh').onclick = () => $('chon-file').click();
       $('chon-file').onchange = (e) => taiAnh([...e.target.files]);
 
       const keo = $('keo');
-      for (const su of ['dragenter', 'dragover']) {
+      for (const su of ['dragenter', 'dragover'])
         keo.addEventListener(su, (e) => {
           e.preventDefault();
           keo.classList.add('dangkeo');
         });
-      }
-      for (const su of ['dragleave', 'drop']) {
+      for (const su of ['dragleave', 'drop'])
         keo.addEventListener(su, () => keo.classList.remove('dangkeo'));
-      }
       keo.addEventListener('drop', (e) => {
         e.preventDefault();
         taiAnh([...e.dataTransfer.files].filter((f) => f.type.startsWith('image/')));
       });
 
       for (const id of TRUONG) $(id).addEventListener('input', capNhatDem);
+      $('content').addEventListener('input', veLaiHl);
+      $('content').addEventListener('scroll', () => {
+        $('hl').scrollTop = $('content').scrollTop;
+        $('hl').scrollLeft = $('content').scrollLeft;
+      });
 
-      // Gõ tiêu đề thì tự sinh slug — CHỈ cho bài mới. Bài đã đăng mà đổi slug là
-      // đổi URL, tức là mọi link cũ tới bài đó gãy.
       $('title').addEventListener('input', () => {
         if (!slugDangSua) $('slug').value = slugHoa($('title').value);
         capNhatDem();
       });
 
-      // Ctrl+S để lưu — đây là trình soạn thảo, phản xạ đó là tự nhiên.
+      // Phím tắt trong ô soạn
+      $('content').addEventListener('keydown', (e) => {
+        if (e.key === 'Tab') {
+          e.preventDefault();
+          const t = ta();
+          thayDoan(t.selectionStart, t.selectionEnd, '  ');
+          return;
+        }
+        if (!(e.ctrlKey || e.metaKey)) return;
+        const k = e.key.toLowerCase();
+        if (k === 'b') {
+          e.preventDefault();
+          bao('**');
+        } else if (k === 'i') {
+          e.preventDefault();
+          bao('_');
+        } else if (k === 'k') {
+          e.preventDefault();
+          const t = ta();
+          const chon = t.value.slice(t.selectionStart, t.selectionEnd) || 'chữ hiện ra';
+          thayDoan(t.selectionStart, t.selectionEnd, `[${chon}](https://)`);
+        }
+      });
+
       document.addEventListener('keydown', (e) => {
         if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
           e.preventDefault();

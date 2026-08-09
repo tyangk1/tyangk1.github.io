@@ -181,7 +181,28 @@ const server = createServer(async (req, res) => {
     }
 
     if (req.method === 'POST' && duong === '/api/sync') {
-      return json(res, 200, await chayLenh('pnpm', ['sync']));
+      // `?drafts=1` cho phần xem trước: bài đang viết gần như luôn là nháp, mà
+      // `pnpm sync` thường thì loại hẳn bài nháp — xem trước sẽ ra 404.
+      const caNhap = url.searchParams.get('drafts') === '1';
+      return json(res, 200, await chayLenh('pnpm', [caNhap ? 'sync:drafts' : 'sync']));
+    }
+
+    /**
+     * Dev server của Astro có đang chạy không.
+     *
+     * Phần xem trước nhúng chính site vào iframe thay vì tự dựng một bộ render
+     * xấp xỉ. Đánh đổi: phải có `pnpm dev` chạy song song. Kiểm ở đây để nói rõ
+     * "chưa chạy pnpm dev" thay vì để người dùng nhìn một iframe trắng.
+     */
+    if (req.method === 'GET' && duong === '/api/dev-song') {
+      try {
+        const r = await fetch('http://localhost:4321/', {
+          signal: AbortSignal.timeout(2500),
+        });
+        return json(res, 200, { song: r.ok });
+      } catch {
+        return json(res, 200, { song: false });
+      }
     }
 
     res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' });

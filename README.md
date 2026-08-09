@@ -367,6 +367,37 @@ Danh sách bài bên trái, trình soạn bên phải. Làm được: tạo · s
 ảnh lên (chọn file hoặc **kéo thả**), và bấm **Đồng bộ** để chạy `pnpm sync` ngay
 trong trang.
 
+#### Ô soạn thân bài
+
+Có tô màu cú pháp MDX (heading, thẻ component, `code`, đậm/nghiêng, link, danh
+sách, khối code), thanh công cụ, và phím tắt `Ctrl+B` / `Ctrl+I` / `Ctrl+K`.
+`Tab` chèn hai dấu cách thay vì nhảy focus.
+
+Thanh công cụ có nút chèn sẵn **Callout · Steps · Figure · PullQuote** — đỡ phải
+nhớ cú pháp và đỡ gõ sai tên thuộc tính.
+
+Cách tô màu: một `<pre>` màu nằm **dưới**, một `<textarea>` chữ trong suốt nằm
+**trên**, hai lớp dùng đúng cùng font, padding và line-height. Đã đo: lệch chiều
+cao nội dung giữa hai lớp là **0px**, nên con trỏ nằm khít trên chữ.
+
+Vì sao không dùng CodeMirror hay `contenteditable`: gõ tiếng Việt bằng Telex/VNI
+đi qua **IME** của hệ điều hành, và IME chỉ hoạt động đáng tin trên `<textarea>`
+gốc. Một trình soạn "xịn" hơn mà ăn mất dấu là đánh đổi tệ nhất có thể cho blog
+tiếng Việt. Cách này còn giữ nguyên undo, chọn chữ và kiểm chính tả của trình duyệt.
+
+#### Xem trước — dùng chính site, không phải bản xấp xỉ
+
+Bấm **Xem trước** để chia đôi màn hình: soạn bên trái, trang thật bên phải.
+
+Nó không tự dựng bộ render riêng. Nó lưu bài → chạy `pnpm sync:drafts` → nhúng
+`localhost:4321/blog/<slug>` vào iframe. Nghĩa là xem trước dùng **đúng**
+component, đúng CSS, đúng font của bài thật — không có chuyện xem trước một kiểu
+mà site ra một kiểu.
+
+Đánh đổi: cần `pnpm dev` chạy song song. Admin tự kiểm và nói rõ nếu chưa có, thay
+vì để bạn nhìn một iframe trắng. Dùng `sync:drafts` vì bài đang viết gần như luôn
+là nháp — `pnpm sync` thường thì loại nháp và xem trước sẽ ra 404.
+
 Những chi tiết đáng nói:
 
 | Chi tiết                                               | Vì sao                                                                                                 |
@@ -402,6 +433,11 @@ giá đúng để trả.
 | Tải ảnh + lưu bài                      | ảnh `10.9KB → 1.3KB`, bài vào database, danh sách lên 9                     |
 | Bấm Đồng bộ                            | chạy `pnpm sync` thật, in output, ra **8 bài** — loại đúng bài nháp vừa tạo |
 | Bấm Xoá                                | hỏi xác nhận, xoá xong danh sách về 8                                       |
+| Tô màu trên một bài MDX thật           | 4 heading · 6 thẻ component · 15 `code` · 4 đậm · 3 danh sách · 4 khối code |
+| Lớp tô màu khớp `<textarea>`           | cùng font, padding, line-height · lệch chiều cao **0px**                    |
+| Chọn chữ rồi bấm **B**                 | `Tôi từng` → `**Tôi từng**`                                                 |
+| Bấm Callout                            | chèn khối 102 ký tự đúng vị trí con trỏ                                     |
+| Bấm Xem trước                          | chia đôi màn hình, iframe render đúng bài — có `.callout` và `.steps`       |
 
 ### Đăng bài = build lại
 
