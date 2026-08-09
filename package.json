@@ -19,6 +19,7 @@
     "newsletter:xac-nhan": "node scripts/newsletter-send.mjs --xac-nhan",
     "newsletter:gui": "node scripts/newsletter-send.mjs",
     "giscus:setup": "node scripts/giscus-setup.mjs",
+    "giscus:bat": "node scripts/giscus-bat.mjs",
     "anh:upload": "node scripts/upload-anh.mjs",
     "typecheck": "astro check",
     "check:content": "node scripts/check-frontmatter.mjs",

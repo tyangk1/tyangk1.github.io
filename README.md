@@ -63,6 +63,7 @@ pnpm build && pnpm preview
 | `pnpm newsletter:xac-nhan` | Gửi thư xác nhận cho người mới đăng ký. **Mặc định chạy thử**           |
 | `pnpm newsletter:gui`      | Gửi thông báo bài mới: `--bai=<slug>`. **Mặc định chạy thử**            |
 | `pnpm giscus:setup`        | Lấy tự động 4 giá trị cấu hình giscus: `pnpm giscus:setup owner/repo`   |
+| `pnpm giscus:bat`          | Bật bình luận trên bản deploy: đặt Actions variables + chạy Deploy      |
 | `pnpm anh:upload`          | Ảnh ở máy → Supabase Storage, in ra URL để dán vào bài                  |
 | `pnpm format:check`        | Prettier ở chế độ chỉ kiểm — CI chạy lệnh này, đỏ là chặn merge         |
 | `pnpm sync`                | Database → file, chỉ bài đã đăng                                        |
@@ -449,7 +450,27 @@ này khi app chưa cài thì mỗi trang bài hiện một hộp lỗi
 `giscus is not installed on this repository` — tệ hơn hẳn so với không có khối
 bình luận, vì `commentsEnabled` để trống thì khối tự ẩn sạch sẽ.
 
-**Bật bình luận** — sau khi cài app tại <https://github.com/apps/giscus> (chọn
+**Bật bình luận — một lệnh.** Sau khi cài app tại
+<https://github.com/apps/giscus> (chọn repo `tyangk1.github.io`):
+
+```powershell
+$env:GH_TOKEN="ghp_..."   # scope repo + workflow
+pnpm giscus:bat
+```
+
+Script tự làm ba việc: kiểm app đã cài chưa, tra 4 giá trị rồi đặt thành Actions
+variables, và kích hoạt Deploy. **App chưa cài thì nó dừng và không đặt biến nào**
+— đã kiểm: chạy thử lúc chưa cài, nó báo lỗi và danh sách variables vẫn chỉ có hai
+biến Supabase.
+
+Vì sao phải kiểm trước: bật biến khi app chưa cài khiến mỗi trang bài hiện hộp lỗi
+`giscus is not installed on this repository`, tệ hơn hẳn so với không có khối bình
+luận.
+
+<details>
+<summary>Hoặc làm tay từng bước</summary>
+
+Sau khi cài app tại <https://github.com/apps/giscus> (chọn
 repo `tyangk1.github.io`), làm hai việc:
 
 1. Bỏ dấu `#` ở bốn dòng giscus trong `.env` (cho bản chạy ở máy).
@@ -468,6 +489,10 @@ Vì sao phải làm bước 2: `src/env.ts` đọc `import.meta.env` lúc **buil
 bạn. Thiếu bước này thì bình luận chạy ở máy mà **im lặng tắt** trên site thật.
 Dùng `variables` chứ không phải `secrets`: đây là giá trị công khai, giscus in
 thẳng chúng vào HTML.
+
+`gh` chưa cài trên máy này — dùng `pnpm giscus:bat` ở trên thì không cần nó.
+
+</details>
 
 Script tự chọn category **Announcements** nếu có — chỉ chủ repo mở được thread
 mới ở đó, nên khách không tạo được discussion rác.
