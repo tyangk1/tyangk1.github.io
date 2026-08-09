@@ -188,20 +188,50 @@ const server = createServer(async (req, res) => {
     }
 
     /**
-     * Dev server của Astro có đang chạy không.
+     * Cổng 4321 có phải DEV SERVER không — không chỉ "có gì đang chạy".
      *
-     * Phần xem trước nhúng chính site vào iframe thay vì tự dựng một bộ render
-     * xấp xỉ. Đánh đổi: phải có `pnpm dev` chạy song song. Kiểm ở đây để nói rõ
-     * "chưa chạy pnpm dev" thay vì để người dùng nhìn một iframe trắng.
+     * Phân biệt này là bắt buộc, và đã trả giá để biết: `astro preview` cũng nghe
+     * cổng 4321 và cũng trả 200, nhưng nó phục vụ bản build TĨNH trong `dist/`.
+     * Xem trước trỏ vào đó thì bài mới sửa không bao giờ hiện, và bài mới tạo trả
+     * 404 — mà không có dấu hiệu nào cho biết mình đang xem bản cũ.
+     *
+     * Dấu hiệu chắc chắn: dev server của Astro chèn `/@vite/client` vào HTML để
+     * chạy HMR. Bản build tĩnh thì không bao giờ có chuỗi đó.
      */
     if (req.method === 'GET' && duong === '/api/dev-song') {
       try {
-        const r = await fetch('http://localhost:4321/', {
-          signal: AbortSignal.timeout(2500),
+        const r = await fetch('http://localhost:4321/', { signal: AbortSignal.timeout(3000) });
+        if (!r.ok) return json(res, 200, { song: false, lyDo: `HTTP ${r.status}` });
+
+        const html = await r.text();
+        const laDev = html.includes('/@vite/client');
+
+        return json(res, 200, {
+          song: laDev,
+          lyDo: laDev
+            ? ''
+            : 'Cổng 4321 đang là `astro preview` (bản build tĩnh), không phải dev server.',
         });
-        return json(res, 200, { song: r.ok });
       } catch {
-        return json(res, 200, { song: false });
+        return json(res, 200, { song: false, lyDo: 'Không có gì nghe ở cổng 4321.' });
+      }
+    }
+
+    /**
+     * Một trang bài đã tồn tại trên dev server chưa.
+     *
+     * Cần vì Astro phải sinh route cho file MDX mới, và việc đó mất một nhịp.
+     * Gán `src` cho iframe trước lúc đó là nhận 404 và mắc ở đấy.
+     */
+    if (req.method === 'GET' && duong === '/api/dev-trang') {
+      const slug = url.searchParams.get('slug') ?? '';
+      try {
+        const r = await fetch(`http://localhost:4321/blog/${encodeURIComponent(slug)}`, {
+          signal: AbortSignal.timeout(4000),
+        });
+        return json(res, 200, { co: r.ok });
+      } catch {
+        return json(res, 200, { co: false });
       }
     }
 

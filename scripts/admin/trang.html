@@ -117,15 +117,91 @@
       }
       .cot {
         overflow-y: auto;
+        /* `overflow-x: hidden` tường minh, không phải để bịt lỗi.
+           Chỉ đặt `overflow-y: auto` thì trục X thành `auto` theo mặc định, và
+           trên màn 390px nó sinh một thanh cuộn ngang 24px dù KHÔNG phần tử con
+           nào vượt mép phải — đã kiểm từng phần tử. Cột này cuộn dọc, cuộn ngang
+           ở đây không bao giờ là điều mong muốn. */
+        overflow-x: hidden;
         min-width: 0;
         padding: 14px 16px 50px;
       }
-      .cot + .cot {
+      /* `:not([hidden])` là bắt buộc, không phải cho gọn.
+         `[hidden]` chỉ đặt `display: none` ở UA stylesheet, nên bất kỳ rule
+         `display` nào của tác giả cũng thắng nó. Thiếu phần này thì cột xem trước
+         vẫn hiện ra dù chưa bật — đã gặp đúng lỗi đó. */
+      .cot + .cot:not([hidden]) {
         border-left: 1px solid var(--vien);
         padding: 0;
         overflow: hidden;
         display: flex;
         flex-direction: column;
+      }
+
+      /* Chốt chung cho mọi phần tử ẩn trong trang này, cùng lý do trên. */
+      [hidden] {
+        display: none !important;
+      }
+
+      /* --- Màn hình hẹp ---------------------------------------------------
+         Dưới 900px: danh sách bài thành một khối gập lại ở trên, không còn cột
+         cố định 270px. Dưới 900px mà giữ hai cột thì cột soạn chỉ còn ~350px —
+         không viết nổi. */
+      #nut-ds {
+        display: none;
+      }
+
+      @media (max-width: 900px) {
+        body {
+          grid-template-columns: 1fr;
+          grid-template-rows: auto 1fr;
+          height: 100dvh;
+        }
+        aside {
+          border-right: 0;
+          border-bottom: 1px solid var(--vien);
+          max-height: 45vh;
+        }
+        aside[hidden] {
+          display: none !important;
+        }
+        #nut-ds {
+          display: inline-block;
+        }
+        /* Xem trước xếp DỌC trên màn hẹp. Chia đôi ngang ở 400px mỗi bên thì cả
+           hai bên đều không đọc được. */
+        .than.co-xem {
+          grid-template-columns: 1fr;
+          grid-template-rows: 1fr 1fr;
+        }
+        .cot + .cot:not([hidden]) {
+          border-left: 0;
+          border-top: 1px solid var(--vien);
+        }
+        .hang,
+        .hang3 {
+          grid-template-columns: 1fr;
+        }
+        #content {
+          height: 45vh;
+        }
+      }
+
+      @media (max-width: 560px) {
+        .cot {
+          padding: 10px 11px 40px;
+        }
+        .thanh {
+          padding: 8px 10px;
+        }
+        /* Vùng chạm tối thiểu 24px cho ngón tay (WCAG 2.5.8). */
+        .congcu button {
+          padding: 7px 10px;
+          min-height: 32px;
+        }
+        button {
+          min-height: 32px;
+        }
       }
 
       h1 {
@@ -428,6 +504,7 @@
 
     <main>
       <div class="thanh">
+        <button id="nut-ds" aria-pressed="false" title="Ẩn/hiện danh sách bài">☰</button>
         <button class="chinh" id="nut-luu">Lưu</button>
         <button id="nut-xem" aria-pressed="false">Xem trước</button>
         <button id="nut-tai-anh">Tải ảnh lên…</button>
@@ -560,10 +637,12 @@
             <span id="xem-tt"></span>
           </div>
           <div class="canh" id="canh-dev" hidden>
-            Chưa thấy dev server. Xem trước dùng <b>chính site</b> để render, nên cần chạy song
-            song: <br /><br /><code>pnpm dev</code><br /><br />
-            Cách này chính xác hơn một bộ render tự viết — nó dùng đúng component, đúng CSS, đúng
-            font của bài thật.
+            <b id="ly-do-dev"></b><br /><br />
+            Xem trước dùng <b>chính site</b> để render, nên cần dev server chạy song song:
+            <br /><br /><code>pnpm dev</code><br /><br />
+            Phải là <code>pnpm dev</code>, <b>không</b> phải <code>pnpm preview</code> —
+            <code>preview</code> phục vụ bản build tĩnh trong <code>dist/</code> nên bài vừa sửa
+            không hiện, bài mới tạo trả 404, và không có dấu hiệu nào cho biết bạn đang xem bản cũ.
           </div>
           <iframe id="khung-xem" title="Xem trước bài viết"></iframe>
         </div>
@@ -908,26 +987,66 @@
       }
 
       // ===== Xem trước =======================================================
-      async function lamMoiXem() {
-        const { song } = await (await fetch('/api/dev-song')).json();
-        $('canh-dev').hidden = song;
-        $('khung-xem').hidden = !song;
-        if (!song) {
-          $('xem-tt').textContent = '';
-          return;
-        }
+      let dangLamMoi = false;
+      /** Slug mà iframe đang nạp. Đổi bài thì phải gán lại `src`. */
+      let daNap = null;
 
-        $('xem-tt').textContent = 'Đang lưu và đồng bộ…';
-        if (!(await luu({ imLang: true }))) {
-          $('xem-tt').textContent = 'Bài chưa hợp lệ — sửa lỗi bên trái rồi thử lại.';
-          return;
-        }
+      async function lamMoiXem({ imLang = false } = {}) {
+        // Không cho hai lần cập nhật chồng nhau: `pnpm sync` ghi file, hai lần
+        // chạy song song có thể ghi dở dang lên nhau.
+        if (dangLamMoi) return;
+        dangLamMoi = true;
 
-        // `sync:drafts` vì bài đang viết gần như luôn là nháp.
-        await fetch('/api/sync?drafts=1', { method: 'POST' });
-        const slug = $('slug').value.trim();
-        $('khung-xem').src = `http://localhost:4321/blog/${slug}?t=${Date.now()}`;
-        $('xem-tt').textContent = `/blog/${slug}`;
+        try {
+          const { song, lyDo } = await (await fetch('/api/dev-song')).json();
+          $('canh-dev').hidden = song;
+          $('khung-xem').hidden = !song;
+          $('ly-do-dev').textContent = lyDo ?? '';
+          if (!song) {
+            $('xem-tt').textContent = '';
+            return;
+          }
+
+          $('xem-tt').textContent = 'đang cập nhật…';
+          if (!(await luu({ imLang: true }))) {
+            $('xem-tt').textContent = 'bài chưa hợp lệ — xem lỗi bên trên';
+            return;
+          }
+
+          // `sync:drafts` vì bài đang viết gần như luôn là nháp.
+          await fetch('/api/sync?drafts=1', { method: 'POST' });
+
+          const slug = $('slug').value.trim();
+          const dich = `http://localhost:4321/blog/${slug}`;
+
+          // Chờ Astro sinh route cho file MDX. Bài MỚI cần một nhịp; gán `src`
+          // trước lúc đó là nhận 404 và mắc ở đấy vĩnh viễn, vì bên dưới cố tình
+          // không gán lại `src` mỗi lần cập nhật.
+          let co = false;
+          for (let i = 0; i < 10 && !co; i += 1) {
+            ({ co } = await (
+              await fetch(`/api/dev-trang?slug=${encodeURIComponent(slug)}`)
+            ).json());
+            if (!co) await new Promise((r) => setTimeout(r, 700));
+          }
+
+          if (!co) {
+            $('xem-tt').textContent = 'dev server chưa sinh trang này — thử lại sau vài giây';
+            return;
+          }
+
+          // Chỉ gán `src` khi CHƯA nạp đúng bài này. Các lần cập nhật sau để HMR
+          // của Astro tự lo — gán lại `src` sẽ kéo iframe về đầu trang, mà đang
+          // đọc đoạn giữa bài bị kéo lên đầu thì rất khó chịu.
+          if (daNap !== slug) {
+            $('khung-xem').src = dich;
+            daNap = slug;
+          }
+
+          $('xem-tt').textContent = imLang ? `đã cập nhật · /blog/${slug}` : `/blog/${slug}`;
+        } finally {
+          dangLamMoi = false;
+        }
       }
 
       $('nut-xem').onclick = async () => {
@@ -937,7 +1056,29 @@
         $('nut-xem').setAttribute('aria-pressed', String(hien));
         if (hien) await lamMoiXem();
       };
-      $('nut-lam-moi').onclick = lamMoiXem;
+      $('nut-lam-moi').onclick = () => lamMoiXem();
+
+      /**
+       * Preview tự cập nhật: gõ xong ngừng 1,5 giây thì lưu + sync, và Astro dev
+       * tự nạp lại iframe qua HMR khi file MDX đổi.
+       *
+       * 1,5 giây là con số cân nhắc: ngắn hơn thì mỗi lần ngừng gõ để nghĩ là một
+       * lượt ghi database và một lần chạy `pnpm sync`; dài hơn thì mất cảm giác
+       * "thấy ngay".
+       *
+       * Chỉ chạy khi cột xem trước đang mở — không mở thì không có ai xem, chạy
+       * là tốn công vô ích.
+       *
+       * Tác dụng phụ có lợi: bài được lưu liên tục, nên đóng tab giữa lúc viết
+       * cũng không mất gì.
+       */
+      let hen = null;
+      function henLamMoi() {
+        if ($('cot-xem').hidden) return;
+        clearTimeout(hen);
+        $('xem-tt').textContent = 'sẽ cập nhật…';
+        hen = setTimeout(() => lamMoiXem({ imLang: true }), 1500);
+      }
 
       // ===== Ảnh =============================================================
       async function taiAnh(files) {
@@ -1012,8 +1153,17 @@
         taiAnh([...e.dataTransfer.files].filter((f) => f.type.startsWith('image/')));
       });
 
-      for (const id of TRUONG) $(id).addEventListener('input', capNhatDem);
+      for (const id of TRUONG) {
+        $(id).addEventListener('input', capNhatDem);
+        $(id).addEventListener('input', henLamMoi);
+      }
       $('content').addEventListener('input', veLaiHl);
+
+      $('nut-ds').onclick = () => {
+        const a = document.querySelector('aside');
+        a.hidden = !a.hidden;
+        $('nut-ds').setAttribute('aria-pressed', String(a.hidden));
+      };
       $('content').addEventListener('scroll', () => {
         $('hl').scrollTop = $('content').scrollTop;
         $('hl').scrollLeft = $('content').scrollLeft;
