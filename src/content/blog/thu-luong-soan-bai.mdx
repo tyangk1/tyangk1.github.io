@@ -1,0 +1,52 @@
+---
+title: "Thử luồng soạn bài: từ Supabase tới site"
+description: "Ghi lại toàn bộ chuỗi thao tác từ lúc soạn bài trong Supabase tới lúc bài hiện trên site, kèm chỗ dễ quên nhất là bước đồng bộ ra file."
+publishedAt: 2026-08-09
+tags: ["Astro","Web"]
+takeaways: ["Bốn bước từ Supabase tới site, và bước nào dễ quên","Ảnh trong Storage được tối ưu lúc build, không tải lúc chạy","Vì sao sửa file trong src/content/ bằng tay là vô nghĩa"]
+coverImage: "https://aglhmdrxpiwvnafctbxy.supabase.co/storage/v1/object/public/anh-blog/2026/so-do-luong-soan-bai.webp"
+coverAlt: "Sơ đồ bốn khối của luồng soạn bài, nối với nhau bằng mũi tên"
+draft: false
+featured: false
+---
+
+Bài này tồn tại để kiểm một thứ: từ lúc gõ chữ trong Supabase tới lúc
+người đọc thấy bài trên site, có bao nhiêu bước và bước nào dễ quên nhất.
+
+<Callout type="info" title="Câu trả lời ngắn">
+Bốn bước, và bước dễ quên là `pnpm sync`. Quên nó thì site vẫn deploy
+thành công — chỉ là bằng nội dung của lần commit trước.
+</Callout>
+
+## Bốn bước
+
+<Steps>
+1. Soạn nội dung trong Supabase Studio.
+2. `pnpm anh:upload ./anh/so-do.png` nếu bài có ảnh, rồi dán URL nó in ra.
+3. `pnpm sync` để kéo nội dung từ database ra file MDX.
+4. `git add -A && git commit && git push` — CI tự build và deploy.
+</Steps>
+
+<Figure
+  src="https://aglhmdrxpiwvnafctbxy.supabase.co/storage/v1/object/public/anh-blog/2026/so-do-luong-soan-bai.webp"
+  alt="Sơ đồ bốn khối: Supabase, pnpm sync, git push, CI và Deploy, nối với nhau bằng mũi tên"
+  caption="Ảnh này nằm trong Supabase Storage, nhưng được tải về và tối ưu lúc build."
+/>
+
+## Vì sao ảnh không tải từ Supabase lúc người đọc mở bài
+
+`astro.config.ts` khai báo host Storage trong `image.domains`, nên Astro tải
+ảnh gốc về **lúc build**, sinh nhiều kích thước kèm `srcset`, rồi phục vụ từ
+chính site.
+
+<PullQuote>
+Supabase Storage chỉ là chỗ chứa ảnh gốc. Site vẫn tĩnh 100%.
+</PullQuote>
+
+Nghĩa là không tốn băng thông Supabase mỗi lần có người đọc, và Storage lỗi cũng
+không ảnh hưởng người đang đọc bài.
+
+## Chỗ dễ sai
+
+Sửa file trong `src/content/` bằng tay là vô nghĩa — lần `pnpm sync` sau sẽ
+ghi đè. Database là nguồn sự thật lúc soạn.
