@@ -4,6 +4,14 @@ import { SITE, AUTHOR } from '~/site.config';
 import { getPublishedPosts } from '~/utils/posts';
 import { postHref } from '~/lib/routes';
 
+/*
+  Chạy lúc có request: người đăng ký RSS phải thấy bài mới ngay, không chờ build.
+
+  RSS là chỗ staleness gây hại rõ nhất — người đọc RSS chủ động chờ bài mới, và một feed
+  cũ nghĩa là họ bỏ luôn bài đó chứ không phải thấy muộn.
+*/
+export const prerender = false;
+
 export const GET: APIRoute = async (context) => {
   const posts = await getPublishedPosts();
 

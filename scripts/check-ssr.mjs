@@ -68,6 +68,31 @@ if (slugs.length === 0) {
   process.exit(1);
 }
 
+/** Bộ luật dùng chung cho mọi trang HTML — cùng luật với `check:html`. */
+function kiemTrangHtml(duong, html, { canMucLuc = false } = {}) {
+  if (!/<title>[^<]+<\/title>/.test(html)) bao(duong, 'thiếu <title>');
+
+  // Trang `noindex` được miễn description và canonical, cùng lý do như `check:html`:
+  // hai thẻ đó tồn tại để máy tìm kiếm hiển thị, mà trang đã nói "đừng index".
+  const noindex = /<meta name="robots" content="[^"]*noindex/.test(html);
+  if (!noindex) {
+    if (!/<meta name="description" content="[^"]+"/.test(html)) bao(duong, 'thiếu meta description');
+    if (!/<link rel="canonical" href="[^"]+"/.test(html)) bao(duong, 'thiếu canonical');
+  }
+
+  // `alt=""` là hợp lệ (ảnh trang trí), thiếu hẳn thuộc tính thì không.
+  for (const m of html.matchAll(/<img\b[^>]*>/g)) {
+    if (!/\balt=/.test(m[0])) bao(duong, `ảnh thiếu alt: ${m[0].slice(0, 70)}`);
+  }
+
+  const ids = [...html.matchAll(/\sid="([^"]+)"/g)].map((m) => m[1]);
+  const trung = ids.filter((v, i) => ids.indexOf(v) !== i);
+  if (trung.length) bao(duong, `id trùng: ${[...new Set(trung)].join(', ')}`);
+
+  if (canMucLuc && !/data-toc-link="/.test(html)) bao(duong, 'mục lục rỗng');
+}
+
+// ── Trang bài ─────────────────────────────────────────────────────────────────
 for (const slug of slugs.sort()) {
   const duong = `/blog/${slug}`;
   const res = await fetch(`${GOC}${duong}`);
@@ -78,32 +103,89 @@ for (const slug of slugs.sort()) {
     continue;
   }
 
-  // 1. Thẻ meta bắt buộc — cùng bộ luật với `check:html`.
-  if (!/<title>[^<]+<\/title>/.test(html)) bao(duong, 'thiếu <title>');
-  if (!/<meta name="description" content="[^"]+"/.test(html)) bao(duong, 'thiếu meta description');
-  if (!/<link rel="canonical" href="[^"]+"/.test(html)) bao(duong, 'thiếu canonical');
-
-  // 2. Ảnh thiếu alt. `alt=""` là hợp lệ (ảnh trang trí), thiếu hẳn thì không.
-  for (const m of html.matchAll(/<img\b[^>]*>/g)) {
-    if (!/\balt=/.test(m[0])) bao(duong, `ảnh thiếu alt: ${m[0].slice(0, 70)}`);
-  }
-
-  // 3. `id` trùng — làm neo heading và mục lục trỏ sai chỗ.
-  const ids = [...html.matchAll(/\sid="([^"]+)"/g)].map((m) => m[1]);
-  const trung = ids.filter((v, i) => ids.indexOf(v) !== i);
-  if (trung.length) bao(duong, `id trùng: ${[...new Set(trung)].join(', ')}`);
-
-  // 4. Mục lục phải có mục. Rỗng nghĩa là phần bóc heading đã vỡ.
-  if (!/data-toc-link="/.test(html)) bao(duong, 'mục lục rỗng');
-
-  // 5. Thân bài phải khớp ảnh chụp vàng — không được lệch khỏi hình dạng bản MDX.
+  kiemTrangHtml(duong, html, { canMucLuc: true });
   if (!html.includes('class="prose')) bao(duong, 'không tìm thấy khối .prose');
 }
 
-// 6. Ba trường hợp phải 404, không được là 200 trang trống hay 500.
+/*
+  ── Trang danh sách ───────────────────────────────────────────────────────────
+
+  Chúng cũng chạy on-demand nên `check:html` không thấy chúng nữa. Sau khi chuyển, số
+  trang HTML mà `check:html` quét được tụt còn 6 — nếu không kiểm ở đây thì trang chủ
+  không còn được kiểm alt ảnh hay id trùng bởi bất cứ bộ kiểm nào.
+*/
+const TRANG_DANH_SACH = ['/', '/blog', '/tags', '/search'];
+
+for (const duong of TRANG_DANH_SACH) {
+  const res = await fetch(`${GOC}${duong}`);
+  const html = await res.text();
+
+  if (res.status !== 200) {
+    bao(duong, `HTTP ${res.status}`);
+    continue;
+  }
+
+  kiemTrangHtml(duong, html);
+}
+
+// Từng trang tag, lấy tên tag từ chính trang /tags thay vì viết cứng danh sách.
+const trangTags = await (await fetch(`${GOC}/tags`)).text();
+const slugTags = [...new Set([...trangTags.matchAll(/href="\/tags\/([a-z0-9-]+)"/g)].map((m) => m[1]))];
+
+for (const t of slugTags) {
+  const duong = `/tags/${t}`;
+  const res = await fetch(`${GOC}${duong}`);
+  if (res.status !== 200) {
+    bao(duong, `HTTP ${res.status}`);
+    continue;
+  }
+  kiemTrangHtml(duong, await res.text());
+}
+
+// ── Hai endpoint XML: phải hợp lệ và phải CÓ bài ──────────────────────────────
+const sitemap = await fetch(`${GOC}/sitemap.xml`);
+const xmlSitemap = await sitemap.text();
+const soUrlBai = (xmlSitemap.match(/<loc>[^<]*\/blog\/[a-z0-9-]+<\/loc>/g) ?? []).length;
+
+if (sitemap.status !== 200) bao('/sitemap.xml', `HTTP ${sitemap.status}`);
+else if (soUrlBai < slugs.length) {
+  // Đây chính là lỗi đã xảy ra thật: sitemap vẫn hợp lệ XML nhưng rỗng phần bài viết,
+  // nên Google mất đường phát hiện mọi bài. Kiểm số lượng, không chỉ kiểm HTTP 200.
+  bao('/sitemap.xml', `chỉ có ${soUrlBai} URL bài, cần ít nhất ${slugs.length}`);
+}
+
+const rss = await fetch(`${GOC}/rss.xml`);
+const xmlRss = await rss.text();
+const soItem = (xmlRss.match(/<item>/g) ?? []).length;
+
+if (rss.status !== 200) bao('/rss.xml', `HTTP ${rss.status}`);
+else if (soItem < slugs.length) bao('/rss.xml', `chỉ có ${soItem} item, cần ít nhất ${slugs.length}`);
+
+// ── Tìm kiếm ──────────────────────────────────────────────────────────────────
+const timJson = await fetch(`${GOC}/search.json?q=${encodeURIComponent('tieng viet')}`);
+if (timJson.status !== 200) {
+  bao('/search.json', `HTTP ${timJson.status}`);
+} else {
+  const kq = await timJson.json();
+  // Gõ KHÔNG DẤU phải ra bài có dấu — đó là điểm quan trọng nhất của bộ tìm kiếm này.
+  if (!(kq.ket_qua ?? []).length) bao('/search.json', 'gõ không dấu "tieng viet" ra 0 kết quả');
+}
+
+const timTrang = await fetch(`${GOC}/search?q=${encodeURIComponent('tieng viet')}`);
+const htmlTim = await timTrang.text();
+// Kết quả phải nằm NGAY trong HTML, tức là trang chạy được khi JS bị chặn.
+if (!/id="search-results"[\s\S]{0,400}<li/.test(htmlTim)) {
+  bao('/search?q=', 'không có kết quả trong HTML — trang tìm kiếm phụ thuộc JS');
+}
+
+// ── Những đường phải 404, không được 200 trang trống hay 500 ───────────────────
 for (const [ten, duong] of [
-  ['slug không tồn tại', '/blog/khong-he-ton-tai-bao-gio'],
-  ['slug rỗng sau /blog/', '/blog/-'],
+  ['slug bài không tồn tại', '/blog/khong-he-ton-tai-bao-gio'],
+  ['tag không tồn tại', '/tags/khong-he-ton-tai-bao-gio'],
+  ['/blog/page/1 trùng với /blog', '/blog/page/1'],
+  ['số trang quá lớn', '/blog/page/999'],
+  ['số trang không phải số', '/blog/page/abc'],
+  ['số trang không nguyên', '/blog/page/2.5'],
 ]) {
   const res = await fetch(`${GOC}${duong}`);
   if (res.status !== 404) bao(duong, `${ten}: HTTP ${res.status}, cần 404`);
@@ -111,7 +193,10 @@ for (const [ten, duong] of [
 
 dungMay();
 
-console.log(`Đã gọi ${slugs.length} route bài trên máy chủ SSR.`);
+console.log(
+  `Đã gọi ${slugs.length} route bài, ${TRANG_DANH_SACH.length} trang danh sách, ` +
+    `${slugTags.length} trang tag, sitemap, RSS và tìm kiếm.`,
+);
 
 if (loi.length) {
   console.log('');

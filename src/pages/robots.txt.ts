@@ -19,7 +19,10 @@ export const GET: APIRoute = () => {
     '# được. Dòng này chỉ để trang đăng nhập không xuất hiện trong kết quả tìm kiếm.',
     'Disallow: /admin',
     '',
-    `Sitemap: ${absoluteUrl('/sitemap-index.xml')}`,
+    // `/sitemap.xml`, không phải `/sitemap-index.xml`: sitemap giờ do
+    // `src/pages/sitemap.xml.ts` sinh lúc có request, không phải `@astrojs/sitemap`.
+    // Lý do đổi nằm trong file đó — bản integration đã tụt xuống 0 URL bài.
+    `Sitemap: ${absoluteUrl('/sitemap.xml')}`,
     '',
   ].join('\n');
 

@@ -1,6 +1,7 @@
 ---
 import { SITE, AUTHOR, SOCIALS } from '~/site.config';
 import { getPublishedPosts, featuredPosts, collectTags } from '~/utils/posts';
+import { CACHE_DANH_SACH, datCache } from '~/lib/cache';
 import { absoluteUrl } from '~/utils/format';
 import { docLuotXem, baiDocNhieuNhat } from '~/utils/views';
 import BaseLayout from '~/layouts/BaseLayout.astro';
@@ -11,6 +12,16 @@ import TagPill from '~/components/TagPill.astro';
 import Newsletter from '~/components/Newsletter.astro';
 import Icon from '~/components/Icon.astro';
 import type { IconName } from '~/lib/icons';
+
+/*
+  Chạy lúc có request, để một bài mới xuất hiện ngay chứ không chờ build.
+
+  Danh sách bài là thứ đổi khi TẬP bài đổi, nên nó không cần render riêng cho từng người
+  đọc — tầng cache CDN 60 giây gánh phần đó, xem `~/lib/cache`.
+*/
+export const prerender = false;
+
+datCache(Astro.response, CACHE_DANH_SACH);
 
 const posts = await getPublishedPosts();
 const tags = collectTags(posts);

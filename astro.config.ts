@@ -1,6 +1,5 @@
 import { defineConfig } from 'astro/config';
 import mdx from '@astrojs/mdx';
-import sitemap from '@astrojs/sitemap';
 import node from '@astrojs/node';
 import tailwindcss from '@tailwindcss/vite';
 import { readFileSync } from 'node:fs';
@@ -77,18 +76,18 @@ export default defineConfig({
   */
   adapter: node({ mode: 'standalone' }),
 
-  integrations: [
-    mdx(),
-    sitemap({
-      // Ảnh OG là endpoint sinh ảnh, không phải trang — không đưa vào sitemap.
-      //
-      // `/admin` cũng bị loại: nó đã có `noindex`, mà vừa `noindex` vừa nằm trong
-      // sitemap là tự mâu thuẫn — sitemap nghĩa là "hãy index trang này". Google
-      // sẽ nghe thẻ `noindex` nên không có hại thật, nhưng nó chỉ đường cho người
-      // lạ tới trang đăng nhập một cách vô ích.
-      filter: (page) => !page.includes('/og/') && !page.includes('/admin'),
-    }),
-  ],
+  /*
+    KHÔNG dùng `@astrojs/sitemap` nữa. Sitemap do `src/pages/sitemap.xml.ts` sinh.
+
+    Integration đó chỉ liệt kê route SINH RA FILE lúc build. Trang bài và các trang danh
+    sách giờ chạy lúc có request nên không sinh file — đã đo: sitemap tụt còn 22 URL và 0
+    URL bài, tức Google mất đường phát hiện mọi bài viết. Nó vỡ im lặng: file vẫn tồn
+    tại, vẫn hợp lệ XML, chỉ là rỗng phần quan trọng nhất.
+
+    Giữ cả hai thì tệ hơn cả hai: `robots.txt` chỉ trỏ được vào một sitemap, và hai
+    sitemap không khớp nhau là tín hiệu mâu thuẫn gửi cho máy tìm kiếm.
+  */
+  integrations: [mdx()],
 
   markdown: {
     // Astro 7 nhận plugin remark/rehype qua `processor: unified({...})`.

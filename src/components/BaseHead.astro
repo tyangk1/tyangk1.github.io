@@ -118,7 +118,13 @@ const ogImageUrl = absoluteUrl(ogImage);
 <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
 <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
 <link rel="manifest" href="/site.webmanifest" />
-<link rel="sitemap" href="/sitemap-index.xml" />
+{
+  /* `/sitemap.xml`, không phải `/sitemap-index.xml`: sitemap giờ do
+    `src/pages/sitemap.xml.ts` sinh lúc có request, không phải `@astrojs/sitemap`.
+    Bỏ sót chỗ này thì mọi trang trên site đều trỏ vào một sitemap không tồn tại —
+    `pnpm check:html` bắt được, sau khi tôi đã đổi `robots.txt` mà quên file này. */
+}
+<link rel="sitemap" href="/sitemap.xml" />
 <link
   rel="alternate"
   type="application/rss+xml"

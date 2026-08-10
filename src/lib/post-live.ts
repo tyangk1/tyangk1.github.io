@@ -114,6 +114,51 @@ export async function layBaiDaDang(timeZone: string): Promise<PostLike[]> {
   return rows.map((row) => rowToPost({ ...row, content: '' }));
 }
 
+export interface KetQuaTim {
+  slug: string;
+  title: string;
+  description: string;
+  published_at: string;
+  tags: string[] | null;
+  rank: number;
+}
+
+/**
+ * Tìm bài bằng full-text search của Postgres.
+ *
+ * Gọi RPC `search_posts` (xem migration `20260815000000_full_text_search.sql`). Hàm đó là
+ * `security invoker` nên RLS vẫn áp dụng — khoá anon không lấy được bài nháp, và điều đó
+ * đã được kiểm bằng cách tấn công chính nó, có đối chứng.
+ *
+ * Gọi từ PHÍA MÁY CHỦ chứ không từ trình duyệt. Khoá anon vốn công khai nên đây không
+ * phải chuyện bảo mật; lý do là để trang tìm kiếm chạy được khi không có JS, và để chỗ
+ * đổi cách tìm kiếm về sau chỉ có một.
+ */
+export async function timBai(q: string, gioiHan = 20): Promise<KetQuaTim[]> {
+  const tuKhoa = q.trim();
+  if (tuKhoa.length < 2) return [];
+
+  const url = env('PUBLIC_SUPABASE_URL');
+  const key = env('PUBLIC_SUPABASE_ANON_KEY');
+  if (!url || !key) throw new Error('Thiếu PUBLIC_SUPABASE_URL hoặc PUBLIC_SUPABASE_ANON_KEY.');
+
+  const res = await fetch(`${url}/rest/v1/rpc/search_posts`, {
+    method: 'POST',
+    headers: {
+      apikey: key,
+      Authorization: `Bearer ${key}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ q: tuKhoa, max_results: gioiHan }),
+  });
+
+  if (!res.ok) {
+    throw new Error(`Tìm kiếm thất bại (HTTP ${res.status}): ${(await res.text()).slice(0, 200)}`);
+  }
+
+  return (await res.json()) as KetQuaTim[];
+}
+
 /** Giải mã thực thể ký tự, để chữ trong mục lục là chữ chứ không phải `&amp;`. */
 function giaiMa(text: string): string {
   const TEN: Record<string, string> = {

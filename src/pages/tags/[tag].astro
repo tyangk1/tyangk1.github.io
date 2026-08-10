@@ -1,28 +1,38 @@
 ---
-import type { GetStaticPaths } from 'astro';
-import { getPublishedPosts, collectTags, postsByTag, type Post } from '~/utils/posts';
+import { getPublishedPosts, collectTags, postsByTag } from '~/utils/posts';
+import { CACHE_DANH_SACH, CACHE_KHONG_TIM_THAY, datCache } from '~/lib/cache';
 import BaseLayout from '~/layouts/BaseLayout.astro';
 import PostCard from '~/components/PostCard.astro';
 import TagPill from '~/components/TagPill.astro';
-import type { TagCount } from '~/utils/posts';
 
-export const getStaticPaths: GetStaticPaths = async () => {
-  const posts = await getPublishedPosts();
-  const tags = collectTags(posts);
+/*
+  Chạy lúc có request, nên KHÔNG còn `getStaticPaths`.
 
-  return tags.map((tag) => ({
-    params: { tag: tag.slug },
-    props: { tag, tags, items: postsByTag(posts, tag.slug) },
-  }));
-};
+  Đây là lý do quan trọng hơn "để bài mới hiện ra": với `getStaticPaths`, tập trang tag
+  được đóng băng lúc build. Một bài mới mang tag CHƯA TỪNG dùng thì trang tag đó không
+  tồn tại — và chính bài đó lại có link trỏ tới nó. Tức là đăng một bài với tag mới là
+  tự tạo ra một link 404 trên trang bài của mình.
+*/
+export const prerender = false;
 
-interface Props {
-  tag: TagCount;
-  tags: TagCount[];
-  items: Post[];
+const posts = await getPublishedPosts();
+const tags = collectTags(posts);
+const tag = tags.find((t) => t.slug === Astro.params.tag);
+
+/*
+  Tag không có bài nào thì 404, không phải trang trống.
+
+  Cố ý đối chiếu với tag CÓ THẬT thay vì nhận mọi giá trị params rồi hiện danh sách rỗng:
+  cách kia biến mọi chuỗi gõ bừa thành một URL trả 200, và Google sẽ index chúng.
+*/
+if (!tag) {
+  datCache(Astro.response, CACHE_KHONG_TIM_THAY);
+  return Astro.rewrite('/404');
 }
 
-const { tag, tags, items } = Astro.props;
+datCache(Astro.response, CACHE_DANH_SACH);
+
+const items = postsByTag(posts, tag.slug);
 ---
 
 <BaseLayout

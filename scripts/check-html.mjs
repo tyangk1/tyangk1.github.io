@@ -35,11 +35,38 @@ const SLUG_BAI = new Set(
   (await readdir('src/content/blog').catch(() => [])).map((f) => f.replace(/\.mdx?$/, '')),
 );
 
-function laRouteChay(duong) {
-  if (duong === '/404') return true;
+/** Route on-demand có đường dẫn cố định. */
+const DUONG_CO_DINH = new Set([
+  '/',
+  '/404',
+  '/blog',
+  '/tags',
+  '/search',
+  '/search.json',
+  '/rss.xml',
+  '/sitemap.xml',
+]);
 
-  const m = duong.match(/^\/blog\/([^/]+)$/);
-  return m ? SLUG_BAI.has(m[1]) : false;
+function laRouteChay(duong) {
+  if (DUONG_CO_DINH.has(duong)) return true;
+
+  // `/blog/<slug>` — đối chiếu với tập slug thật, xem chú thích ở trên.
+  const bai = duong.match(/^\/blog\/([^/]+)$/);
+  if (bai) return SLUG_BAI.has(bai[1]);
+
+  // `/blog/page/<n>` — chỉ số nguyên. Trang 1 nằm ở `/blog` nên bắt đầu từ 2.
+  const trang = duong.match(/^\/blog\/page\/(\d+)$/);
+  if (trang) return Number(trang[1]) >= 2;
+
+  /*
+    `/tags/<slug>` — nhận mọi slug dạng chữ-số-gạch.
+
+    Ở đây KHÔNG đối chiếu được với danh sách tag thật: tag nằm trong trường `tags` của
+    từng bài, và bộ kiểm này chỉ đọc tên file. Đổi lại, `pnpm check:ssr` gọi thật từng
+    trang tag lấy từ chính trang `/tags`, nên tag gõ sai vẫn bị bắt — chỉ là bắt ở bộ
+    kiểm khác. Nói ra chỗ hụt này để người sau không tưởng nó đã được phủ ở đây.
+  */
+  return /^\/tags\/[a-z0-9-]+$/.test(duong);
 }
 
 async function htmlFiles(dir) {

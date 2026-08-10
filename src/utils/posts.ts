@@ -1,6 +1,7 @@
 import { getCollection, type CollectionEntry } from 'astro:content';
 import { slugify } from '~/utils/format';
 import { SITE } from '~/site.config';
+import { layBaiDaDang } from '~/lib/post-live';
 
 export type Post = CollectionEntry<'blog'>;
 
@@ -20,14 +21,43 @@ export type Post = CollectionEntry<'blog'>;
  * `src/content/blog/` mà không đi qua database.
  */
 export async function getPublishedPosts(): Promise<Post[]> {
-  const today = todayInSiteZone();
+  try {
+    /*
+      Database là nguồn sự thật, không phải `src/content/blog`.
 
-  const posts = await getCollection(
-    'blog',
-    ({ data }) => import.meta.env.DEV || (!data.draft && postDate(data.publishedAt) <= today),
-  );
+      Content Layer biên dịch bài LÚC BUILD, nên `getCollection()` trả về bản chụp lúc
+      build và một bài mới không hiện ra tới lần build kế tiếp. Đọc thẳng database ở đây
+      làm cho MỌI trang dùng hàm này thành live cùng lúc — trang chủ, tag, RSS, sitemap —
+      thay vì phải sửa từng trang một.
 
-  return posts.sort((a, b) => b.data.publishedAt.valueOf() - a.data.publishedAt.valueOf());
+      Ép kiểu sang `Post` được giải thích trong `~/lib/post-live`: phần các trang thật sự
+      đọc đã khai đủ trong `PostLike`.
+    */
+    return (await layBaiDaDang(SITE.timeZone)) as unknown as Post[];
+  } catch (loi) {
+    /*
+      Không có database thì CHỈ ở dev mới lùi về file MDX.
+
+      Ở production thì cố tình để lỗi nổ ra. Lùi về bản chụp lúc build nghe như một lưới
+      an toàn, nhưng nó có một cách hỏng cụ thể và không sửa lại được: một bài đã bị rút
+      xuống nháp vẫn còn trong bản chụp, nên site sẽ ĐĂNG LẠI thứ tác giả vừa rút. Trang
+      lỗi thì người ta thấy và sửa; đăng lại bài đã rút thì không ai thấy.
+
+      Ở dev thì ngược lại: `pnpm dev --allow-offline` tồn tại để viết bài khi không có
+      mạng, và ở đó bản chụp là đúng thứ cần.
+    */
+    if (!import.meta.env.DEV) throw loi;
+
+    console.warn(`[posts] không đọc được database, lùi về src/content/blog: ${loi}`);
+
+    const today = todayInSiteZone();
+    const posts = await getCollection(
+      'blog',
+      ({ data }) => import.meta.env.DEV || (!data.draft && postDate(data.publishedAt) <= today),
+    );
+
+    return posts.sort((a, b) => b.data.publishedAt.valueOf() - a.data.publishedAt.valueOf());
+  }
 }
 
 /** Hôm nay theo múi giờ blog, dạng `YYYY-MM-DD`. Xem chú thích ở `SITE.timeZone`. */
