@@ -678,6 +678,33 @@ pnpm newsletter:send --post=<slug> # thông báo một bài
 pnpm newsletter:auto               # mọi bài đã lên mà chưa gửi
 ```
 
+### Mất mật khẩu `/admin` thì làm gì
+
+```bash
+pnpm admin:password
+```
+
+Nó sinh mật khẩu mới, đặt vào Supabase Auth, ghi vào `.env`, rồi **đăng nhập thử** để
+chứng minh mật khẩu đó dùng được. Không in mật khẩu ra terminal — mật khẩu đi qua
+terminal là mật khẩu đi vào scrollback, vào log, và vào ảnh chụp màn hình.
+
+**Không có cách nào "tìm lại" mật khẩu cũ, và đó là đúng.** Supabase lưu bản đã băm
+trong `auth.users`; không ai đọc ngược ra được — không phải bạn, không phải script,
+không phải Supabase. Mất thì chỉ đặt lại.
+
+#### Mỗi bí mật nằm ở đâu
+
+| Bí mật                    | Ở đâu                                                                          | Đọc lại được?                |
+| ------------------------- | ------------------------------------------------------------------------------ | ---------------------------- |
+| Mật khẩu `/admin` của bạn | Supabase Auth (đã băm). Bản dùng được: `.env` → `ADMIN_PASSWORD`               | Không — chỉ đặt lại          |
+| Mật khẩu hai bot          | `.env` → `SUPABASE_BOT_PASSWORD`, `NEWSLETTER_BOT_PASSWORD`; và GitHub Secrets | Không, nhưng tạo lại được    |
+| Khoá AI, Resend, Supabase | `.env` và GitHub Secrets                                                       | Xem ở dashboard nhà cung cấp |
+| Ai là admin               | Bảng `admins` trong database                                                   | Có — `select * from admins`  |
+
+Hai dòng `ADMIN_*` trong `.env` **không được code nào đọc** — chúng chỉ ở đó để bạn tìm
+lại được. Chuyển vào trình quản lý mật khẩu rồi xoá đi: `.env` đã được gitignore, nhưng
+nó không phải chỗ dành cho mật khẩu của người.
+
 ### Ba tài khoản, ba bộ quyền
 
 Trên CI **không** dùng `service_role`: khoá đó đi xuyên toàn bộ RLS, tức đọc được cả
