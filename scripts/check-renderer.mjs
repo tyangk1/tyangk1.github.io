@@ -48,10 +48,10 @@ const GOLDEN_DIR = 'tests/renderer-golden';
  * `table-scroll`, `steps`), nên cách đó cắt giữa bài.
  */
 function extractProseBody(html) {
-  const batDau = html.indexOf(PROSE_OPEN);
-  if (batDau === -1) return null;
+  const start = html.indexOf(PROSE_OPEN);
+  if (start === -1) return null;
 
-  const i = batDau + PROSE_OPEN.length;
+  const i = start + PROSE_OPEN.length;
   const end = findClosingTag(html, i, 'div', 1);
 
   return end === -1 ? null : stripTakeaways(html.slice(i, end));
@@ -359,10 +359,10 @@ if (REGENERATE) {
 
   for (const file of readdirSync('src/content/blog').filter((f) => f.endsWith('.mdx')).sort()) {
     const slug = file.replace(/\.mdx$/, '');
-    const trang = `dist/blog/${slug}/index.html`;
-    if (!existsSync(trang)) continue;
+    const pagePath = `dist/blog/${slug}/index.html`;
+    if (!existsSync(pagePath)) continue;
 
-    const prose = extractProseBody(readFileSync(trang, 'utf8'));
+    const prose = extractProseBody(readFileSync(pagePath, 'utf8'));
     if (prose === null) continue;
 
     writeFileSync(`${GOLDEN_DIR}/${slug}.html`, `${normalize(prose)}\n`, 'utf8');

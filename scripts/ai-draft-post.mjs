@@ -117,7 +117,7 @@ const MIN_WORDS = num('AI_MIN_WORDS', 900);
  * Trả lỗi về dạng giống `validatePost` để nó đi tiếp vào cùng vòng sửa: model được xem
  * lỗi và sửa, thay vì cả brief bị đánh dấu thất bại.
  */
-async function loiRender(content) {
+async function renderProblems(content) {
   let ra;
   try {
     ra = await renderContent(content);
@@ -132,10 +132,10 @@ async function loiRender(content) {
     ];
   }
 
-  const loi = [];
+  const problems = [];
 
   if (ra.unknown.length) {
-    loi.push({
+    problems.push({
       field: 'content',
       message:
         `Thân bài dùng thành phần không tồn tại: ${ra.unknown.join(', ')}. ` +
@@ -146,10 +146,10 @@ async function loiRender(content) {
   }
 
   for (const v of ra.invalid) {
-    loi.push({ field: 'content', message: `Thân bài dùng thành phần sai: ${v}` });
+    problems.push({ field: 'content', message: `Thân bài dùng thành phần sai: ${v}` });
   }
 
-  return loi;
+  return problems;
 }
 
 const argv = process.argv.slice(2);
@@ -283,7 +283,7 @@ async function draftPost(item, log) {
       });
     }
 
-    errors.push(...(await loiRender(post.content)));
+    errors.push(...(await renderProblems(post.content)));
 
     if (errors.length === 0) return post;
 

@@ -161,7 +161,7 @@ export async function searchPosts(q: string, limit = 20): Promise<SearchHit[]> {
 
 /** Giải mã thực thể ký tự, để chữ trong mục lục là chữ chứ không phải `&amp;`. */
 function decodeEntities(text: string): string {
-  const TEN: Record<string, string> = {
+  const ENTITY_NAMES: Record<string, string> = {
     amp: '&',
     lt: '<',
     gt: '>',
@@ -173,7 +173,7 @@ function decodeEntities(text: string): string {
   return text
     .replace(/&#x([0-9a-fA-F]+);/g, (_a, hex) => String.fromCodePoint(parseInt(hex, 16)))
     .replace(/&#(\d+);/g, (_a, dec) => String.fromCodePoint(Number(dec)))
-    .replace(/&([a-z]+);/gi, (all, ten) => TEN[ten.toLowerCase()] ?? all);
+    .replace(/&([a-z]+);/gi, (all, ten) => ENTITY_NAMES[ten.toLowerCase()] ?? all);
 }
 
 /**
