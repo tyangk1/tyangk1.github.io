@@ -34,6 +34,7 @@ import { loadEnv, env } from './lib/env.mjs';
 import { resolveAuth, makeRest, SUPABASE_URL } from './lib/db-auth.mjs';
 import { LIMITS, validatePost, normalizePost, slugify, today } from './lib/post.mjs';
 import { systemPrompt, userPrompt, fixPrompt } from './lib/draft-prompt.mjs';
+import { parseDraft, describeRaw } from './lib/parse-draft.mjs';
 
 // Phải nạp TRƯỚC khi đọc biến bên dưới — `node` thuần không tự đọc `.env`.
 await loadEnv();
@@ -159,30 +160,6 @@ async function callModel(messages) {
   return content;
 }
 
-/** Bóc JSON ra khỏi câu trả lời, chịu được cả khi model bọc trong ```json. */
-function parseDraft(raw) {
-  let s = raw.trim();
-
-  const fence = s.match(/```(?:json)?\s*([\s\S]*?)```/);
-  if (fence) s = fence[1].trim();
-
-  // Vài model thêm một câu dẫn trước JSON. Cắt từ dấu { đầu tới } cuối.
-  const first = s.indexOf('{');
-  const last = s.lastIndexOf('}');
-  if (first > 0 || last < s.length - 1) {
-    if (first === -1 || last === -1) throw new Error('Không tìm thấy object JSON nào.');
-    s = s.slice(first, last + 1);
-  }
-
-  const obj = JSON.parse(s);
-  for (const key of ['title', 'description', 'content']) {
-    if (typeof obj[key] !== 'string' || !obj[key].trim()) {
-      throw new Error(`Thiếu hoặc rỗng khoá "${key}".`);
-    }
-  }
-  return obj;
-}
-
 /**
  * Soạn một bài, có vòng sửa lỗi.
  *
@@ -202,8 +179,13 @@ async function draftPost(item, log) {
     try {
       draft = parseDraft(raw);
     } catch (e) {
-      if (attempt === MAX_FIXES) throw new Error(`Không bóc được JSON: ${e.message}`);
-      log(`  lượt ${attempt + 1}: JSON không bóc được (${e.message}) — hỏi lại`);
+      if (attempt === MAX_FIXES) {
+        throw new Error(
+          `Không bóc được JSON: ${e.message}\n     model trả về: ${describeRaw(raw)}`,
+        );
+      }
+      log(`  lượt ${attempt + 1}: JSON không bóc được (${e.message})`);
+      log(`     model trả về: ${describeRaw(raw)}`);
       messages.push({ role: 'assistant', content: raw.slice(0, 4000) });
       messages.push({ role: 'user', content: 'Trả về DUY NHẤT object JSON, không kèm gì khác.' });
       continue;
