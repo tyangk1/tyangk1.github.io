@@ -18,7 +18,7 @@ export function limitsBlock(limits) {
 const MDX_COMPONENTS = `Trong thân bài dùng được đúng bốn thành phần sau, viết y nguyên cú pháp:
 
 <Callout type="info" title="Tiêu đề hộp">
-Nội dung. type nhận: info | warning | success | tip
+Nội dung. type nhận: note | tip | warning | danger — KHÔNG có type nào khác
 </Callout>
 
 <Steps>

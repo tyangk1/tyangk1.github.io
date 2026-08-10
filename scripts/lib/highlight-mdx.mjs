@@ -68,7 +68,7 @@ export function highlightMdx(vanBan) {
 /** Mẫu chèn nhanh cho thanh công cụ. Dùng chung để hai admin chèn giống nhau. */
 export const MDX_SNIPPETS = {
   callout:
-    '\n<Callout type="info" title="Tiêu đề hộp">\nNội dung. type nhận: info | warning | success | tip\n</Callout>\n',
+    '\n<Callout type="info" title="Tiêu đề hộp">\nNội dung. type nhận: note | tip | warning | danger\n</Callout>\n',
   steps: '\n<Steps>\n1. Bước một.\n2. Bước hai.\n3. Bước ba.\n</Steps>\n',
   figure:
     '\n<Figure\n  src=""\n  alt="Mô tả ảnh cho người dùng screen reader"\n  caption="Chú thích hiện dưới ảnh"\n/>\n',
