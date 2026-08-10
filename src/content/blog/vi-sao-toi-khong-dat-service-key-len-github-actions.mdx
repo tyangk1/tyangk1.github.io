@@ -1,0 +1,72 @@
+---
+title: "Vì sao tôi không đặt service key lên GitHub Actions"
+description: "Service key Supabase bỏ qua toàn bộ RLS. Đặt lên GitHub Actions là giao quyền chủ database cho script. Hãy đổi thành nhiều tài khoản bot phân quyền."
+publishedAt: 2026-08-10
+tags: ["Bảo mật","CI/CD"]
+takeaways: ["Service key Supabase bypass RLS, đọc được toàn bộ dữ liệu nhạy cảm.","Tách service key thành nhiều bot account riêng biệt, mỗi bot một bộ quyền.","Thu hồi quyền của bot chỉ bằng cách xóa một dòng trong bảng admins."]
+coverImage: "https://aglhmdrxpiwvnafctbxy.supabase.co/storage/v1/object/public/anh-blog/2026/sukuna-x-gojo-3840x2160-21530.png"
+coverAlt: "222"
+draft: false
+featured: false
+---
+
+## Sức mạnh đáng sợ của Supabase service key trên CI/CD
+
+Nhiều lập trình viên vứt service key của Supabase thẳng vào GitHub Actions để tự động hóa mọi thứ. Hành động này vô tình biến một script viết bài đơn giản thành một con bot có toàn quyền tối cao với cơ sở dữ liệu. Service key Supabase đi xuyên toàn bộ RLS. Nó đọc được bảng email người đăng ký, mọi bài nháp, mọi bucket, và cả schema auth.
+
+Đặt service key lên GitHub Actions là cho một script soạn bài dùng bộ quyền của chủ database. Khi CI/CD bị lộ secret hoặc một dependency độc hại len lỏi vào workflow, kẻ tấn công nắm trọn toàn bộ hệ thống. Không có lớp bảo vệ nào đứng giữa script tự động và dữ liệu người dùng.
+
+Việc giao quyền tối cao cho một script tự động hóa đơn giản giống như việc đưa chìa khóa két sắt công ty cho nhân viên bảo vệ quét dọn. Bạn tin tưởng công cụ, nhưng bạn không thể kiểm soát được điều gì xảy ra khi công cụ đó bị xâm nhập từ bên ngoài. Các chuỗi cung ứng phần mềm trên GitHub Actions thường xuyên đối mặt với nguy cơ bị tấn công qua các dependency bên thứ ba.
+
+<Callout type="warning" title="Rủi ro lộ secret">
+Một khi service key bị lộ trên CI/CD, kẻ tấn công có quyền đọc và ghi mọi bảng trong cơ sở dữ liệu, vượt qua hoàn toàn các chính sách bảo mật hàng cột.
+</Callout>
+
+## Đổi một khóa toàn năng thành nhiều tài khoản bot
+
+Cách giải quyết là vứt bỏ service key khỏi CI/CD và dùng các tài khoản bot riêng biệt. Mỗi việc một bộ quyền hạn rõ ràng. Tôi tạo ra các tài khoản bot và định danh chúng trong bảng admins thay vì dùng chung một khóa quản trị.
+
+Quyền hạn của từng bot được quyết định trực tiếp bởi các cột trong bảng đó. Ví dụ cụ thể:
+
+- Bot soạn bài: `can_read_subscribers = false`
+- Bot newsletter: `can_read_subscribers = true`
+
+Khi chia nhỏ quyền như vậy, mỗi tác vụ chỉ nắm giữ đúng thứ nó cần để hoàn thành công việc. Script soạn bài chỉ cần quyền ghi vào bảng bài viết và bucket hình ảnh. Nó hoàn toàn không có lý do gì để nhìn thấy danh sách người đăng ký nhận bản tin.
+
+<Steps>
+1. Xóa service key khỏi toàn bộ secret của GitHub Actions.
+2. Tạo các tài khoản bot riêng biệt lưu trong hệ thống.
+3. Thêm các cột phân quyền chi tiết vào bảng quản trị.
+</Steps>
+
+<PullQuote>
+Mỗi việc một tài khoản bot, quyền do cột trong bảng quyết định.
+</PullQuote>
+
+## Kiểm chứng thực tế bằng JWT thật của bot
+
+Tôi đã kiểm bằng JWT thật của bot soạn bài và có đối chứng rõ ràng. Bảng newsletter_subscribers có 2 dòng. Chủ blog đăng nhập vào thì thấy 2 dòng. Trong khi đó, bot soạn bài truy vấn chỉ thấy 0 dòng. Khi bot cố tình xóa dữ liệu, hệ thống trả về lỗi 403 permission denied ngay lập tức.
+
+Sự phân tách này chặn đứng nguy cơ rò rỉ dữ liệu khi bot soạn bài bị chiếm quyền. Nó không thể đọc danh sách email người đăng ký dù đang chạy cùng một môi trường CI/CD. Kết quả thực tế cho thấy mô hình phân quyền dựa trên database hoạt động cực kỳ chính xác.
+
+<Callout type="tip" title="Kết quả kiểm thử">
+JWT của bot soạn bài trả về đúng 0 dòng khi truy vấn bảng nhạy cảm và nhận lỗi 403 khi cố gắng thực hiện các thao tác ngoài phạm vi cho phép.
+</Callout>
+
+## Cạm bẫy chết người khi phân quyền bot
+
+Ban đầu, policy cho mọi admin đọc bảng email. Nếu bạn đổi service key thành bot mà không tách quyền thì hóa ra chỉ đổi tên chứ không nhỏ đi. Bảo mật vẫn giữ nguyên ở mức lỏng lẻo.
+
+Đây là cái bẫy lớn nhất mà tôi gặp phải trong quá trình cấu hình. Tôi cứ nghĩ rằng việc tạo ra một tài khoản bot riêng là đủ để cô lập quyền hạn. Nhưng nếu chính sách hàng cột vẫn gom nhóm tất cả các tài khoản có vai trò admin vào chung một điều kiện đọc, thì con bot mới tạo vẫn có quyền lực tối cao y như cũ.
+
+<Callout type="note" title="Bài học xương máu">
+Tách bot là chưa đủ nếu chính sách RLS vẫn gom nhóm quyền admin lại với nhau. Phải tách biệt hoàn toàn phạm vi truy cập dữ liệu của từng bot.
+</Callout>
+
+Để khắc phục, tôi phải thêm cột `can_read_subscribers` và một hàm security definer riêng. Lý do là policy chạy trên `newsletter_subscribers` cần đọc bảng `admins` để quyết định, mà bảng `admins` lại có tính không có policy nào để tránh lặp vô hạn.
+
+Khi cần thu hồi một bot, tôi chỉ việc xóa một dòng trong bảng admins. Bot đó mất quyền truy cập ngay lập tức mà không cần đổi hay thu hồi key hệ thống. Thao tác này cực kỳ nhanh gọn và không làm ảnh hưởng đến các tiến trình CI/CD khác đang chạy song song.
+
+## Hành động ngay hôm nay
+
+Kiểm tra lại ngay các repository GitHub Actions của bạn xem có đang cất giữ service key nào không. Xóa nó đi, tạo các tài khoản bot với quyền hạn tối thiểu cho từng tác vụ tự động hóa cụ thể. Sự an toàn của cơ sở dữ liệu bắt đầu từ việc thu hồi những đặc quyền không cần thiết.

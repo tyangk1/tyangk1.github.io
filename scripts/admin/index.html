@@ -1226,6 +1226,9 @@
         toast('Đã xoá', 'ok');
       };
       $('btn-new').onclick = () => {
+        // Rời bảng sang trình soạn: "Bài mới" bấm được từ cả hai màn hình, và ở màn hình
+        // bảng thì chỉ dựng form trống mà không chuyển màn hình là bấm xong không thấy gì.
+        showPosts(false);
         fillForm(null);
         $('title').focus();
       };
@@ -1445,6 +1448,19 @@
       config = await (await fetch('/api/config')).json();
       await loadPosts();
       fillForm(null);
+
+      /*
+        MỞ RA LÀ THẤY BẢNG, không phải thấy form trống.
+
+        Đây là thứ tự đúng của một công cụ quản lý nội dung: danh sách là cửa sổ chính, chọn
+        một dòng mới mở chi tiết. Bản trước mở ra là form "Bài mới" và bảng nằm sau một cái
+        nút — tức mặc định là "viết bài mới", trong khi việc thường làm hơn nhiều là tìm một
+        bài đã có để sửa.
+
+        `fillForm(null)` vẫn gọi TRƯỚC: nó dựng trạng thái sạch cho trình soạn, nên khi người
+        dùng bấm "Bài mới" hoặc chọn một bài thì form đã ở trạng thái xác định.
+      */
+      showPosts(true);
     </script>
   </body>
 </html>
