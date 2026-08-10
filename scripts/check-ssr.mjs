@@ -194,9 +194,23 @@ if (searchJson.status !== 200) {
 
 const searchPage = await fetch(`${ORIGIN}/search?q=${encodeURIComponent('tieng viet')}`);
 const searchHtml = await searchPage.text();
-// Kết quả phải nằm NGAY trong HTML, tức là trang chạy được khi JS bị chặn.
-if (!/id="search-results"[\s\S]{0,400}<li/.test(searchHtml)) {
-  report('/search?q=', 'không có kết quả trong HTML — trang tìm kiếm phụ thuộc JS');
+
+/*
+  Tìm SLUG của bài trong HTML, không phải tìm một thẻ `<li>` nào đó.
+
+  Bản đầu tôi viết `/id="search-results"[\s\S]{0,400}<li/` và nó BÁO ĐẠT SAI trên một bản
+  deploy chạy code cũ — code đó không có tìm kiếm phía máy chủ nào cả, `<ul id="search-results">`
+  rỗng, nhưng mẫu trên khớp vào `<li>` của danh sách tag ở khối "Duyệt theo chủ đề" ngay bên
+  dưới. Một phép kiểm báo đạt trên đúng thứ nó sinh ra để bắt thì tệ hơn không có nó.
+
+  Giờ đòi đúng hai điều kiện cụ thể: link tới bài khớp truy vấn, và số kết quả trong dòng
+  trạng thái. Cả hai chỉ có thể do máy chủ sinh ra.
+*/
+if (!searchHtml.includes('/blog/css-cho-tieng-viet')) {
+  report('/search?q=', 'HTML không có link tới bài khớp — tìm kiếm không chạy phía máy chủ');
+}
+if (!/\d+ kết quả cho/.test(searchHtml)) {
+  report('/search?q=', 'HTML không có dòng "N kết quả cho" — trang phụ thuộc JS');
 }
 
 /*

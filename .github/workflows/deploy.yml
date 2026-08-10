@@ -10,12 +10,29 @@ name: Deploy
 # publish" cũng cần đúng các bước đó — nó không kích hoạt được CI (GitHub không
 # chạy workflow cho push tạo bởi GITHUB_TOKEN), nên nó gọi thẳng workflow kia.
 # Xem chú thích đầy đủ trong `build-and-deploy.yml`.
+# ┌─────────────────────────────────────────────────────────────────────────────┐
+# │ TOÀN BỘ PHẦN TRÊN MÔ TẢ CÁCH LÀM CŨ. ĐỌC KHỐI NÀY TRƯỚC.                    │
+# └─────────────────────────────────────────────────────────────────────────────┘
+#
+# Site giờ deploy trên Vercel — xem `DEPLOY.md`. GitHub Pages không chạy được máy chủ, mà
+# trang bài và các trang danh sách đọc database lúc có request, nên đẩy bản build hiện tại
+# lên Pages sẽ làm sập cả site (không chỉ mất trang bài: có adapter thì Astro dồn file cho
+# trình duyệt vào `dist/client/`, nên `path: dist` đẩy mọi thứ xuống một tầng).
+#
+# `build-and-deploy.yml` đã dừng có chủ ý khi thấy `dist/server`. Nhưng để trigger tự động
+# ở đây thì mỗi lần push lên main sẽ có một workflow ĐỎ — và main đỏ vĩnh viễn là cách
+# nhanh nhất dạy người ta bỏ qua CI, kể cả lúc nó đỏ vì lý do thật. Nên tắt trigger, giữ
+# lại `workflow_dispatch` để còn đường lùi về Pages nếu cần.
+#
+# Muốn quay lại site tĩnh hoàn toàn: bỏ `adapter` trong `astro.config.ts` và cho trang bài
+# cùng các trang danh sách prerender trở lại.
 on:
-  workflow_run:
-    workflows: [CI]
-    types: [completed]
-    branches: [main]
-  # Cho phép bấm chạy tay, tiện khi cần deploy lại mà không sửa gì.
+  # workflow_run:
+  #   workflows: [CI]
+  #   types: [completed]
+  #   branches: [main]
+
+  # Bấm chạy tay — giờ là cách duy nhất, và chỉ dùng khi thật sự muốn thử lại đường Pages.
   workflow_dispatch:
 
 jobs:
