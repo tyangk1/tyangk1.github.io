@@ -1283,12 +1283,12 @@
           const r = await fetch('/api/publish-now', { method: 'POST' });
           const j = await r.json();
 
-          if (!r.ok) toast(Không gọi được deploy: ${j.errors ?? r.status}, 'bad');
+          if (!r.ok) toast(`Không gọi được deploy: ${j.errors ?? r.status}`, 'bad');
           else if (j.result === 'qua_som') toast('Vừa có một lần deploy — đợi nó xong đã', 'bad');
           else if (j.result === 'chua_cau_hinh') toast('Chưa cất token: chạy pnpm deploy:token', 'bad');
           else toast('Đã gọi deploy — bài lên trong khoảng 1–2 phút', 'ok');
         } catch (e) {
-          toast(`Lỗi: ${e.message}, 'bad');
+          toast(`Lỗi: ${e.message}`, 'bad');
         } finally {
           setTimeout(() => (btn.disabled = false), 60000);
         }

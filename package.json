@@ -27,7 +27,7 @@
     "check:html": "node scripts/check-html.mjs",
     "check:renderer": "node scripts/check-renderer.mjs",
     "check:ssr": "node scripts/check-ssr.mjs",
-    "check:all": "pnpm typecheck && pnpm build && pnpm check:content && pnpm check:parse && pnpm check:html && pnpm check:renderer && pnpm check:ssr",
+    "check:all": "pnpm typecheck && pnpm check:scripts && pnpm build && pnpm check:content && pnpm check:parse && pnpm check:html && pnpm check:renderer && pnpm check:ssr",
     "lighthouse": "pnpm dlx lighthouse@12 http://localhost:4321/ --output=html --output-path=./lighthouse-report.html --chrome-flags=\"--headless=new\"",
     "icons": "node scripts/generate-icons.mjs",
     "format": "prettier --write .",
@@ -38,7 +38,8 @@
     "check:parse": "node scripts/check-parse-draft.mjs",
     "admin:password": "node scripts/admin-password.mjs",
     "deploy:token": "node scripts/deploy-token.mjs",
-    "check:deploy": "node scripts/check-ssr.mjs"
+    "check:deploy": "node scripts/check-ssr.mjs",
+    "check:scripts": "node scripts/check-inline-scripts.mjs"
   },
   "dependencies": {
     "@astrojs/markdown-remark": "^7.2.2",

@@ -103,16 +103,19 @@ export function mountPostListUi(
   injectCss();
 
   /*
-    Bỏ cuộn của phần tử chứa.
+    Chuyển việc cuộn từ `#ds` vào bên trong.
 
-    `#ds` mang class `.list` có `overflow-y: auto` và giới hạn chiều cao — đúng cho một cột
-    cuộn phẳng, nhưng ở đây nó sẽ tạo HAI vùng cuộn lồng nhau: một của `.list`, một của
-    `.pl-scroll`. Hai thanh cuộn lồng nhau là chỗ không ai bấm đúng được.
+    `#ds` mang class `.list` có `overflow-y: auto` — nếu để nguyên thì có HAI vùng cuộn lồng
+    nhau, và ô tìm cùng thanh phân trang sẽ cuộn mất theo danh sách. Cho `#ds` thành khung
+    không cuộn, rồi chỉ `.pl-list` bên trong cuộn: hai thứ kia luôn nhìn thấy được.
   */
-  root.style.overflow = 'visible';
-  root.style.maxHeight = 'none';
+  root.style.overflow = 'hidden';
+  root.style.display = 'flex';
+  root.style.flexDirection = 'column';
+  root.style.minHeight = '0';
 
   root.innerHTML = `
+    <div class="pl-ui">
     <div class="pl-tools">
       <label class="sr-only" for="pl-term">Tìm bài</label>
       <input id="pl-term" type="search" placeholder="Tìm theo tiêu đề, slug hoặc tag…" autocomplete="off" />
@@ -124,18 +127,7 @@ export function mountPostListUi(
         <option value="draft">${escapeHtml(labels.draft)}</option>
       </select>
     </div>
-    <div class="pl-scroll">
-      <table class="pl-table">
-        <thead>
-          <tr>
-            <th scope="col">Tiêu đề</th>
-            <th scope="col">Trạng thái</th>
-            <th scope="col">Ngày đăng</th>
-          </tr>
-        </thead>
-        <tbody id="pl-body"></tbody>
-      </table>
-    </div>
+    <ul class="pl-list" id="pl-body"></ul>
     <div class="pl-foot">
       <span id="pl-count" aria-live="polite"></span>
       <span class="pl-pager">
@@ -143,6 +135,7 @@ export function mountPostListUi(
         <span id="pl-page"></span>
         <button type="button" id="pl-next" aria-label="Trang sau">›</button>
       </span>
+    </div>
     </div>
   `;
 
@@ -166,14 +159,18 @@ export function mountPostListUi(
               không Enter được. Người viết bài dùng bàn phím rất nhiều, nên chỗ này phải là
               một phần tử tương tác thật.
             */
-            return `<tr${row.slug === currentSlug ? ' aria-current="true"' : ''}>
-              <td><button type="button" class="pl-pick" data-slug="${escapeHtml(row.slug)}">${escapeHtml(row.title || row.slug)}</button></td>
-              <td><span class="badge ${s}">${escapeHtml(labels[s])}</span></td>
-              <td class="pl-date">${escapeHtml(row.published_at ?? '')}</td>
-            </tr>`;
+            return `<li${row.slug === currentSlug ? ' aria-current="true"' : ''}>
+              <button type="button" class="pl-pick" data-slug="${escapeHtml(row.slug)}">
+                <span class="pl-title">${escapeHtml(row.title || row.slug)}</span>
+                <span class="pl-meta">
+                  <span class="badge ${s}">${escapeHtml(labels[s])}</span>
+                  <span class="pl-date">${escapeHtml(row.published_at ?? '')}</span>
+                </span>
+              </button>
+            </li>`;
           })
           .join('')
-      : `<tr><td colspan="3" class="pl-empty">Không có bài nào khớp.</td></tr>`;
+      : `<li class="pl-empty">Không có bài nào khớp.</li>`;
 
     el('pl-count').textContent = `${matched.length} bài${
       matched.length !== rows.length ? ` / ${rows.length}` : ''
@@ -252,22 +249,40 @@ export function mountPostListUi(
  *
  * Không để hai admin tự dán CSS vào `<style>` của chúng: đó là hai bản sao, và bản sao thì
  * lệch. Module tự lo cả HTML lẫn CSS thì thêm một cột vào bảng chỉ phải sửa một chỗ.
+ *
+ * VỪA MỘT CỘT HẸP — sidebar rộng 260px. Bản đầu tôi vẽ bảng ba cột và nó VỠ TOÀN BỘ: `#ds`
+ * nằm trong `aside` của `.shell { grid-template-columns: 260px 1fr }`, nên một bảng có ô
+ * tìm, bộ lọc, ba cột và thanh phân trang không có chỗ nào để nằm. Không phải lỗi CSS lẻ —
+ * đặt bảng vào một cột hẹp là sai ngay từ lựa chọn thiết kế.
+ *
+ * KHÔNG VIẾT DẤU NHÁY NGƯỢC TRONG CHUỖI CSS DƯỚI ĐÂY. Nó là template literal, nên một dấu
+ * nháy ngược trong comment CSS sẽ KẾT THÚC chuỗi và cả file thành lỗi cú pháp — lúc đó admin
+ * trắng trang, không phải lệch một chút. Đã trả giá đúng như vậy: mọi giải thích cần dấu
+ * nháy ngược thì viết ở đây, ngoài chuỗi.
  */
 const POST_LIST_CSS = `
-  .pl-tools { display: flex; gap: 8px; margin-bottom: 10px; }
-  .pl-tools input { flex: 1; min-width: 0; }
-  .pl-scroll { overflow: auto; max-height: 60vh; }
-  .pl-table { width: 100%; border-collapse: collapse; font-size: 13px; }
-  .pl-table th, .pl-table td { text-align: left; padding: 7px 8px; border-bottom: 1px solid var(--border); vertical-align: top; }
-  .pl-table th { position: sticky; top: 0; background: var(--panel); font-size: 11px; text-transform: uppercase; letter-spacing: .04em; }
-  .pl-table tr[aria-current='true'] { background: var(--bg); }
-  .pl-pick { all: unset; cursor: pointer; font-weight: 700; line-height: 1.35; }
-  .pl-pick:hover { color: var(--blue); }
-  .pl-pick:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
-  .pl-date { white-space: nowrap; font-variant-numeric: tabular-nums; color: var(--muted); }
-  .pl-empty { color: var(--muted); padding: 18px 8px; }
-  .pl-foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 8px; font-size: 12px; color: var(--muted); }
-  .pl-pager { display: flex; align-items: center; gap: 6px; }
-  .pl-pager button { min-width: 28px; }
+  /* Module tự định nghĩa .sr-only, KHÔNG dựa vào trang chủ nhà có nó.
+     Admin cục bộ không định nghĩa class này, nên hai nhãn hiện ra thành chữ và ăn mất nửa
+     chiều rộng cột — đã thấy trên ảnh chụp màn hình thật. Một module dùng chung mà cần
+     class của người gọi thì nó vỡ ở đúng chỗ người gọi không biết là mình phải cung cấp. */
+  .pl-ui .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0; }
+  .pl-ui { display: flex; flex-direction: column; min-height: 0; height: 100%; }
+  /* Xếp DỌC, không phải hai cột: cột sidebar chỉ 260px, chia đôi thì cả ô tìm lẫn ô lọc
+     đều hẹp tới mức không đọc được giá trị đang chọn. */
+  .pl-tools { display: grid; gap: 6px; padding: 8px 10px; border-bottom: 1px solid var(--border); flex: none; }
+  .pl-tools input, .pl-tools select { width: 100%; min-width: 0; box-sizing: border-box; font-size: 12px; padding: 5px 7px; }
+  .pl-list { list-style: none; margin: 0; padding: 0; overflow-y: auto; overflow-x: hidden; flex: 1; min-height: 0; }
+  .pl-list > li { border-bottom: 1px solid var(--border); }
+  .pl-list > li[aria-current='true'] { background: var(--panel); box-shadow: inset 3px 0 0 var(--blue); }
+  .pl-pick { all: unset; display: grid; gap: 3px; width: 100%; box-sizing: border-box; padding: 9px 11px; cursor: pointer; }
+  .pl-pick:hover { background: var(--panel); }
+  .pl-pick:focus-visible { outline: 2px solid var(--blue); outline-offset: -2px; }
+  .pl-title { font-size: 13px; font-weight: 600; line-height: 1.35; overflow-wrap: anywhere; }
+  .pl-meta { display: flex; gap: 6px; align-items: center; font-size: 11px; color: var(--muted); }
+  .pl-date { white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .pl-empty { color: var(--muted); padding: 18px 11px; font-size: 12px; }
+  .pl-foot { display: flex; align-items: center; justify-content: space-between; gap: 6px; padding: 7px 10px; border-top: 1px solid var(--border); font-size: 11px; color: var(--muted); flex: none; }
+  .pl-pager { display: flex; align-items: center; gap: 4px; }
+  .pl-pager button { min-width: 26px; min-height: 26px; padding: 2px 6px; font-size: 13px; line-height: 1; }
   .pl-pager button:disabled { opacity: .4; cursor: default; }
 `;
