@@ -1,7 +1,7 @@
 ---
 import { SITE } from '~/site.config';
 import { getPublishedPosts, collectTags } from '~/utils/posts';
-import { CACHE_DANH_SACH, datCache } from '~/lib/cache';
+import { CACHE_LIST, setCache } from '~/lib/cache';
 import BaseLayout from '~/layouts/BaseLayout.astro';
 import PostCard from '~/components/PostCard.astro';
 import Pagination from '~/components/Pagination.astro';
@@ -10,7 +10,7 @@ import { blogPageHref } from '~/lib/routes';
 
 export const prerender = false;
 
-datCache(Astro.response, CACHE_DANH_SACH);
+setCache(Astro.response, CACHE_LIST);
 
 const posts = await getPublishedPosts();
 const tags = collectTags(posts);

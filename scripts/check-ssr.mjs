@@ -16,31 +16,31 @@ import { readdirSync, readFileSync, existsSync } from 'node:fs';
 import { spawn } from 'node:child_process';
 
 const PORT = Number(process.env.SSR_CHECK_PORT ?? 4326);
-const GOC = `http://127.0.0.1:${PORT}`;
-const VANG = 'tests/renderer-golden';
+const ORIGIN = `http://127.0.0.1:${PORT}`;
+const GOLDEN_DIR = 'tests/renderer-golden';
 
 if (!existsSync('dist/server/entry.mjs')) {
   console.error('Chưa có dist/server/entry.mjs. Chạy `pnpm build` trước.');
   process.exit(1);
 }
 
-const may = spawn(process.execPath, ['dist/server/entry.mjs'], {
+const server = spawn(process.execPath, ['dist/server/entry.mjs'], {
   env: { ...process.env, HOST: '127.0.0.1', PORT: String(PORT) },
   stdio: ['ignore', 'pipe', 'pipe'],
 });
 
-let logMay = '';
-may.stdout.on('data', (d) => (logMay += d));
-may.stderr.on('data', (d) => (logMay += d));
+let serverLog = '';
+server.stdout.on('data', (d) => (serverLog += d));
+server.stderr.on('data', (d) => (serverLog += d));
 
-const dungMay = () => may.kill();
-process.on('exit', dungMay);
+const stopServer = () => server.kill();
+process.on('exit', stopServer);
 
 /** Chờ máy chủ nhận kết nối. Không chờ thì phép thử đầu tiên luôn hỏng. */
-async function choSan() {
+async function waitForServer() {
   for (let i = 0; i < 60; i += 1) {
     try {
-      await fetch(`${GOC}/404`);
+      await fetch(`${ORIGIN}/404`);
       return true;
     } catch {
       await new Promise((r) => setTimeout(r, 250));
@@ -49,62 +49,62 @@ async function choSan() {
   return false;
 }
 
-if (!(await choSan())) {
-  console.error(`Máy chủ không lên sau 15 giây.\n${logMay}`);
+if (!(await waitForServer())) {
+  console.error(`Máy chủ không lên sau 15 giây.\n${serverLog}`);
   process.exit(1);
 }
 
-const loi = [];
-const bao = (duong, thongDiep) => loi.push(`${duong} — ${thongDiep}`);
+const problems = [];
+const report = (path, message) => problems.push(`${path} — ${message}`);
 
-const slugs = existsSync(VANG)
-  ? readdirSync(VANG)
+const slugs = existsSync(GOLDEN_DIR)
+  ? readdirSync(GOLDEN_DIR)
       .filter((f) => f.endsWith('.html'))
       .map((f) => f.replace(/\.html$/, ''))
   : [];
 
 if (slugs.length === 0) {
-  console.error(`Không có ảnh chụp nào trong ${VANG}/ — không biết phải kiểm route nào.`);
+  console.error(`Không có ảnh chụp nào trong ${GOLDEN_DIR}/ — không biết phải kiểm route nào.`);
   process.exit(1);
 }
 
 /** Bộ luật dùng chung cho mọi trang HTML — cùng luật với `check:html`. */
-function kiemTrangHtml(duong, html, { canMucLuc = false } = {}) {
-  if (!/<title>[^<]+<\/title>/.test(html)) bao(duong, 'thiếu <title>');
+function checkHtmlPage(path, html, { needsToc = false } = {}) {
+  if (!/<title>[^<]+<\/title>/.test(html)) report(path, 'thiếu <title>');
 
   // Trang `noindex` được miễn description và canonical, cùng lý do như `check:html`:
   // hai thẻ đó tồn tại để máy tìm kiếm hiển thị, mà trang đã nói "đừng index".
   const noindex = /<meta name="robots" content="[^"]*noindex/.test(html);
   if (!noindex) {
-    if (!/<meta name="description" content="[^"]+"/.test(html)) bao(duong, 'thiếu meta description');
-    if (!/<link rel="canonical" href="[^"]+"/.test(html)) bao(duong, 'thiếu canonical');
+    if (!/<meta name="description" content="[^"]+"/.test(html)) report(path, 'thiếu meta description');
+    if (!/<link rel="canonical" href="[^"]+"/.test(html)) report(path, 'thiếu canonical');
   }
 
   // `alt=""` là hợp lệ (ảnh trang trí), thiếu hẳn thuộc tính thì không.
   for (const m of html.matchAll(/<img\b[^>]*>/g)) {
-    if (!/\balt=/.test(m[0])) bao(duong, `ảnh thiếu alt: ${m[0].slice(0, 70)}`);
+    if (!/\balt=/.test(m[0])) report(path, `ảnh thiếu alt: ${m[0].slice(0, 70)}`);
   }
 
   const ids = [...html.matchAll(/\sid="([^"]+)"/g)].map((m) => m[1]);
-  const trung = ids.filter((v, i) => ids.indexOf(v) !== i);
-  if (trung.length) bao(duong, `id trùng: ${[...new Set(trung)].join(', ')}`);
+  const duplicates = ids.filter((v, i) => ids.indexOf(v) !== i);
+  if (duplicates.length) report(path, `id trùng: ${[...new Set(duplicates)].join(', ')}`);
 
-  if (canMucLuc && !/data-toc-link="/.test(html)) bao(duong, 'mục lục rỗng');
+  if (needsToc && !/data-toc-link="/.test(html)) report(path, 'mục lục rỗng');
 }
 
 // ── Trang bài ─────────────────────────────────────────────────────────────────
 for (const slug of slugs.sort()) {
-  const duong = `/blog/${slug}`;
-  const res = await fetch(`${GOC}${duong}`);
+  const path = `/blog/${slug}`;
+  const res = await fetch(`${ORIGIN}${path}`);
   const html = await res.text();
 
   if (res.status !== 200) {
-    bao(duong, `HTTP ${res.status}`);
+    report(path, `HTTP ${res.status}`);
     continue;
   }
 
-  kiemTrangHtml(duong, html, { canMucLuc: true });
-  if (!html.includes('class="prose')) bao(duong, 'không tìm thấy khối .prose');
+  checkHtmlPage(path, html, { needsToc: true });
+  if (!html.includes('class="prose')) report(path, 'không tìm thấy khối .prose');
 }
 
 /*
@@ -114,94 +114,124 @@ for (const slug of slugs.sort()) {
   trang HTML mà `check:html` quét được tụt còn 6 — nếu không kiểm ở đây thì trang chủ
   không còn được kiểm alt ảnh hay id trùng bởi bất cứ bộ kiểm nào.
 */
-const TRANG_DANH_SACH = ['/', '/blog', '/tags', '/search'];
+const LIST_PAGES = ['/', '/blog', '/tags', '/search'];
 
-for (const duong of TRANG_DANH_SACH) {
-  const res = await fetch(`${GOC}${duong}`);
+for (const path of LIST_PAGES) {
+  const res = await fetch(`${ORIGIN}${path}`);
   const html = await res.text();
 
   if (res.status !== 200) {
-    bao(duong, `HTTP ${res.status}`);
+    report(path, `HTTP ${res.status}`);
     continue;
   }
 
-  kiemTrangHtml(duong, html);
+  checkHtmlPage(path, html);
 }
 
 // Từng trang tag, lấy tên tag từ chính trang /tags thay vì viết cứng danh sách.
-const trangTags = await (await fetch(`${GOC}/tags`)).text();
-const slugTags = [...new Set([...trangTags.matchAll(/href="\/tags\/([a-z0-9-]+)"/g)].map((m) => m[1]))];
+const tagsPageHtml = await (await fetch(`${ORIGIN}/tags`)).text();
+const tagSlugs = [...new Set([...tagsPageHtml.matchAll(/href="\/tags\/([a-z0-9-]+)"/g)].map((m) => m[1]))];
 
-for (const t of slugTags) {
-  const duong = `/tags/${t}`;
-  const res = await fetch(`${GOC}${duong}`);
+for (const t of tagSlugs) {
+  const path = `/tags/${t}`;
+  const res = await fetch(`${ORIGIN}${path}`);
   if (res.status !== 200) {
-    bao(duong, `HTTP ${res.status}`);
+    report(path, `HTTP ${res.status}`);
     continue;
   }
-  kiemTrangHtml(duong, await res.text());
+  checkHtmlPage(path, await res.text());
 }
 
 // ── Hai endpoint XML: phải hợp lệ và phải CÓ bài ──────────────────────────────
-const sitemap = await fetch(`${GOC}/sitemap.xml`);
-const xmlSitemap = await sitemap.text();
-const soUrlBai = (xmlSitemap.match(/<loc>[^<]*\/blog\/[a-z0-9-]+<\/loc>/g) ?? []).length;
+const sitemap = await fetch(`${ORIGIN}/sitemap.xml`);
+const sitemapXml = await sitemap.text();
+const postUrlCount = (sitemapXml.match(/<loc>[^<]*\/blog\/[a-z0-9-]+<\/loc>/g) ?? []).length;
 
-if (sitemap.status !== 200) bao('/sitemap.xml', `HTTP ${sitemap.status}`);
-else if (soUrlBai < slugs.length) {
+if (sitemap.status !== 200) report('/sitemap.xml', `HTTP ${sitemap.status}`);
+else if (postUrlCount < slugs.length) {
   // Đây chính là lỗi đã xảy ra thật: sitemap vẫn hợp lệ XML nhưng rỗng phần bài viết,
   // nên Google mất đường phát hiện mọi bài. Kiểm số lượng, không chỉ kiểm HTTP 200.
-  bao('/sitemap.xml', `chỉ có ${soUrlBai} URL bài, cần ít nhất ${slugs.length}`);
+  report('/sitemap.xml', `chỉ có ${postUrlCount} URL bài, cần ít nhất ${slugs.length}`);
 }
 
-const rss = await fetch(`${GOC}/rss.xml`);
-const xmlRss = await rss.text();
-const soItem = (xmlRss.match(/<item>/g) ?? []).length;
+const rss = await fetch(`${ORIGIN}/rss.xml`);
+const rssXml = await rss.text();
+const itemCount = (rssXml.match(/<item>/g) ?? []).length;
 
-if (rss.status !== 200) bao('/rss.xml', `HTTP ${rss.status}`);
-else if (soItem < slugs.length) bao('/rss.xml', `chỉ có ${soItem} item, cần ít nhất ${slugs.length}`);
+if (rss.status !== 200) report('/rss.xml', `HTTP ${rss.status}`);
+else if (itemCount < slugs.length) report('/rss.xml', `chỉ có ${itemCount} item, cần ít nhất ${slugs.length}`);
 
 // ── Tìm kiếm ──────────────────────────────────────────────────────────────────
-const timJson = await fetch(`${GOC}/search.json?q=${encodeURIComponent('tieng viet')}`);
-if (timJson.status !== 200) {
-  bao('/search.json', `HTTP ${timJson.status}`);
+const searchJson = await fetch(`${ORIGIN}/search.json?q=${encodeURIComponent('tieng viet')}`);
+if (searchJson.status !== 200) {
+  report('/search.json', `HTTP ${searchJson.status}`);
 } else {
-  const kq = await timJson.json();
+  const payload = await searchJson.json();
   // Gõ KHÔNG DẤU phải ra bài có dấu — đó là điểm quan trọng nhất của bộ tìm kiếm này.
-  if (!(kq.ket_qua ?? []).length) bao('/search.json', 'gõ không dấu "tieng viet" ra 0 kết quả');
+  if (!(payload.results ?? []).length) report('/search.json', 'gõ không dấu "tieng viet" ra 0 kết quả');
 }
 
-const timTrang = await fetch(`${GOC}/search?q=${encodeURIComponent('tieng viet')}`);
-const htmlTim = await timTrang.text();
+const searchPage = await fetch(`${ORIGIN}/search?q=${encodeURIComponent('tieng viet')}`);
+const searchHtml = await searchPage.text();
 // Kết quả phải nằm NGAY trong HTML, tức là trang chạy được khi JS bị chặn.
-if (!/id="search-results"[\s\S]{0,400}<li/.test(htmlTim)) {
-  bao('/search?q=', 'không có kết quả trong HTML — trang tìm kiếm phụ thuộc JS');
+if (!/id="search-results"[\s\S]{0,400}<li/.test(searchHtml)) {
+  report('/search?q=', 'không có kết quả trong HTML — trang tìm kiếm phụ thuộc JS');
 }
+
+/*
+  ── Ảnh OG và ảnh bìa ─────────────────────────────────────────────────────────
+
+  Kiểm cả CONTENT-TYPE và SỐ BYTE, không chỉ HTTP 200. Một endpoint sinh ảnh lỗi vẫn trả
+  200 kèm chuỗi rỗng rất dễ, và khi đó bài chia sẻ lên mạng xã hội ra khung trắng — thứ
+  không sửa lại được, vì các nền tảng cache ảnh xem trước theo URL.
+*/
+for (const slug of slugs.sort()) {
+  const ogPath = `/og/${slug}.png`;
+  const og = await fetch(`${ORIGIN}${ogPath}`);
+  const ogBytes = og.ok ? (await og.arrayBuffer()).byteLength : 0;
+
+  if (og.status !== 200) report(ogPath, `HTTP ${og.status}`);
+  else if (!(og.headers.get('content-type') ?? '').includes('image/png')) {
+    report(ogPath, `content-type = ${og.headers.get('content-type')}`);
+  } else if (ogBytes < 2000) report(ogPath, `chỉ ${ogBytes} byte — ảnh gần như rỗng`);
+
+  const coverPath = `/covers/${slug}.svg`;
+  const cover = await fetch(`${ORIGIN}${coverPath}`);
+  const coverText = cover.ok ? await cover.text() : '';
+
+  if (cover.status !== 200) report(coverPath, `HTTP ${cover.status}`);
+  else if (!coverText.includes('<svg')) report(coverPath, 'không phải SVG');
+}
+
+const ogHome = await fetch(`${ORIGIN}/og/trang-chu.png`);
+if (ogHome.status !== 200) report('/og/trang-chu.png', `HTTP ${ogHome.status}`);
 
 // ── Những đường phải 404, không được 200 trang trống hay 500 ───────────────────
-for (const [ten, duong] of [
+for (const [name, path] of [
   ['slug bài không tồn tại', '/blog/khong-he-ton-tai-bao-gio'],
   ['tag không tồn tại', '/tags/khong-he-ton-tai-bao-gio'],
   ['/blog/page/1 trùng với /blog', '/blog/page/1'],
   ['số trang quá lớn', '/blog/page/999'],
   ['số trang không phải số', '/blog/page/abc'],
   ['số trang không nguyên', '/blog/page/2.5'],
+  ['ảnh OG của bài không tồn tại', '/og/khong-he-ton-tai-bao-gio.png'],
+  ['ảnh bìa của bài không tồn tại', '/covers/khong-he-ton-tai-bao-gio.svg'],
 ]) {
-  const res = await fetch(`${GOC}${duong}`);
-  if (res.status !== 404) bao(duong, `${ten}: HTTP ${res.status}, cần 404`);
+  const res = await fetch(`${ORIGIN}${path}`);
+  if (res.status !== 404) report(path, `${name}: HTTP ${res.status}, cần 404`);
 }
 
-dungMay();
+stopServer();
 
 console.log(
-  `Đã gọi ${slugs.length} route bài, ${TRANG_DANH_SACH.length} trang danh sách, ` +
-    `${slugTags.length} trang tag, sitemap, RSS và tìm kiếm.`,
+  `Đã gọi ${slugs.length} route bài, ${LIST_PAGES.length} trang danh sách, ` +
+    `${tagSlugs.length} trang tag, sitemap, RSS và tìm kiếm.`,
 );
 
-if (loi.length) {
+if (problems.length) {
   console.log('');
-  for (const l of loi) console.log(`  ✗ ${l}`);
-  console.log(`\n${loi.length} vấn đề.`);
+  for (const l of problems) console.log(`  ✗ ${l}`);
+  console.log(`\n${problems.length} vấn đề.`);
   process.exit(1);
 }
 

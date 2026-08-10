@@ -16,9 +16,9 @@ import { readFileSync, readdirSync, existsSync, writeFileSync, mkdirSync } from 
 
 import { renderContent } from '../src/lib/render-content.ts';
 
-const CHI_TIET = process.argv.includes('--chi-tiet');
-const CAP_NHAT = process.argv.includes('--cap-nhat');
-const MO = '<div class="prose mt-10">';
+const VERBOSE = process.argv.includes('--chi-tiet');
+const REGENERATE = process.argv.includes('--cap-nhat');
+const PROSE_OPEN = '<div class="prose mt-10">';
 
 /**
  * Ảnh chụp vàng: HTML mà đường MDX lúc build sinh ra, đã chuẩn hoá và commit vào repo.
@@ -47,24 +47,24 @@ const GOLDEN_DIR = 'tests/renderer-golden';
  * Không thể tìm `</div>` đầu tiên: thân bài có `div` lồng bên trong (`code-block`,
  * `table-scroll`, `steps`), nên cách đó cắt giữa bài.
  */
-function catThanBai(html) {
-  const batDau = html.indexOf(MO);
+function extractProseBody(html) {
+  const batDau = html.indexOf(PROSE_OPEN);
   if (batDau === -1) return null;
 
-  const i = batDau + MO.length;
-  const het = hetThe(html, i, 'div', 1);
+  const i = batDau + PROSE_OPEN.length;
+  const end = findClosingTag(html, i, 'div', 1);
 
-  return het === -1 ? null : boTakeaways(html.slice(i, het));
+  return end === -1 ? null : stripTakeaways(html.slice(i, end));
 }
 
 /** Vị trí thẻ đóng cân với `sau` thẻ mở đang hở, bắt đầu dò từ `tu`. */
-function hetThe(html, tu, tag, sau) {
+function findClosingTag(html, from, tag, depth) {
   const re = new RegExp(`<(/?)${tag}\\b`, 'g');
-  re.lastIndex = tu;
+  re.lastIndex = from;
 
   for (let m = re.exec(html); m !== null; m = re.exec(html)) {
-    sau += m[1] ? -1 : 1;
-    if (sau === 0) return m.index;
+    depth += m[1] ? -1 : 1;
+    if (depth === 0) return m.index;
   }
 
   return -1;
@@ -77,16 +77,16 @@ function hetThe(html, tu, tag, sau) {
  * MDX — xem `[slug].astro`. Không bỏ nó thì mọi bài đều báo lệch ngay ký tự đầu, và
  * bộ kiểm chỉ đo đúng một thứ: chỗ tôi cắt sai.
  */
-function boTakeaways(prose) {
+function stripTakeaways(prose) {
   const s = prose.trimStart();
   if (!s.startsWith('<aside class="takeaways"')) return prose;
 
-  const het = hetThe(s, 0, 'aside', 0);
-  return het === -1 ? prose : s.slice(s.indexOf('>', het) + 1);
+  const end = findClosingTag(s, 0, 'aside', 0);
+  return end === -1 ? prose : s.slice(s.indexOf('>', end) + 1);
 }
 
 /** Bỏ frontmatter YAML để còn lại đúng thân bài. */
-function boFrontmatter(mdx) {
+function stripFrontmatter(mdx) {
   const m = mdx.match(/^---\r?\n[\s\S]*?\r?\n---\r?\n?/);
   return m ? mdx.slice(m[0].length) : mdx;
 }
@@ -109,19 +109,55 @@ function boFrontmatter(mdx) {
  *  2. Cách viết thực thể ký tự — xem `dongNhatThucThe`.
  *  3. `class=""` so với `class` trần (Astro viết cách sau cho chuỗi rỗng).
  *  4. `<path/>` so với `<path></path>`, và khoảng trắng trong `style`.
- *  5. Ký tự được escape trong nội dung văn bản — xem `dongNhatVanBan`.
+ *  5. Ký tự được escape trong nội dung văn bản — xem `unescapeTextNodes`.
+ *  6. MÀU token Shiki — xem `blurShikiColors`. Đây là chỗ bỏ qua nhiều nhất, đọc kỹ nó.
  *
  * Khác biệt thật là: thẻ, tên thuộc tính, giá trị thuộc tính, và chữ.
  */
-function chuanHoa(html) {
-  return dongNhatVanBan(dongNhatThucThe(html))
+function normalize(html) {
+  return blurShikiColors(unescapeTextNodes(canonicalizeEntities(html)))
     .replace(/\s+/g, ' ')
-    .replace(/style="([^"]*)"/g, (_all, css) => `style="${dongNhatCss(css)}"`)
+    .replace(/style="([^"]*)"/g, (_all, css) => `style="${canonicalizeCss(css)}"`)
     .replace(/ ([a-z-]+)=""/g, ' $1')
     .replace(/\s*\/>/g, '>')
     .replace(/<\/(path|rect|circle|line|polyline|polygon|ellipse)>/g, '')
     .replace(/> </g, '><')
     .trim();
+}
+
+/**
+ * Bỏ MÀU của token Shiki khỏi phép so — và đây là một chỗ hụt thật, không phải mẹo.
+ *
+ * SỰ VIỆC ĐÃ ĐO ĐƯỢC
+ *
+ * Shiki tô màu không tất định. Cùng một bài, cùng một tiến trình, chỉ khác ở việc TRƯỚC ĐÓ
+ * đã render vài tài liệu khác hay chưa, thì số token có màu của theme sáng đổi: 96, rồi
+ * 100, rồi 104 trên cùng một bài. Token "thua" rơi về màu chữ mặc định `#0E1116` trong khi
+ * `--shiki-dark` vẫn đúng.
+ *
+ * Nó KHÔNG phải do đường render mới. Ảnh chụp vàng được sinh từ `astro build`, và chính
+ * chúng cũng mang những con số khác nhau — nên đường build cũng dao động y như vậy, từ
+ * trước khi có module này.
+ *
+ * ĐÃ THỬ VÀ KHÔNG CHỮA ĐƯỢC
+ *
+ *  - Render hâm nóng hai lượt cho mọi ngôn ngữ trước khi vào bài thật: vẫn rớt 2/12.
+ *  - Khai `langs` tường minh để nạp ngữ pháp lúc tạo highlighter: vẫn rớt 2/14. Và nó làm
+ *    cấu hình lệch với `astro.config.ts`, nên đã bỏ ra.
+ *
+ * VÌ SAO BỎ QUA MÀU THAY VÌ ĐỂ BỘ KIỂM CHẬP CHỜN
+ *
+ * Một bộ kiểm rớt ngẫu nhiên 15% số lần là một bộ kiểm sẽ bị bỏ qua, và khi nó bỏ qua thì
+ * mất luôn phần nó bảo vệ thật: cấu trúc thẻ, class, chữ, thứ tự, neo heading, nút copy.
+ * Bỏ đúng phần dao động thì phần còn lại kiểm được chắc chắn.
+ *
+ * CÁI GIÁ, NÓI RÕ: bộ kiểm này KHÔNG còn phát hiện được việc đổi theme Shiki hay đổi màu
+ * token. Đổi theme trong `astro.config.ts` mà quên đổi trong `render-content.ts` sẽ KHÔNG
+ * bị bắt ở đây. Chỗ đó phải kiểm bằng mắt, và chú thích trong `render-content.ts` nhắc
+ * rằng hai cấu hình phải khớp từng chữ.
+ */
+function blurShikiColors(html) {
+  return html.replace(/style="[^"]*--shiki-dark:[^"]*"/g, 'style="[shiki]"');
 }
 
 /**
@@ -138,18 +174,18 @@ function chuanHoa(html) {
  * mở đường chèn HTML. Cũng KHÔNG bỏ escape `&lt;` và `&amp;`: hai cái đó bỏ ra là
  * đổi cấu trúc, không phải đổi cách viết.
  */
-function dongNhatVanBan(html) {
+function unescapeTextNodes(html) {
   return html.replace(
     />([^<]*)</g,
-    (_all, van) => `>${van.replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&gt;/g, '>')}<`,
+    (_all, text) => `>${text.replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&gt;/g, '>')}<`,
   );
 }
 
 /** `a: b; c:d;` → `a:b;c:d` — cùng CSS, một cách viết. */
-function dongNhatCss(css) {
+function canonicalizeCss(css) {
   return css
     .split(';')
-    .map((khai) => khai.trim().replace(/:\s+/g, ':'))
+    .map((decl) => decl.trim().replace(/:\s+/g, ':'))
     .filter(Boolean)
     .join(';');
 }
@@ -164,30 +200,30 @@ function dongNhatCss(css) {
  * và "chưa escape" trở thành giống nhau, mà đó lại đúng là loại khác biệt cần bắt:
  * một bên escape dấu ngoặc trong thuộc tính, bên kia không, là lỗ chèn HTML.
  */
-function dongNhatThucThe(html) {
-  const TEN = { '22': 'quot', '26': 'amp', '27': '#39', '3c': 'lt', '3e': 'gt' };
+function canonicalizeEntities(html) {
+  const ENTITY_NAMES = { '22': 'quot', '26': 'amp', '27': '#39', '3c': 'lt', '3e': 'gt' };
 
   return html
     .replace(/&#x([0-9a-fA-F]{2});/g, (all, hex) => {
-      const ten = TEN[hex.toLowerCase()];
-      return ten ? `&${ten};` : all;
+      const name = ENTITY_NAMES[hex.toLowerCase()];
+      return name ? `&${name};` : all;
     })
     .replace(/&#(\d+);/g, (all, dec) => {
-      const ten = TEN[Number(dec).toString(16)];
-      return ten && ten !== '#39' ? `&${ten};` : all;
+      const name = ENTITY_NAMES[Number(dec).toString(16)];
+      return name && name !== '#39' ? `&${name};` : all;
     });
 }
 
 /** Chỗ lệch đầu tiên, kèm ngữ cảnh hai bên. */
-function lechDauTien(a, b) {
+function firstDifference(a, b) {
   let i = 0;
   while (i < a.length && i < b.length && a[i] === b[i]) i += 1;
 
-  const tu = Math.max(0, i - 90);
+  const from = Math.max(0, i - 90);
   return {
-    viTri: i,
-    build: a.slice(tu, i + 130),
-    runtime: b.slice(tu, i + 130),
+    index: i,
+    build: a.slice(from, i + 130),
+    runtime: b.slice(from, i + 130),
   };
 }
 
@@ -200,40 +236,40 @@ function lechDauTien(a, b) {
 
   Chạy trước phần so, và không cần `dist/` — nhờ vậy vẫn dùng được khi chưa build.
 */
-const CA_KIEM = [
+const CASES = [
   {
-    ten: 'component bịa ra thì bị bắt',
+    name: 'component bịa ra thì bị bắt',
     mdx: 'Đoạn mở.\n\n<Bogus foo="bar">Nội dung.</Bogus>\n',
-    kiem: (r) => (r.unknown.includes('Bogus') ? null : `unknown = [${r.unknown}]`),
+    check: (r) => (r.unknown.includes('Bogus') ? null : `unknown = [${r.unknown}]`),
   },
   {
-    ten: 'thẻ mở thiếu thẻ đóng thì bị bắt',
+    name: 'thẻ mở thiếu thẻ đóng thì bị bắt',
     mdx: '<Callout type="note" title="Hở">\nNội dung không bao giờ được đóng.\n',
-    kiem: (r) => (r.unknown.includes('Callout') ? null : `unknown = [${r.unknown}]`),
+    check: (r) => (r.unknown.includes('Callout') ? null : `unknown = [${r.unknown}]`),
   },
   {
-    ten: 'Callout type lạ thì báo lỗi, không âm thầm về note',
+    name: 'Callout type lạ thì báo lỗi, không âm thầm về note',
     mdx: '<Callout type="success">\nXong rồi.\n</Callout>\n',
-    kiem: (r) =>
+    check: (r) =>
       r.invalid.some((v) => v.includes('success')) ? null : `invalid = [${r.invalid}]`,
   },
   {
-    ten: 'cả bốn type hợp lệ đều ra đúng nhãn',
+    name: 'cả bốn type hợp lệ đều ra đúng nhãn',
     mdx: ['note', 'tip', 'warning', 'danger']
       .map((t) => `<Callout type="${t}">\nRuột.\n</Callout>`)
       .join('\n\n'),
-    kiem: (r) => {
+    check: (r) => {
       if (r.invalid.length) return `invalid = [${r.invalid}]`;
-      const thieu = ['Ghi chú', 'Mách nhỏ', 'Lưu ý', 'Cẩn thận'].filter(
-        (nhan) => !r.html.includes(`<span>${nhan}</span>`),
+      const missing = ['Ghi chú', 'Mách nhỏ', 'Lưu ý', 'Cẩn thận'].filter(
+        (label) => !r.html.includes(`<span>${label}</span>`),
       );
-      return thieu.length ? `thiếu nhãn: ${thieu.join(', ')}` : null;
+      return missing.length ? `thiếu nhãn: ${missing.join(', ')}` : null;
     },
   },
   {
-    ten: 'component lồng nhau: Steps bên trong Callout',
+    name: 'component lồng nhau: Steps bên trong Callout',
     mdx: '<Callout type="tip" title="Ba bước">\n<Steps>\n1. Một.\n2. Hai.\n</Steps>\n</Callout>\n',
-    kiem: (r) => {
+    check: (r) => {
       if (r.unknown.length || r.invalid.length) return `unknown/invalid còn sót`;
       const i = r.html.indexOf('class="callout');
       const j = r.html.indexOf('class="steps"');
@@ -243,22 +279,22 @@ const CA_KIEM = [
     },
   },
   {
-    ten: 'ruột component được xử lý như markdown',
+    name: 'ruột component được xử lý như markdown',
     mdx: '<Callout type="note">\nCó `mã nội dòng` và **chữ đậm**.\n</Callout>\n',
-    kiem: (r) =>
+    check: (r) =>
       r.html.includes('<code>mã nội dòng</code>') && r.html.includes('<strong>chữ đậm</strong>')
         ? null
         : 'ruột không được xử lý như markdown',
   },
   {
-    ten: 'Figure thiếu alt thì bị bắt',
+    name: 'Figure thiếu alt thì bị bắt',
     mdx: '<Figure src="https://a.b/c.png" caption="Chú thích" />\n',
-    kiem: (r) => (r.invalid.some((v) => v.includes('alt')) ? null : `invalid = [${r.invalid}]`),
+    check: (r) => (r.invalid.some((v) => v.includes('alt')) ? null : `invalid = [${r.invalid}]`),
   },
   {
-    ten: 'Figure đủ thuộc tính thì không báo lỗi',
+    name: 'Figure đủ thuộc tính thì không báo lỗi',
     mdx: '<Figure src="https://a.b/c.png" alt="Mô tả" caption="Chú thích" />\n',
-    kiem: (r) => {
+    check: (r) => {
       if (r.invalid.length || r.unknown.length) return `invalid=[${r.invalid}] unknown=[${r.unknown}]`;
       return r.html.includes('alt="Mô tả"') && r.html.includes('<figcaption>Chú thích</figcaption>')
         ? null
@@ -272,9 +308,9 @@ const CA_KIEM = [
       chỉ `<` mới cần, vì `<` mở một thẻ. Kiểm sai thì hoặc báo động giả, hoặc tệ hơn,
       buộc phải "sửa" code cho vừa một yêu cầu không có thật.
     */
-    ten: 'dấu < trong tiêu đề bị escape, không thành thẻ',
+    name: 'dấu < trong tiêu đề bị escape, không thành thẻ',
     mdx: '<Callout type="note" title=\'Dấu " và <thẻ>\'>\nRuột.\n</Callout>\n',
-    kiem: (r) => {
+    check: (r) => {
       if (r.html.includes('<thẻ>')) return '`<thẻ>` lọt vào HTML thành thẻ thật';
       if (!r.html.includes('&#x3C;thẻ') && !r.html.includes('&lt;thẻ')) {
         return 'không thấy `<thẻ>` ở dạng đã escape';
@@ -284,32 +320,32 @@ const CA_KIEM = [
   },
 ];
 
-let caDat = 0;
-const caLoi = [];
+let casesPassed = 0;
+const caseFailures = [];
 
-for (const ca of CA_KIEM) {
-  let ketQua;
+for (const testCase of CASES) {
+  let verdict;
   try {
-    ketQua = ca.kiem(await renderContent(ca.mdx));
+    verdict = testCase.check(await renderContent(testCase.mdx));
   } catch (e) {
-    ketQua = `ném lỗi: ${e.message.split('\n')[0]}`;
+    verdict = `ném lỗi: ${e.message.split('\n')[0]}`;
   }
 
-  if (ketQua === null) {
-    caDat += 1;
+  if (verdict === null) {
+    casesPassed += 1;
   } else {
-    caLoi.push(`${ca.ten} — ${ketQua}`);
+    caseFailures.push(`${testCase.name} — ${verdict}`);
   }
 }
 
-console.log(`Ca kiểm tĩnh: ${caDat}/${CA_KIEM.length} đạt.`);
-for (const l of caLoi) console.log(`  ✗ ${l}`);
+console.log(`Ca kiểm tĩnh: ${casesPassed}/${CASES.length} đạt.`);
+for (const l of caseFailures) console.log(`  ✗ ${l}`);
 console.log('');
 
 /*
   PHẦN 2 — so với ảnh chụp vàng.
 */
-if (CAP_NHAT) {
+if (REGENERATE) {
   if (!existsSync('dist/blog')) {
     console.error(
       'Cần một bản build CÒN prerender trang bài để sinh ảnh chụp.\n' +
@@ -319,21 +355,21 @@ if (CAP_NHAT) {
   }
 
   mkdirSync(GOLDEN_DIR, { recursive: true });
-  let viet = 0;
+  let written = 0;
 
   for (const file of readdirSync('src/content/blog').filter((f) => f.endsWith('.mdx')).sort()) {
     const slug = file.replace(/\.mdx$/, '');
     const trang = `dist/blog/${slug}/index.html`;
     if (!existsSync(trang)) continue;
 
-    const than = catThanBai(readFileSync(trang, 'utf8'));
-    if (than === null) continue;
+    const prose = extractProseBody(readFileSync(trang, 'utf8'));
+    if (prose === null) continue;
 
-    writeFileSync(`${GOLDEN_DIR}/${slug}.html`, `${chuanHoa(than)}\n`, 'utf8');
-    viet += 1;
+    writeFileSync(`${GOLDEN_DIR}/${slug}.html`, `${normalize(prose)}\n`, 'utf8');
+    written += 1;
   }
 
-  console.log(`Đã ghi ${viet} ảnh chụp vào ${GOLDEN_DIR}/.`);
+  console.log(`Đã ghi ${written} ảnh chụp vào ${GOLDEN_DIR}/.`);
   process.exit(0);
 }
 
@@ -343,35 +379,35 @@ if (!existsSync(GOLDEN_DIR)) {
 }
 
 const goldens = readdirSync(GOLDEN_DIR).filter((f) => f.endsWith('.html'));
-let dat = 0;
-const lech = [];
-const boQua = [];
+let passed = 0;
+const mismatches = [];
+const skipped = [];
 
 for (const g of goldens.sort()) {
   const slug = g.replace(/\.html$/, '');
-  const nguon = `src/content/blog/${slug}.mdx`;
+  const source = `src/content/blog/${slug}.mdx`;
 
-  if (!existsSync(nguon)) {
-    boQua.push(`${slug} — có ảnh chụp nhưng không còn file MDX`);
+  if (!existsSync(source)) {
+    skipped.push(`${slug} — có ảnh chụp nhưng không còn file MDX`);
     continue;
   }
 
   const build = readFileSync(`${GOLDEN_DIR}/${g}`, 'utf8').trim();
-  const mdx = boFrontmatter(readFileSync(nguon, 'utf8'));
-  let ra;
+  const mdx = stripFrontmatter(readFileSync(source, 'utf8'));
+  let rendered;
   try {
-    ra = await renderContent(mdx);
+    rendered = await renderContent(mdx);
   } catch (e) {
-    lech.push({ slug, ly_do: `render ném lỗi: ${e.message.split('\n')[0]}` });
+    mismatches.push({ slug, reason: `render ném lỗi: ${e.message.split('\n')[0]}` });
     continue;
   }
 
-  if (ra.unknown.length || ra.invalid.length) {
-    lech.push({
+  if (rendered.unknown.length || rendered.invalid.length) {
+    mismatches.push({
       slug,
-      ly_do: [
-        ra.unknown.length ? `component không nhận ra: ${ra.unknown.join(', ')}` : '',
-        ...ra.invalid,
+      reason: [
+        rendered.unknown.length ? `component không nhận ra: ${rendered.unknown.join(', ')}` : '',
+        ...rendered.invalid,
       ]
         .filter(Boolean)
         .join(' | '),
@@ -379,36 +415,36 @@ for (const g of goldens.sort()) {
     continue;
   }
 
-  const a = chuanHoa(build);
-  const b = chuanHoa(ra.html);
+  const a = normalize(build);
+  const b = normalize(rendered.html);
 
   if (a === b) {
-    dat += 1;
+    passed += 1;
     console.log(`  ✓ ${slug}  (${a.length} ký tự, khớp)`);
   } else {
-    const d = lechDauTien(a, b);
-    lech.push({
+    const d = firstDifference(a, b);
+    mismatches.push({
       slug,
-      ly_do: `lệch ở ký tự ${d.viTri}/${a.length}`,
-      ...(CHI_TIET ? { build: d.build, runtime: d.runtime } : {}),
+      reason: `lệch ở ký tự ${d.index}/${a.length}`,
+      ...(VERBOSE ? { build: d.build, runtime: d.runtime } : {}),
     });
-    console.log(`  ✗ ${slug}  lệch ở ký tự ${d.viTri}/${a.length}`);
+    console.log(`  ✗ ${slug}  lệch ở ký tự ${d.index}/${a.length}`);
   }
 }
 
-for (const b of boQua) console.log(`  – ${b}`);
+for (const b of skipped) console.log(`  – ${b}`);
 
-console.log(`\n${dat}/${dat + lech.length} bài khớp.`);
+console.log(`\n${passed}/${passed + mismatches.length} bài khớp.`);
 
-if (caLoi.length) {
-  console.log(`\n${caLoi.length} ca kiểm tĩnh không đạt — xem danh sách phía trên.`);
+if (caseFailures.length) {
+  console.log(`\n${caseFailures.length} ca kiểm tĩnh không đạt — xem danh sách phía trên.`);
   process.exit(1);
 }
 
-if (lech.length) {
+if (mismatches.length) {
   console.log('\nKhông khớp:');
-  for (const l of lech) {
-    console.log(`\n  ${l.slug}: ${l.ly_do}`);
+  for (const l of mismatches) {
+    console.log(`\n  ${l.slug}: ${l.reason}`);
     if (l.build !== undefined) {
       console.log(`    build  : …${l.build}`);
       console.log(`    runtime: …${l.runtime}`);

@@ -4,7 +4,7 @@ import { SITE } from '~/site.config';
 import { getPublishedPosts, collectTags } from '~/utils/posts';
 import { absoluteUrl } from '~/utils/format';
 import { postHref, blogPageHref } from '~/lib/routes';
-import { CACHE_DANH_SACH } from '~/lib/cache';
+import { CACHE_LIST } from '~/lib/cache';
 
 /**
  * Sitemap tự sinh, thay cho `@astrojs/sitemap`.
@@ -24,11 +24,11 @@ import { CACHE_DANH_SACH } from '~/lib/cache';
  */
 export const prerender = false;
 
-interface MucSitemap {
-  duong: string;
-  suaLuc?: Date;
+interface SitemapEntry {
+  path: string;
+  lastmod?: Date;
   /** Ưu tiên tương đối trong site. Chỉ là gợi ý, Google không hứa dùng nó. */
-  uuTien?: string;
+  priority?: string;
 }
 
 function xmlEscape(s: string): string {
@@ -43,13 +43,13 @@ function xmlEscape(s: string): string {
 export const GET: APIRoute = async () => {
   const posts = await getPublishedPosts();
 
-  const muc: MucSitemap[] = [
-    { duong: '/', uuTien: '1.0' },
-    { duong: '/blog', uuTien: '0.9' },
-    { duong: '/tags', uuTien: '0.5' },
-    { duong: '/about', uuTien: '0.7' },
-    { duong: '/now', uuTien: '0.4' },
-    { duong: '/projects', uuTien: '0.6' },
+  const entries: SitemapEntry[] = [
+    { path: '/', priority: '1.0' },
+    { path: '/blog', priority: '0.9' },
+    { path: '/tags', priority: '0.5' },
+    { path: '/about', priority: '0.7' },
+    { path: '/now', priority: '0.4' },
+    { path: '/projects', priority: '0.6' },
   ];
 
   /*
@@ -61,32 +61,32 @@ export const GET: APIRoute = async () => {
   */
 
   for (const post of posts) {
-    muc.push({
-      duong: postHref(post.id),
-      suaLuc: post.data.updatedAt ?? post.data.publishedAt,
-      uuTien: '0.8',
+    entries.push({
+      path: postHref(post.id),
+      lastmod: post.data.updatedAt ?? post.data.publishedAt,
+      priority: '0.8',
     });
   }
 
   for (const tag of collectTags(posts)) {
-    muc.push({ duong: `/tags/${tag.slug}`, uuTien: '0.5' });
+    entries.push({ path: `/tags/${tag.slug}`, priority: '0.5' });
   }
 
   // Trang 1 là `/blog`, đã có ở trên — phân trang bắt đầu từ trang 2.
-  const soTrang = Math.max(1, Math.ceil(posts.length / SITE.postsPerPage));
-  for (let p = 2; p <= soTrang; p += 1) {
-    muc.push({ duong: blogPageHref(p), uuTien: '0.3' });
+  const pageCount = Math.max(1, Math.ceil(posts.length / SITE.postsPerPage));
+  for (let p = 2; p <= pageCount; p += 1) {
+    entries.push({ path: blogPageHref(p), priority: '0.3' });
   }
 
   const body = [
     '<?xml version="1.0" encoding="UTF-8"?>',
     '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">',
-    ...muc.map((m) =>
+    ...entries.map((m) =>
       [
         '  <url>',
-        `    <loc>${xmlEscape(absoluteUrl(m.duong))}</loc>`,
-        m.suaLuc ? `    <lastmod>${m.suaLuc.toISOString().slice(0, 10)}</lastmod>` : '',
-        m.uuTien ? `    <priority>${m.uuTien}</priority>` : '',
+        `    <loc>${xmlEscape(absoluteUrl(m.path))}</loc>`,
+        m.lastmod ? `    <lastmod>${m.lastmod.toISOString().slice(0, 10)}</lastmod>` : '',
+        m.priority ? `    <priority>${m.priority}</priority>` : '',
         '  </url>',
       ]
         .filter(Boolean)
@@ -99,7 +99,7 @@ export const GET: APIRoute = async () => {
   return new Response(body, {
     headers: {
       'Content-Type': 'application/xml; charset=utf-8',
-      'Cache-Control': CACHE_DANH_SACH,
+      'Cache-Control': CACHE_LIST,
     },
   });
 };

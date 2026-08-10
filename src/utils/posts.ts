@@ -1,7 +1,7 @@
 import { getCollection, type CollectionEntry } from 'astro:content';
 import { slugify } from '~/utils/format';
 import { SITE } from '~/site.config';
-import { layBaiDaDang } from '~/lib/post-live';
+import { fetchPublishedPosts } from '~/lib/post-live';
 
 export type Post = CollectionEntry<'blog'>;
 
@@ -33,8 +33,8 @@ export async function getPublishedPosts(): Promise<Post[]> {
       Ép kiểu sang `Post` được giải thích trong `~/lib/post-live`: phần các trang thật sự
       đọc đã khai đủ trong `PostLike`.
     */
-    return (await layBaiDaDang(SITE.timeZone)) as unknown as Post[];
-  } catch (loi) {
+    return (await fetchPublishedPosts(SITE.timeZone)) as unknown as Post[];
+  } catch (error) {
     /*
       Không có database thì CHỈ ở dev mới lùi về file MDX.
 
@@ -46,9 +46,9 @@ export async function getPublishedPosts(): Promise<Post[]> {
       Ở dev thì ngược lại: `pnpm dev --allow-offline` tồn tại để viết bài khi không có
       mạng, và ở đó bản chụp là đúng thứ cần.
     */
-    if (!import.meta.env.DEV) throw loi;
+    if (!import.meta.env.DEV) throw error;
 
-    console.warn(`[posts] không đọc được database, lùi về src/content/blog: ${loi}`);
+    console.warn(`[posts] không đọc được database, lùi về src/content/blog: ${error}`);
 
     const today = todayInSiteZone();
     const posts = await getCollection(

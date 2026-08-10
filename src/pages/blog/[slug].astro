@@ -1,7 +1,7 @@
 ---
 import { Image } from 'astro:assets';
 
-import { layBaiTheoSlug, layBaiDaDang, headingsFromHtml } from '~/lib/post-live';
+import { getPostBySlug, fetchPublishedPosts, headingsFromHtml } from '~/lib/post-live';
 import { renderContent } from '~/lib/render-content';
 
 import { SITE, AUTHOR } from '~/site.config';
@@ -45,19 +45,19 @@ const slug = Astro.params.slug;
 
 if (!slug) return Astro.rewrite('/404');
 
-const [baiLive, danhSachLive] = await Promise.all([
-  layBaiTheoSlug(slug, SITE.timeZone),
-  layBaiDaDang(SITE.timeZone),
+const [postRow, postRows] = await Promise.all([
+  getPostBySlug(slug, SITE.timeZone),
+  fetchPublishedPosts(SITE.timeZone),
 ]);
 
 /*
   Không có bài thì 404 THẬT, không phải trang trống.
 
-  `layBaiTheoSlug` trả `null` cho cả ba trường hợp: không tồn tại, còn nháp, và chưa tới
+  `getPostBySlug` trả `null` cho cả ba trường hợp: không tồn tại, còn nháp, và chưa tới
   ngày đăng. Cả ba đều phải là 404 với người lạ — trả 200 kèm trang trống thì Google
   index một URL rỗng, và một bài hẹn giờ bị lộ là có tồn tại.
 */
-if (!baiLive) return Astro.rewrite('/404');
+if (!postRow) return Astro.rewrite('/404');
 
 /*
   Một chỗ ép kiểu, cố ý, và chỉ đúng một chỗ.
@@ -72,11 +72,11 @@ if (!baiLive) return Astro.rewrite('/404');
   trường khác thì nó sẽ là `undefined` lúc chạy — nên `PostLike` phải được cập nhật
   cùng lúc, và đó là lý do nó khai từng trường thay vì dùng `Record<string, unknown>`.
 */
-const post = baiLive as unknown as Post;
-const posts = danhSachLive as unknown as Post[];
+const post = postRow as unknown as Post;
+const posts = postRows as unknown as Post[];
 
-const daRender = await renderContent(post.body ?? '');
-const contentHtml = daRender.html;
+const rendered = await renderContent(post.body ?? '');
+const contentHtml = rendered.html;
 const headings = headingsFromHtml(contentHtml);
 
 const { minutes } = readingTime(post.body ?? '');
@@ -178,16 +178,10 @@ const schema = [
     */
   }
   <div class="wrap py-10 xl:grid xl:grid-cols-[1fr_minmax(0,44rem)_1fr] xl:gap-10">
-    {
-      /* `data-pagefind-body` khoanh vùng phần Pagefind đưa vào chỉ mục tìm kiếm.
-        Những khối lặp lại ở mọi bài (điều hướng, bài liên quan, bình luận) được
-        đánh `data-pagefind-ignore` để chúng không làm nhiễu kết quả. */
-    }
     <article
       class="mx-auto w-full max-w-[44rem] xl:col-start-2 xl:row-start-1 xl:mx-0"
-      data-pagefind-body
     >
-      <nav aria-label="Đường dẫn" class="text-sm text-muted" data-pagefind-ignore>
+      <nav aria-label="Đường dẫn" class="text-sm text-muted">
         <a href="/blog" class="tap gap-1.5 py-1 transition-colors hover:text-accent">
           <Icon name="arrowLeft" size={14} />
           Tất cả bài viết
@@ -341,7 +335,7 @@ const schema = [
           chặn, và bàn phím + screen reader hiểu sẵn.
         */
       }
-      <details class="group mt-8 rounded-card border border-border xl:hidden" data-pagefind-ignore>
+      <details class="group mt-8 rounded-card border border-border xl:hidden">
         <summary
           class="flex cursor-pointer items-center justify-between px-5 py-3.5 text-sm font-bold"
         >
@@ -381,7 +375,7 @@ const schema = [
           người vừa đọc xong và đang tìm bài kế tiếp.
         */
       }
-      <div class="mt-12 border-t border-border pt-6" data-pagefind-ignore>
+      <div class="mt-12 border-t border-border pt-6">
         <ul class="flex flex-wrap gap-2" aria-label="Chủ đề của bài này">
           {
             post.data.tags.map((tag: string) => (
@@ -404,7 +398,6 @@ const schema = [
 
       <aside
         class="mt-10 flex flex-col gap-4 rounded-card border border-border bg-surface p-6 sm:flex-row sm:items-center"
-        data-pagefind-ignore
       >
         {
           /* Chữ đầu của tên làm ảnh đại diện tạm. Có ảnh thật thì thay bằng
@@ -429,7 +422,6 @@ const schema = [
           <nav
             aria-label="Bài trước và bài sau"
             class="mt-10 grid gap-4 sm:grid-cols-2"
-            data-pagefind-ignore
           >
             {older ? (
               <a
@@ -460,7 +452,7 @@ const schema = [
 
       {
         related.length > 0 && (
-          <section class="mt-14" aria-labelledby="related-heading" data-pagefind-ignore>
+          <section class="mt-14" aria-labelledby="related-heading">
             <h2 id="related-heading" class="eyebrow">
               Bài liên quan
             </h2>
@@ -473,11 +465,11 @@ const schema = [
         )
       }
 
-      <div data-pagefind-ignore>
+      <div>
         <Newsletter heading="Có bài mới thì tôi báo" />
       </div>
 
-      <div data-pagefind-ignore>
+      <div>
         <Comments />
       </div>
     </article>
@@ -498,7 +490,6 @@ const schema = [
     <aside
       class="hidden xl:col-start-1 xl:row-start-1 xl:block"
       aria-label="Về bài viết này"
-      data-pagefind-ignore
     >
       {
         /*
@@ -543,7 +534,7 @@ const schema = [
         đứng cạnh người đọc suốt bài.
       */
     }
-    <aside class="hidden xl:col-start-3 xl:row-start-1 xl:block" data-pagefind-ignore>
+    <aside class="hidden xl:col-start-3 xl:row-start-1 xl:block">
       {
         /* Nới từ 14rem lên 16rem cùng lúc với `--container-wrap` 80rem → 90rem:
           cột phải giờ rộng 308px, để nội dung ở 224px thì dư ra 84px trống. */

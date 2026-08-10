@@ -1,7 +1,7 @@
 ---
 import { SITE } from '~/site.config';
 import { getPublishedPosts } from '~/utils/posts';
-import { CACHE_DANH_SACH, CACHE_KHONG_TIM_THAY, datCache } from '~/lib/cache';
+import { CACHE_LIST, CACHE_NOT_FOUND, setCache } from '~/lib/cache';
 import BaseLayout from '~/layouts/BaseLayout.astro';
 import PostCard from '~/components/PostCard.astro';
 import Pagination from '~/components/Pagination.astro';
@@ -24,14 +24,14 @@ const lastPage = Math.max(1, Math.ceil(posts.length / SITE.postsPerPage));
   đó là vô số URL rác cho Google index.
 */
 const page = Number(Astro.params.page);
-const hopLe = Number.isInteger(page) && page >= 2 && page <= lastPage;
+const valid = Number.isInteger(page) && page >= 2 && page <= lastPage;
 
-if (!hopLe) {
-  datCache(Astro.response, CACHE_KHONG_TIM_THAY);
+if (!valid) {
+  setCache(Astro.response, CACHE_NOT_FOUND);
   return Astro.rewrite('/404');
 }
 
-datCache(Astro.response, CACHE_DANH_SACH);
+setCache(Astro.response, CACHE_LIST);
 
 const items = posts.slice((page - 1) * SITE.postsPerPage, page * SITE.postsPerPage);
 ---

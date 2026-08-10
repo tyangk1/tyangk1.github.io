@@ -27,7 +27,7 @@
  * bài rồi bấm "Đăng ngay" thì đường xoá cache vẫn chạy, nên 60 giây này là mức chờ TỆ
  * NHẤT khi không làm gì cả, không phải mức chờ thường gặp.
  */
-export const CACHE_DANH_SACH = 'public, max-age=0, s-maxage=60, stale-while-revalidate=300';
+export const CACHE_LIST = 'public, max-age=0, s-maxage=60, stale-while-revalidate=300';
 
 /**
  * Một bài cụ thể.
@@ -35,11 +35,11 @@ export const CACHE_DANH_SACH = 'public, max-age=0, s-maxage=60, stale-while-reva
  * Ngắn hơn danh sách: người sửa bài thường tải lại chính trang đó để xem, nên chờ 60
  * giây ở đây gây khó chịu nhất và tiết kiệm được ít nhất — một bài chỉ có một URL.
  */
-export const CACHE_MOT_BAI = 'public, max-age=0, s-maxage=30, stale-while-revalidate=300';
+export const CACHE_POST = 'public, max-age=0, s-maxage=30, stale-while-revalidate=300';
 
 /** Trang lỗi. Không cache lâu, vì thứ làm nó lỗi thường được sửa ngay sau đó. */
-export const CACHE_KHONG_TIM_THAY = 'public, max-age=0, s-maxage=10';
+export const CACHE_NOT_FOUND = 'public, max-age=0, s-maxage=10';
 
-export function datCache(response: { headers: Headers }, gia_tri: string): void {
-  response.headers.set('Cache-Control', gia_tri);
+export function setCache(response: { headers: Headers }, value: string): void {
+  response.headers.set('Cache-Control', value);
 }

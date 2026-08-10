@@ -113,7 +113,7 @@ function withMarkdownBody(open: string, body: string, close: string): string {
   return `${open}\n\n${inner}\n\n${close}`;
 }
 
-function calloutHtml(attrs: Record<string, string>, body: string, loi: string[]): string {
+function calloutHtml(attrs: Record<string, string>, body: string, problems: string[]): string {
   const type = attrs['type'] ?? 'note';
   const preset = CALLOUT_PRESET[type];
 
@@ -127,18 +127,18 @@ function calloutHtml(attrs: Record<string, string>, body: string, loi: string[])
     Sửa prompt là sửa một lần; báo lỗi ở đây là sửa cả loại lỗi.
   */
   if (!preset) {
-    loi.push(
+    problems.push(
       `<Callout type="${type}"> — type không tồn tại. ` +
         `Chỉ có: ${Object.keys(CALLOUT_PRESET).join(', ')}.`,
     );
   }
 
-  const dung = preset ?? CALLOUT_PRESET['note']!;
-  const title = attrs['title']?.trim() ? attrs['title'] : dung.label;
+  const chosen = preset ?? CALLOUT_PRESET['note']!;
+  const title = attrs['title']?.trim() ? attrs['title'] : chosen.label;
 
   return withMarkdownBody(
     `<aside class="callout callout--${escapeAttr(type)}">` +
-      `<p class="callout__label">${icon(dung.icon, 17)}` +
+      `<p class="callout__label">${icon(chosen.icon, 17)}` +
       `<span>${escapeText(title)}</span></p>` +
       `<div class="callout__body">`,
     body,
@@ -163,13 +163,13 @@ function pullQuoteHtml(attrs: Record<string, string>, body: string, _loi: string
   );
 }
 
-function figureHtml(attrs: Record<string, string>, loi: string[]): string {
+function figureHtml(attrs: Record<string, string>, problems: string[]): string {
   // `alt` là bắt buộc, đúng như tài liệu của `Figure.astro`: chú thích phía dưới là
   // thứ mọi người đọc, `alt` là thứ dành riêng cho người dùng screen reader — cái nọ
   // không thay thế được cái kia. Thiếu `alt` là lỗi accessibility thật, và nó lặng lẽ
   // hơn mọi lỗi khác vì trang vẫn hiện ra bình thường với người nhìn thấy ảnh.
-  if (!attrs['src']?.trim()) loi.push('<Figure> thiếu thuộc tính src.');
-  if (attrs['alt'] === undefined) loi.push('<Figure> thiếu thuộc tính alt (bắt buộc).');
+  if (!attrs['src']?.trim()) problems.push('<Figure> thiếu thuộc tính src.');
+  if (attrs['alt'] === undefined) problems.push('<Figure> thiếu thuộc tính alt (bắt buộc).');
 
   const size =
     (attrs['width'] ? ` width="${escapeAttr(attrs['width'])}"` : '') +
@@ -187,7 +187,7 @@ function figureHtml(attrs: Record<string, string>, loi: string[]): string {
 
 const PAIRED: Record<
   string,
-  (attrs: Record<string, string>, body: string, loi: string[]) => string
+  (attrs: Record<string, string>, body: string, problems: string[]) => string
 > = {
   Callout: calloutHtml,
   Steps: stepsHtml,
@@ -204,7 +204,7 @@ export const KNOWN_COMPONENTS = [...Object.keys(PAIRED), 'Figure'];
  * nào khác bên trong. Nhờ vậy `<Callout>` bọc `<Steps>` cũng đúng, và không cần
  * regex nào phải hiểu lồng nhau — thứ regex không làm được.
  */
-export function expandComponents(source: string, loi: string[] = []): string {
+export function expandComponents(source: string, problems: string[] = []): string {
   /*
     Phần thuộc tính là `(?:"…"|'…'|[^>])*`, KHÔNG phải `[^>]*`.
 
@@ -216,7 +216,7 @@ export function expandComponents(source: string, loi: string[] = []): string {
 
   let out = source.replace(
     new RegExp(`<Figure\\b(${attrPart}?)/>`, 'g'),
-    (_all, rawAttrs: string) => figureHtml(parseAttrs(rawAttrs), loi),
+    (_all, rawAttrs: string) => figureHtml(parseAttrs(rawAttrs), problems),
   );
 
   const names = Object.keys(PAIRED).join('|');
@@ -227,7 +227,7 @@ export function expandComponents(source: string, loi: string[] = []): string {
   // Chặn trên là số cặp thẻ có thể có; hết vòng mà còn thẻ là có thẻ không đóng.
   for (let guard = 0; guard < 200; guard += 1) {
     const next = out.replace(innermost, (_all, name: string, rawAttrs: string, body: string) =>
-      PAIRED[name]!(parseAttrs(rawAttrs), body, loi),
+      PAIRED[name]!(parseAttrs(rawAttrs), body, problems),
     );
     if (next === out) break;
     out = next;
@@ -258,10 +258,16 @@ export function unknownComponents(expanded: string): string[] {
  * Cấu hình dưới đây phải KHỚP `astro.config.ts`; lệch một theme là code block
  * đổi màu mà không ai nhận ra cho tới khi so ảnh.
  */
-let processorPromise: ReturnType<typeof createMarkdownProcessor> | null = null;
+let processorPromise: Promise<Awaited<ReturnType<typeof createMarkdownProcessor>>> | null = null;
 
 function getProcessor() {
-  processorPromise ??= createMarkdownProcessor({
+  processorPromise ??= createProcessor();
+
+  return processorPromise;
+}
+
+async function createProcessor() {
+  const processor = await createMarkdownProcessor({
     // `rehypeHeadingIds` phải đứng TRƯỚC `rehypeContent`, cùng lý do như trong
     // `astro.config.ts`: mặc định Astro gắn id cho heading ở CUỐI pipeline, nên nếu
     // không gọi sớm thì lúc `rehypeContent` chạy các heading chưa có id và không có
@@ -269,6 +275,14 @@ function getProcessor() {
     // sạch neo, và chỉ bộ kiểm so với HTML bản build mới chỉ ra được.
     rehypePlugins: [rehypeHeadingIds, rehypeContent],
     shikiConfig: {
+      /*
+        Phải KHỚP TỪNG CHỮ với `shikiConfig` trong `astro.config.ts`.
+
+        Đã thử thêm `langs` để nạp ngữ pháp sớm, nhằm chữa một chỗ dao động màu của Shiki
+        (xem chú thích trong `scripts/check-renderer.mjs`). Nó KHÔNG chữa được, và giữ lại
+        thì hai cấu hình lệch nhau — mà giữ chúng không lệch mới đúng là việc bộ kiểm tồn
+        tại để làm. Nên đã bỏ ra.
+      */
       themes: {
         light: 'github-light-high-contrast',
         dark: 'github-dark-high-contrast',
@@ -277,7 +291,7 @@ function getProcessor() {
     },
   });
 
-  return processorPromise;
+  return processor;
 }
 
 export interface RenderResult {

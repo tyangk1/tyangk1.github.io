@@ -120,15 +120,15 @@ as $$
     p.description,
     p.published_at,
     p.tags,
-    ts_rank(p.search_vector, truy_van) as rank
+    ts_rank(p.search_vector, tsq) as rank
   from public.posts p,
        -- `websearch_to_tsquery` chứ không phải `to_tsquery`: nó nhận thứ người ta thật sự
        -- gõ vào hộp tìm kiếm ("cache cdn", trích dẫn, dấu trừ) và KHÔNG ném lỗi cú pháp.
        -- `to_tsquery` thì một dấu `&` lạc tay là lỗi 500 trên trang tìm kiếm.
-       websearch_to_tsquery('simple', public.search_normalize(coalesce(q, ''))) truy_van
+       websearch_to_tsquery('simple', public.search_normalize(coalesce(q, ''))) tsq
   where p.draft = false
     and p.published_at <= (current_timestamp at time zone 'Asia/Ho_Chi_Minh')::date
-    and p.search_vector @@ truy_van
+    and p.search_vector @@ tsq
   order by rank desc, p.published_at desc
   -- Chặn trên cứng: `max_results` đến từ query string của người lạ, nên không được để nó
   -- yêu cầu cả bảng. `least` giữ mức tối đa 50 kể cả khi có người gọi với 100000.

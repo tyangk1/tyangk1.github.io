@@ -31,12 +31,12 @@ const DIST = 'dist/client';
   cả `/blog/bai-khong-he-ton-tai`, tức là bỏ luôn thứ bộ kiểm này sinh ra để bắt: link
   gõ sai slug. Ở đây tập slug đúng vẫn là tập file MDX mà `db-sync` vừa ghi ra.
 */
-const SLUG_BAI = new Set(
+const POST_SLUGS = new Set(
   (await readdir('src/content/blog').catch(() => [])).map((f) => f.replace(/\.mdx?$/, '')),
 );
 
 /** Route on-demand có đường dẫn cố định. */
-const DUONG_CO_DINH = new Set([
+const FIXED_PATHS = new Set([
   '/',
   '/404',
   '/blog',
@@ -47,16 +47,16 @@ const DUONG_CO_DINH = new Set([
   '/sitemap.xml',
 ]);
 
-function laRouteChay(duong) {
-  if (DUONG_CO_DINH.has(duong)) return true;
+function isOnDemandRoute(path) {
+  if (FIXED_PATHS.has(path)) return true;
 
   // `/blog/<slug>` — đối chiếu với tập slug thật, xem chú thích ở trên.
-  const bai = duong.match(/^\/blog\/([^/]+)$/);
-  if (bai) return SLUG_BAI.has(bai[1]);
+  const postMatch = path.match(/^\/blog\/([^/]+)$/);
+  if (postMatch) return POST_SLUGS.has(postMatch[1]);
 
   // `/blog/page/<n>` — chỉ số nguyên. Trang 1 nằm ở `/blog` nên bắt đầu từ 2.
-  const trang = duong.match(/^\/blog\/page\/(\d+)$/);
-  if (trang) return Number(trang[1]) >= 2;
+  const pageMatch = path.match(/^\/blog\/page\/(\d+)$/);
+  if (pageMatch) return Number(pageMatch[1]) >= 2;
 
   /*
     `/tags/<slug>` — nhận mọi slug dạng chữ-số-gạch.
@@ -66,7 +66,7 @@ function laRouteChay(duong) {
     trang tag lấy từ chính trang `/tags`, nên tag gõ sai vẫn bị bắt — chỉ là bắt ở bộ
     kiểm khác. Nói ra chỗ hụt này để người sau không tưởng nó đã được phủ ở đây.
   */
-  return /^\/tags\/[a-z0-9-]+$/.test(duong);
+  return /^\/tags\/[a-z0-9-]+$/.test(path);
 }
 
 async function htmlFiles(dir) {
@@ -152,7 +152,7 @@ for (const file of files) {
       (await exists(`${target}.html`)) ||
       (await exists(join(target, 'index.html')));
 
-    if (!ok && !laRouteChay(clean)) report(file, `link gãy: ${href}`);
+    if (!ok && !isOnDemandRoute(clean)) report(file, `link gãy: ${href}`);
   }
 }
 

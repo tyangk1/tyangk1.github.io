@@ -1,6 +1,6 @@
 ---
 import { getPublishedPosts, collectTags, postsByTag } from '~/utils/posts';
-import { CACHE_DANH_SACH, CACHE_KHONG_TIM_THAY, datCache } from '~/lib/cache';
+import { CACHE_LIST, CACHE_NOT_FOUND, setCache } from '~/lib/cache';
 import BaseLayout from '~/layouts/BaseLayout.astro';
 import PostCard from '~/components/PostCard.astro';
 import TagPill from '~/components/TagPill.astro';
@@ -26,11 +26,11 @@ const tag = tags.find((t) => t.slug === Astro.params.tag);
   cách kia biến mọi chuỗi gõ bừa thành một URL trả 200, và Google sẽ index chúng.
 */
 if (!tag) {
-  datCache(Astro.response, CACHE_KHONG_TIM_THAY);
+  setCache(Astro.response, CACHE_NOT_FOUND);
   return Astro.rewrite('/404');
 }
 
-datCache(Astro.response, CACHE_DANH_SACH);
+setCache(Astro.response, CACHE_LIST);
 
 const items = postsByTag(posts, tag.slug);
 ---

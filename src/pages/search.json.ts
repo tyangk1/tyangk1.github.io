@@ -1,6 +1,6 @@
 import type { APIRoute } from 'astro';
 
-import { timBai } from '~/lib/post-live';
+import { searchPosts } from '~/lib/post-live';
 import { postHref } from '~/lib/routes';
 
 /**
@@ -19,13 +19,13 @@ export const GET: APIRoute = async ({ url }) => {
   const q = url.searchParams.get('q') ?? '';
 
   try {
-    const rows = await timBai(q, 20);
+    const rows = await searchPosts(q, 20);
 
     return new Response(
       JSON.stringify({
         q,
-        so_ket_qua: rows.length,
-        ket_qua: rows.map((r) => ({
+        count: rows.length,
+        results: rows.map((r) => ({
           slug: r.slug,
           href: postHref(r.slug),
           title: r.title,
@@ -49,7 +49,7 @@ export const GET: APIRoute = async ({ url }) => {
         },
       },
     );
-  } catch (loi) {
+  } catch (error) {
     /*
       Lỗi tìm kiếm trả 503, KHÔNG trả 200 kèm danh sách rỗng.
 
@@ -58,7 +58,7 @@ export const GET: APIRoute = async ({ url }) => {
       đi mất, mà không ai biết đã có lỗi.
     */
     return new Response(
-      JSON.stringify({ q, loi: 'Không tìm kiếm được lúc này.' }),
+      JSON.stringify({ q, error: 'Không tìm kiếm được lúc này.' }),
       { status: 503, headers: { 'Content-Type': 'application/json; charset=utf-8' } },
     );
   }

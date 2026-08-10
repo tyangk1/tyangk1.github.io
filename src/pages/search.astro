@@ -1,6 +1,6 @@
 ---
 import { getPublishedPosts, collectTags } from '~/utils/posts';
-import { timBai, type KetQuaTim } from '~/lib/post-live';
+import { searchPosts, type SearchHit } from '~/lib/post-live';
 import { postHref } from '~/lib/routes';
 import BaseLayout from '~/layouts/BaseLayout.astro';
 import Icon from '~/components/Icon.astro';
@@ -26,14 +26,14 @@ const baiMoi = posts.slice(0, 5);
   vẫn ra kết quả. Phần JS bên dưới chỉ thêm cảm giác tức thì, không phải điều kiện để
   trang hoạt động.
 */
-const tuKhoa = (Astro.url.searchParams.get('q') ?? '').trim();
+const term = (Astro.url.searchParams.get('q') ?? '').trim();
 
-let ketQua: KetQuaTim[] = [];
-let loiTim = false;
+let results: SearchHit[] = [];
+let searchFailed = false;
 
-if (tuKhoa.length >= 2) {
+if (term.length >= 2) {
   try {
-    ketQua = await timBai(tuKhoa, 20);
+    results = await searchPosts(term, 20);
   } catch {
     /*
       Lỗi thì NÓI RA, không im lặng hiện "không có kết quả".
@@ -41,15 +41,15 @@ if (tuKhoa.length >= 2) {
       Hiện danh sách rỗng khi thật ra database không trả lời được là trả lời sai một câu
       hỏi thật: người đọc sẽ tin blog không có bài nào về chủ đề đó và đi mất.
     */
-    loiTim = true;
+    searchFailed = true;
   }
 }
 
-const dangTim = tuKhoa.length >= 2;
+const hasQuery = term.length >= 2;
 ---
 
 <BaseLayout
-  title={tuKhoa ? `Tìm: ${tuKhoa}` : 'Tìm kiếm'}
+  title={term ? `Tìm: ${term}` : 'Tìm kiếm'}
   description="Tìm bài viết theo từ khoá. Tìm được cả khi gõ không dấu — nhập “tieng viet” vẫn ra bài về tiếng Việt, và kết quả luôn là nội dung mới nhất."
   noindex
 >
@@ -79,7 +79,7 @@ const dangTim = tuKhoa.length >= 2;
         name="q"
         type="search"
         autocomplete="off"
-        value={tuKhoa}
+        value={term}
         placeholder="Nhập từ khoá, ví dụ: astro, css, seo"
         class="w-full rounded-lg border border-border bg-bg py-3 pr-4 pl-12 text-fg placeholder:text-muted"
       />
@@ -88,19 +88,19 @@ const dangTim = tuKhoa.length >= 2;
 
     <p id="search-status" role="status" aria-live="polite" class="mt-4 text-sm text-muted">
       {
-        loiTim
+        searchFailed
           ? 'Không tìm kiếm được lúc này. Thử lại sau một lát.'
-          : dangTim
-            ? ketQua.length === 0
-              ? `Không có kết quả cho “${tuKhoa}”.`
-              : `${ketQua.length} kết quả cho “${tuKhoa}”.`
+          : hasQuery
+            ? results.length === 0
+              ? `Không có kết quả cho “${term}”.`
+              : `${results.length} kết quả cho “${term}”.`
             : ''
       }
     </p>
 
     <ul id="search-results" class="mt-2 divide-y divide-border">
       {
-        ketQua.map((r) => (
+        results.map((r) => (
           <li class="py-5">
             <a href={postHref(r.slug)} class="font-bold hover:text-accent">
               {r.title}
@@ -114,7 +114,7 @@ const dangTim = tuKhoa.length >= 2;
     <div
       id="search-browse"
       class="mt-10 border-t border-border pt-8"
-      hidden={dangTim && ketQua.length > 0}
+      hidden={hasQuery && results.length > 0}
     >
       <h2 class="eyebrow">Duyệt theo chủ đề</h2>
       <ul class="mt-4 flex flex-wrap gap-2">
@@ -160,7 +160,7 @@ const dangTim = tuKhoa.length >= 2;
    * kiếm hoạt động — nó chỉ bỏ bớt một lần tải trang. Tắt JS thì form vẫn nộp và vẫn ra
    * kết quả.
    */
-  interface MucKetQua {
+  interface SearchHit {
     href: string;
     title: string;
     description: string;
@@ -176,12 +176,12 @@ const dangTim = tuKhoa.length >= 2;
    * Khối duyệt chỉ ẩn khi thật sự CÓ kết quả. Xoá hết chữ, hoặc tìm không ra gì, thì nó
    * hiện lại — nếu không, người vừa xoá từ khoá sẽ nhìn vào một trang trắng.
    */
-  function hienKhoiDuyet(hien: boolean) {
+  function showBrowse(hien: boolean) {
     browse?.toggleAttribute('hidden', !hien);
   }
 
   /** Gán bằng `textContent`, không phải `innerHTML`. Tiêu đề bài là dữ liệu, không phải mã. */
-  function ve(items: MucKetQua[]) {
+  function renderResults(items: SearchHit[]) {
     if (!list) return;
     list.replaceChildren(
       ...items.map((r) => {
@@ -204,45 +204,45 @@ const dangTim = tuKhoa.length >= 2;
   }
 
   /** Bỏ qua kết quả của một truy vấn đã cũ, khi hai lần fetch về không đúng thứ tự. */
-  let luotMoiNhat = 0;
+  let latestSeq = 0;
 
-  async function tim(q: string) {
+  async function runSearch(q: string) {
     if (!list || !status) return;
 
-    const tuKhoa = q.trim();
+    const term = q.trim();
 
-    if (tuKhoa.length < 2) {
-      ve([]);
+    if (term.length < 2) {
+      renderResults([]);
       status.textContent = '';
-      hienKhoiDuyet(true);
-      capNhatUrl('');
+      showBrowse(true);
+      updateUrl('');
       return;
     }
 
-    const luot = ++luotMoiNhat;
+    const seq = ++latestSeq;
     status.textContent = 'Đang tìm…';
 
     try {
-      const res = await fetch(`/search.json?q=${encodeURIComponent(tuKhoa)}`);
-      if (luot !== luotMoiNhat) return;
+      const res = await fetch(`/search.json?q=${encodeURIComponent(term)}`);
+      if (seq !== latestSeq) return;
 
       if (!res.ok) {
         status.textContent = 'Không tìm kiếm được lúc này. Thử lại sau một lát.';
         return;
       }
 
-      const data = (await res.json()) as { ket_qua: MucKetQua[] };
-      if (luot !== luotMoiNhat) return;
+      const data = (await res.json()) as { results: SearchHit[] };
+      if (seq !== latestSeq) return;
 
-      ve(data.ket_qua);
+      renderResults(data.results);
       status.textContent =
-        data.ket_qua.length === 0
-          ? `Không có kết quả cho “${tuKhoa}”.`
-          : `${data.ket_qua.length} kết quả cho “${tuKhoa}”.`;
-      hienKhoiDuyet(data.ket_qua.length === 0);
-      capNhatUrl(tuKhoa);
+        data.results.length === 0
+          ? `Không có kết quả cho “${term}”.`
+          : `${data.results.length} kết quả cho “${term}”.`;
+      showBrowse(data.results.length === 0);
+      updateUrl(term);
     } catch {
-      if (luot === luotMoiNhat) {
+      if (seq === latestSeq) {
         status.textContent = 'Không tìm kiếm được lúc này. Thử lại sau một lát.';
       }
     }
@@ -255,7 +255,7 @@ const dangTim = tuKhoa.length >= 2;
    * mới ra khỏi trang tìm kiếm. Nhưng URL vẫn phải đổi: nhờ vậy link kết quả chia sẻ được
    * và tải lại trang không mất truy vấn.
    */
-  function capNhatUrl(q: string) {
+  function updateUrl(q: string) {
     const url = new URL(window.location.href);
     if (q) url.searchParams.set('q', q);
     else url.searchParams.delete('q');
@@ -267,14 +267,14 @@ const dangTim = tuKhoa.length >= 2;
   let timer: number | undefined;
   input?.addEventListener('input', () => {
     window.clearTimeout(timer);
-    timer = window.setTimeout(() => void tim(input.value), 250);
+    timer = window.setTimeout(() => void runSearch(input.value), 250);
   });
 
   // Có JS thì Enter không cần tải lại trang nữa.
   form?.addEventListener('submit', (e) => {
     e.preventDefault();
     window.clearTimeout(timer);
-    if (input) void tim(input.value);
+    if (input) void runSearch(input.value);
   });
 
   input?.focus();

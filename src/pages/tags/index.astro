@@ -1,6 +1,6 @@
 ---
 import { getPublishedPosts, collectTags, postsByTag } from '~/utils/posts';
-import { CACHE_DANH_SACH, datCache } from '~/lib/cache';
+import { CACHE_LIST, setCache } from '~/lib/cache';
 import { formatDate, toISODate } from '~/utils/format';
 import { postHref, tagHref } from '~/lib/routes';
 import { hueForTag } from '~/lib/cover-image';
@@ -9,7 +9,7 @@ import TagPill from '~/components/TagPill.astro';
 
 export const prerender = false;
 
-datCache(Astro.response, CACHE_DANH_SACH);
+setCache(Astro.response, CACHE_LIST);
 
 const posts = await getPublishedPosts();
 const tags = collectTags(posts);

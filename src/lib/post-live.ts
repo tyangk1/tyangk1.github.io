@@ -36,7 +36,7 @@ function today(timeZone: string): string {
  * series) KHÔNG cần nó, nên hai truy vấn dùng hai bộ cột khác nhau — bằng không mỗi
  * lần mở một bài là tải toàn bộ chữ của mọi bài.
  */
-const COT_DAY = [
+const COLUMNS_FULL = [
   'slug',
   'title',
   'description',
@@ -53,11 +53,11 @@ const COT_DAY = [
   'featured',
 ].join(',');
 
-const COT_NHE = COT_DAY.split(',')
+const COLUMNS_LIGHT = COLUMNS_FULL.split(',')
   .filter((c) => c !== 'content')
   .join(',');
 
-async function truyVan(query: string): Promise<PostRow[]> {
+async function queryPosts(query: string): Promise<PostRow[]> {
   const url = env('PUBLIC_SUPABASE_URL');
   const key = env('PUBLIC_SUPABASE_ANON_KEY');
 
@@ -87,14 +87,14 @@ async function truyVan(query: string): Promise<PostRow[]> {
   `published_at <= hôm nay`. Thiếu điều kiện thứ hai thì đặt lịch không còn nghĩa gì —
   đó đúng là lỗi của bản trước.
 */
-function dieuKienDaDang(timeZone: string): string {
+function publishedFilter(timeZone: string): string {
   return `draft=eq.false&published_at=lte.${today(timeZone)}`;
 }
 
 /** Một bài theo slug. `null` nếu không có, là bài nháp, hoặc chưa tới ngày đăng. */
-export async function layBaiTheoSlug(slug: string, timeZone: string): Promise<PostLike | null> {
-  const rows = await truyVan(
-    `select=${COT_DAY}&slug=eq.${encodeURIComponent(slug)}&${dieuKienDaDang(timeZone)}&limit=1`,
+export async function getPostBySlug(slug: string, timeZone: string): Promise<PostLike | null> {
+  const rows = await queryPosts(
+    `select=${COLUMNS_FULL}&slug=eq.${encodeURIComponent(slug)}&${publishedFilter(timeZone)}&limit=1`,
   );
 
   return rows[0] ? rowToPost(rows[0]) : null;
@@ -106,15 +106,15 @@ export async function layBaiTheoSlug(slug: string, timeZone: string): Promise<Po
  * Không có `content`, nên `body` là chuỗi rỗng. Chỗ nào cần `body` của bài khác thì
  * phải đọc riêng bài đó; hiện không chỗ nào cần.
  */
-export async function layBaiDaDang(timeZone: string): Promise<PostLike[]> {
-  const rows = await truyVan(
-    `select=${COT_NHE}&${dieuKienDaDang(timeZone)}&order=published_at.desc&limit=${REST_PAGE_LIMIT}`,
+export async function fetchPublishedPosts(timeZone: string): Promise<PostLike[]> {
+  const rows = await queryPosts(
+    `select=${COLUMNS_LIGHT}&${publishedFilter(timeZone)}&order=published_at.desc&limit=${REST_PAGE_LIMIT}`,
   );
 
   return rows.map((row) => rowToPost({ ...row, content: '' }));
 }
 
-export interface KetQuaTim {
+export interface SearchHit {
   slug: string;
   title: string;
   description: string;
@@ -134,9 +134,9 @@ export interface KetQuaTim {
  * phải chuyện bảo mật; lý do là để trang tìm kiếm chạy được khi không có JS, và để chỗ
  * đổi cách tìm kiếm về sau chỉ có một.
  */
-export async function timBai(q: string, gioiHan = 20): Promise<KetQuaTim[]> {
-  const tuKhoa = q.trim();
-  if (tuKhoa.length < 2) return [];
+export async function searchPosts(q: string, limit = 20): Promise<SearchHit[]> {
+  const term = q.trim();
+  if (term.length < 2) return [];
 
   const url = env('PUBLIC_SUPABASE_URL');
   const key = env('PUBLIC_SUPABASE_ANON_KEY');
@@ -149,18 +149,18 @@ export async function timBai(q: string, gioiHan = 20): Promise<KetQuaTim[]> {
       Authorization: `Bearer ${key}`,
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({ q: tuKhoa, max_results: gioiHan }),
+    body: JSON.stringify({ q: term, max_results: limit }),
   });
 
   if (!res.ok) {
     throw new Error(`Tìm kiếm thất bại (HTTP ${res.status}): ${(await res.text()).slice(0, 200)}`);
   }
 
-  return (await res.json()) as KetQuaTim[];
+  return (await res.json()) as SearchHit[];
 }
 
 /** Giải mã thực thể ký tự, để chữ trong mục lục là chữ chứ không phải `&amp;`. */
-function giaiMa(text: string): string {
+function decodeEntities(text: string): string {
   const TEN: Record<string, string> = {
     amp: '&',
     lt: '<',
@@ -185,10 +185,10 @@ function giaiMa(text: string): string {
  * điều mà tính lại slug từ tiêu đề lần thứ hai không bảo đảm được.
  */
 export function headingsFromHtml(html: string): MarkdownHeading[] {
-  const ra: MarkdownHeading[] = [];
+  const hits: MarkdownHeading[] = [];
 
   for (const m of html.matchAll(/<h([234])\b[^>]*\bid="([^"]*)"[^>]*>([\s\S]*?)<\/h\1>/g)) {
-    const text = giaiMa(
+    const text = decodeEntities(
       m[3]!
         // Bỏ neo `#` mà `rehypeContent` chèn vào cuối heading — nó là điều hướng,
         // không phải phần của tiêu đề, và để lại thì mục lục nào cũng có dấu # ở cuối.
@@ -196,8 +196,8 @@ export function headingsFromHtml(html: string): MarkdownHeading[] {
         .replace(/<[^>]+>/g, ''),
     ).trim();
 
-    ra.push({ depth: Number(m[1]), slug: m[2]!, text });
+    hits.push({ depth: Number(m[1]), slug: m[2]!, text });
   }
 
-  return ra;
+  return hits;
 }
