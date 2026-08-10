@@ -119,6 +119,16 @@ export function mountPostListUi(
       chỗ, vì ở đó mở tab mới cho mỗi lần nhảy bài là ngược ý muốn.
     */
     hrefFor = /** @type {null | ((slug: string) => string)} */ (null),
+
+    /*
+      Nút "+ Bài mới" ngay trên màn hình bảng.
+
+      Thiếu nó là một lỗ UX thật, và tôi chỉ thấy khi mở site thật ra xem: nút "+ Bài mới"
+      nằm trong `aside` của màn hình soạn, mà màn hình đó bị ẩn khi bảng đang hiện. Nên ở
+      CỬA SỔ CHÍNH không có cách nào tạo bài mới — phải sang trình soạn trước rồi mới bấm.
+      Việc thường làm thứ hai mà lại không có nút.
+    */
+    onNew = /** @type {null | (() => void)} */ (null),
     onError = (_message) => {},
   },
 ) {
@@ -174,8 +184,11 @@ export function mountPostListUi(
           chọn một bài. Người vào để xem cho biết rồi muốn quay lại bài đang viết thì không
           có lối. Chế độ gọn không cần vì nó nằm cạnh trình soạn.
         */
-        isTable && onExit
-          ? `<button type="button" class="pl-exit" id="pl-exit">← Trình soạn</button>`
+        isTable
+          ? `<span class="pl-actions">
+               ${onNew ? `<button type="button" class="primary" id="pl-new">+ Bài mới</button>` : ''}
+               ${onExit ? `<button type="button" id="pl-exit">← Trình soạn</button>` : ''}
+             </span>`
           : ''
       }
     </div>
@@ -318,6 +331,7 @@ export function mountPostListUi(
   };
 
   if (isTable && onExit) el('pl-exit').onclick = () => onExit();
+  if (isTable && onNew) el('pl-new').onclick = () => onNew();
 
   el('pl-prev').onclick = () => {
     page -= 1;
@@ -395,7 +409,7 @@ const POST_LIST_CSS = `
   .pl-ui--table .pl-tools { grid-template-columns: minmax(0, 420px) auto 1fr; align-items: center; padding: 12px 18px; }
   .pl-ui--table .pl-tools input { font-size: 14px; padding: 8px 10px; }
   .pl-ui--table .pl-tools select { width: auto; min-width: 170px; font-size: 14px; padding: 8px 10px; }
-  .pl-exit { justify-self: end; }
+  .pl-actions { justify-self: end; display: flex; gap: 8px; align-items: center; }
   .pl-scroll { overflow: auto; flex: 1; min-height: 0; }
   .pl-table { width: 100%; border-collapse: collapse; font-size: 14px; }
   .pl-table th, .pl-table td { text-align: left; padding: 10px 18px; border-bottom: 1px solid var(--border); vertical-align: top; }

@@ -1292,6 +1292,11 @@
             ...postListSource,
             layout: 'table',
             onExit: () => showPosts(false),
+            onNew: () => {
+              showPosts(false);
+              fillForm(null);
+              $('title').focus();
+            },
             // Mỗi dòng là một link thật tới `?slug=…`, mở ở tab mới. Xem `hrefFor` trong
             // `post-list-ui.mjs` để biết vì sao phải là link chứ không phải onclick.
             hrefFor: (slug) => `?slug=${encodeURIComponent(slug)}`,
