@@ -94,22 +94,18 @@ const enabled = Boolean(ENV.publicSupabaseUrl && ENV.publicSupabaseAnonKey);
         overflow: hidden;
       }
 
-      /* --- Khung chính --- */
+      /* --- Khung chính ---
+         MỘT CỘT, không phải hai. Danh sách bài giờ là màn hình riêng (bảng rộng cả trang),
+         nên cột 260px cạnh trình soạn là bản sao thừa của nó — vừa lặp thông tin vừa lấy
+         mất chiều ngang của chỗ viết. `aside` bị bỏ hẳn khỏi luồng. */
       .shell {
         display: grid;
-        grid-template-columns: 260px 1fr;
+        grid-template-columns: 1fr;
         height: 100dvh;
         overflow: hidden;
       }
       aside {
-        border-right: 1px solid var(--border);
-        display: flex;
-        flex-direction: column;
-        min-height: 0;
-      }
-      .list {
-        overflow-y: auto;
-        flex: 1;
+        display: none;
       }
       .item {
         padding: 10px 12px;
@@ -476,26 +472,18 @@ const enabled = Boolean(ENV.publicSupabaseUrl && ENV.publicSupabaseAnonKey);
           </div>
 
           <div class="shell" id="screen-main" hidden>
-            <aside>
-              <div class="header">
-                <button class="primary" id="btn-new">
-                  + Bài mới
-                </button>
-                <button id="btn-posts">Danh sách</button>
-          <button id="btn-queue">Chủ đề</button>
-                <button id="btn-publish" title="Bắt đầu deploy ngay, khỏi chờ nhịp 20 phút">
-                  Đăng ngay
-                </button>
-                <button id="btn-logout">Đăng xuất</button>
-              </div>
-              <div class="list" id="ds" />
-            </aside>
-
             <main>
+              {/* Điều hướng nằm CHUNG một thanh với hành động.
+
+                 Bản trước để nhóm điều hướng trong `aside`; bỏ `aside` đi thì trình soạn
+                 thành ngõ cụt — không còn đường về bảng ngoài nút Back của trình duyệt.
+                 Đã thấy đúng vậy trên ảnh chụp: thanh công cụ chỉ còn Lưu, Ảnh, Xoá.
+
+                 `← Danh sách` đứng đầu vì nó là đường ra, và đường ra phải ở chỗ mắt tìm
+                 trước tiên. */}
               <div class="bar">
-                <button id="btn-list" aria-pressed="false">
-                  ☰
-                </button>
+                <button id="btn-posts">← Danh sách</button>
+                <button class="primary" id="btn-new">+ Bài mới</button>
                 <button class="primary" id="btn-save">
                   Lưu
                 </button>
@@ -503,6 +491,11 @@ const enabled = Boolean(ENV.publicSupabaseUrl && ENV.publicSupabaseAnonKey);
                 <button class="danger" id="btn-delete">
                   Xoá
                 </button>
+                <button id="btn-queue">Chủ đề</button>
+                <button id="btn-publish" title="Bắt đầu deploy ngay, khỏi chờ nhịp 20 phút">
+                  Đăng ngay
+                </button>
+                <button id="btn-logout">Đăng xuất</button>
                 <span id="toast" />
               </div>
 
@@ -980,13 +973,61 @@ const enabled = Boolean(ENV.publicSupabaseUrl && ENV.publicSupabaseAnonKey);
           onError: (message: string) => toast(message, 'bad'),
         };
 
-        const postList = mountPostListUi($('ds')!, {
-          ...postListSource,
-          onPick: (row: any) => {
-            fillForm(row);
-            document.querySelector('.col')?.scrollTo(0, 0);
-          },
-        });
+        /*
+          MỘT TRANG, ĐIỀU HƯỚNG BẰNG URL.
+
+          `?slug=…` là khung soạn một bài, không có query là bảng. Chọn một hàng thì
+          `pushState` rồi đổi khung tại chỗ — không tải lại trang, và nút Back của trình
+          duyệt quay về bảng vì đó là một mục lịch sử thật.
+
+          Vì sao không phải ba màn hình ẩn/hiện như bản trước: trạng thái nằm trong URL thì
+          nó chia sẻ được, bookmark được, Back/Forward chạy đúng, và Ctrl+click mở tab mới.
+          Trạng thái nằm trong biến JS thì không có thứ nào trong số đó.
+        */
+        function openPost(row: any, { push = true } = {}) {
+          if (push) {
+            history.pushState({}, '', `?slug=${encodeURIComponent(row.slug)}`);
+          }
+          $('screen-posts')!.hidden = true;
+          $('screen-main')!.hidden = false;
+          fillForm(row);
+          document.title = `${row.title || row.slug} — Quản trị`;
+          document.querySelector('.col')?.scrollTo(0, 0);
+        }
+
+        function openNew({ push = true } = {}) {
+          if (push) history.pushState({}, '', '?new=1');
+          $('screen-posts')!.hidden = true;
+          $('screen-main')!.hidden = false;
+          fillForm(null);
+          document.title = 'Bài mới — Quản trị';
+          $('title')!.focus();
+        }
+
+        /** Đọc URL rồi hiện đúng khung. Dùng cho cả lúc mở trang và lúc bấm Back. */
+        async function route({ push = false } = {}) {
+          const params = new URLSearchParams(location.search);
+          const slug = params.get('slug');
+
+          if (params.get('new') !== null) {
+            openNew({ push });
+            return;
+          }
+
+          if (slug) {
+            const row = await postListSource.loadOne(slug);
+            if (row) {
+              openPost(row, { push });
+              return;
+            }
+            toast(`Không có bài "${slug}"`, 'bad');
+          }
+
+          showPosts(true);
+          document.title = 'Quản trị nội dung';
+        }
+
+        window.addEventListener('popstate', () => void route());
 
         /*
           Bảng rộng cả trang. Dựng một lần rồi giữ lại, cùng lý do như hàng đợi: dựng lại
@@ -1006,36 +1047,25 @@ const enabled = Boolean(ENV.publicSupabaseUrl && ENV.publicSupabaseAnonKey);
             postTable = mountPostListUi($('screen-posts')!, {
               ...postListSource,
               layout: 'table',
-              onExit: () => showPosts(false),
-              onNew: () => {
-                showPosts(false);
-                fillForm(null);
-                $('title')!.focus();
-              },
+              onNew: () => openNew(),
               // Mỗi dòng là một link thật tới `?slug=…`, mở ở tab mới. Xem `hrefFor` trong
               // `post-list-ui.mjs` để biết vì sao phải là link chứ không phải onclick.
               hrefFor: (slug: string) => `?slug=${encodeURIComponent(slug)}`,
               // Chọn một bài thì rời màn hình danh sách sang trình soạn — đó là toàn bộ
               // mục đích của màn hình này.
-              onPick: (row: any) => {
-                showPosts(false);
-                fillForm(row);
-                document.querySelector('.col')?.scrollTo(0, 0);
-              },
+              onPick: (row: any) => openPost(row),
             });
           }
           void postTable.refresh();
         }
 
         function renderList() {
-          postList.setCurrent(editingSlug);
           postTable?.setCurrent(editingSlug);
         }
 
         async function loadPosts() {
-          await postList.refresh();
-          // Bảng chỉ tải lại khi nó đang mở. Chưa mở thì `refresh()` lúc mở sẽ lo.
-          if (postTable && !$('screen-posts')!.hidden) await postTable.refresh();
+          // Bảng chỉ tải lại khi nó đã dựng. Chưa dựng thì `refresh()` lúc mở sẽ lo.
+          if (postTable) await postTable.refresh();
         }
 
         async function save() {
@@ -1236,7 +1266,10 @@ const enabled = Boolean(ENV.publicSupabaseUrl && ENV.publicSupabaseAnonKey);
           void queueUi.refresh();
         }
 
-        $('btn-posts')!.onclick = () => showPosts(true);
+        $('btn-posts')!.onclick = () => {
+          history.pushState({}, '', location.pathname);
+          void route();
+        };
         $('btn-queue')!.onclick = () => showQueue(true);
 
         /* --- Đăng ngay --------------------------------------------------------
@@ -1286,44 +1319,12 @@ const enabled = Boolean(ENV.publicSupabaseUrl && ENV.publicSupabaseAnonKey);
         async function restoreSession() {
           $('screen-login')!.hidden = true;
           $('screen-main')!.hidden = false;
-          await loadPosts();
           fillForm(null);
 
-          /*
-            Có `?slug=` trong URL thì vào THẲNG trình soạn bài đó.
-
-            Nửa còn lại của việc "chọn một dòng thì mở tab ra soạn": bảng sinh link
-            `?slug=…`, và tab mới mở ra phải hiểu link đó. Thiếu chỗ này thì tab mới lại
-            hiện bảng và cái link chẳng dẫn tới đâu.
-
-            Ở đây nó nằm trong `restoreSession()` — tức SAU khi đăng nhập. Mở link khi chưa
-            đăng nhập thì thấy trang đăng nhập trước, rồi vào đúng bài; query string không
-            mất vì trang không điều hướng đi đâu.
-          */
-          const slugFromUrl = new URLSearchParams(location.search).get('slug');
-          if (slugFromUrl) {
-            const row = await postListSource.loadOne(slugFromUrl);
-            if (row) {
-              fillForm(row as any);
-              document.title = `${(row as any).title} — Quản trị`;
-              return;
-            }
-            toast(`Không có bài "${slugFromUrl}"`, 'bad');
-          }
-
-          /*
-            ĐĂNG NHẬP XONG LÀ THẤY BẢNG, không phải thấy form trống.
-
-            Thứ tự đúng của một công cụ quản lý nội dung: danh sách là cửa sổ chính, chọn một
-            dòng mới mở chi tiết. Bản trước mở ra là form "Bài mới" và bảng nằm sau một cái
-            nút — tức mặc định là "viết bài mới", trong khi việc thường làm hơn nhiều là tìm
-            một bài đã có để sửa.
-
-            `fillForm(null)` vẫn gọi TRƯỚC để trình soạn ở trạng thái sạch và xác định khi
-            người dùng chuyển sang nó.
-          */
-          showPosts(true);
+          // Một lời gọi duy nhất: URL quyết định thấy gì. Xem `route()`.
+          await route();
         }
+
 
         $('login-form')!.addEventListener('submit', async (e) => {
           e.preventDefault();
@@ -1350,13 +1351,7 @@ const enabled = Boolean(ENV.publicSupabaseUrl && ENV.publicSupabaseAnonKey);
 
         $('btn-logout')!.onclick = logout;
         $('btn-save')!.onclick = save;
-        $('btn-new')!.onclick = () => {
-          // Rời bảng sang trình soạn: "Bài mới" bấm được từ cả hai màn hình, và ở màn hình
-          // bảng thì chỉ dựng form trống mà không chuyển màn hình là bấm xong không thấy gì.
-          showPosts(false);
-          fillForm(null);
-          $('title')!.focus();
-        };
+        $('btn-new')!.onclick = () => openNew();
         $('btn-delete')!.onclick = async () => {
           if (!editingSlug) return;
           if (!confirm(`Xoá hẳn bài "${editingSlug}"?\n\nKhông hoàn lại được.`)) return;
@@ -1371,10 +1366,13 @@ const enabled = Boolean(ENV.publicSupabaseUrl && ENV.publicSupabaseAnonKey);
           fillForm(null);
           toast('Đã xoá', 'ok');
         };
-        $('btn-list')!.onclick = () => {
-          const a = document.querySelector('aside')!;
-          a.hidden = !a.hidden;
-        };
+        /*
+          Nút ☰ đã bỏ cùng với `aside`.
+
+          Nó tồn tại để gập/mở cột danh sách trên màn hẹp. Không còn cột đó thì không còn gì
+          để gập — và `pnpm check:admin-ids` bắt được đúng chỗ này: JS vẫn gọi phần tử đó sau
+          khi markup mất nó, và một TypeError lúc khởi tạo làm đứt cả phần script còn lại.
+        */
         $('btn-image')!.onclick = () => ($('file-input') as HTMLInputElement).click();
         ($('file-input') as HTMLInputElement).onchange = (e) =>
           uploadImages([...((e.target as HTMLInputElement).files ?? [])]);

@@ -247,7 +247,7 @@ export function mountPostListUi(
               thói quen không nên có ngoại lệ.
             */
             const pick = hrefFor
-              ? `<a class="pl-pick" href="${escapeHtml(hrefFor(row.slug))}" target="_blank" rel="noopener" data-slug="${escapeHtml(row.slug)}">`
+              ? `<a class="pl-pick" href="${escapeHtml(hrefFor(row.slug))}" data-slug="${escapeHtml(row.slug)}">`
               : `<button type="button" class="pl-pick" data-slug="${escapeHtml(row.slug)}">`;
             const unpick = hrefFor ? '</a>' : '</button>';
 
@@ -283,16 +283,23 @@ export function mountPostListUi(
     el('pl-prev').disabled = page <= 1;
     el('pl-next').disabled = page >= pageCount;
 
-    /*
-      Là link thì KHÔNG gắn handler — để trình duyệt điều hướng.
-
-      Gắn `onclick` lên một `<a target="_blank">` là vừa mở tab mới vừa chạy handler ở tab
-      cũ: hai việc cùng lúc, và tab cũ đổi trạng thái sau lưng người dùng.
-    */
-    if (hrefFor) return;
-
     for (const button of el('pl-body').querySelectorAll('.pl-pick')) {
-      button.onclick = async () => {
+      button.onclick = async (event) => {
+        /*
+          Là LINK, và ta chỉ chặn cú bấm THƯỜNG.
+
+          Ctrl/Cmd+click, Shift+click, chuột giữa — để trình duyệt lo: đó là cách người ta
+          mở tab mới, và chặn hết thì mất luôn hành vi đó. Bấm thường thì `preventDefault`
+          rồi điều hướng tại chỗ, nên không tải lại trang.
+
+          Không có phần này thì hoặc mọi cú bấm mở tab mới (ồn), hoặc mọi cú bấm tải lại
+          trang (chậm và mất trạng thái).
+        */
+        if (hrefFor) {
+          if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+          event.preventDefault();
+        }
+
         const slug = button.dataset.slug;
         button.disabled = true;
         try {
