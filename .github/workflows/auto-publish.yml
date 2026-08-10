@@ -36,6 +36,17 @@ on:
   # Bấm chạy ngay, dùng khi vừa sửa bài và không muốn chờ tới nhịp kế tiếp.
   workflow_dispatch:
 
+  # Nút "Đăng ngay" trong admin.
+  #
+  # Database gọi thẳng GitHub qua `rpc/request_deploy` (pg_net, token trong Supabase
+  # Vault). Nhờ vậy khỏi chờ nhịp cron: sửa xong bấm một cái là bài lên trong khoảng
+  # 60–90 giây — đó là thời gian sync + build + deploy, đã đo trên chính repo này.
+  #
+  # Vẫn giữ cron vì nó GỘP: sửa một bài là nhiều lần Lưu, và không ai muốn 10 lần deploy
+  # cho 10 lần Lưu. Cron là lưới an toàn tự động; nút là lúc nói "xong rồi, lên đi".
+  repository_dispatch:
+    types: [publish-now]
+
 concurrency:
   group: tu-dong-publish
   cancel-in-progress: false
