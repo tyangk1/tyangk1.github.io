@@ -101,6 +101,18 @@ if (slugs.length === 0) {
  * Cache-Control hợp lệ, và nó đúng cho `/search.json` nhưng sai cho một trang bài.
  */
 function checkCacheHeader(path, res) {
+  /*
+    CHỈ kiểm được header khi chạy vào máy chủ ở máy.
+
+    Vercel dùng `s-maxage` cho cache của nó rồi VIẾT LẠI `Cache-Control` gửi xuống — mọi
+    route đều trả về `public, max-age=0` bất kể mình đặt gì. Nên nếu đọc header ở đây khi
+    chạy vào site thật thì bộ kiểm báo sai TOÀN BỘ route, kể cả những route đang cache đúng.
+    Đã gặp: tôi thêm phép kiểm này, nó xanh ở máy, rồi báo sai hàng loạt trên production.
+
+    Vào site thật thì đo HIỆU QUẢ — xem `checkCacheEffect` ở cuối file.
+  */
+  if (urlArg) return;
+
   const value = res.headers.get('cache-control') ?? '';
 
   if (!value) {
@@ -280,6 +292,37 @@ for (const [name, path] of [
 ]) {
   const res = await fetch(`${ORIGIN}${path}`);
   if (res.status !== 404) report(path, `${name}: HTTP ${res.status}, cần 404`);
+}
+
+/*
+  ── CDN có thật sự cache hay không ────────────────────────────────────────────
+
+  Chỉ chạy khi kiểm site thật, vì máy chủ ở máy không có CDN nào để đo.
+
+  Đo bằng HIỆU QUẢ: gọi cùng URL hai lần, lần sau phải là HIT hoặc STALE. Đây là cách duy
+  nhất đáng tin trên Vercel, nơi header gửi xuống đã bị viết lại. Và nó bắt được thứ mà đọc
+  header không bắt được: `/rss.xml` MISS mọi lần vì `rss()` dựng Response riêng, nên header
+  đặt vào `Astro.response` không tới được nó.
+
+  Chỉ kiểm một nhóm đại diện, không kiểm cả 25 route: mỗi route tốn hai request nữa, và
+  nhóm này đã phủ đủ ba loại phản hồi (trang bài, trang danh sách, endpoint XML).
+*/
+if (urlArg) {
+  for (const path of ['/blog/' + slugs[0], '/', '/blog', '/tags', '/rss.xml', '/sitemap.xml']) {
+    const marks = [];
+
+    for (let i = 0; i < 2; i += 1) {
+      const r = await fetch(`${ORIGIN}${path}`);
+      await r.arrayBuffer();
+      marks.push(r.headers.get('x-vercel-cache') ?? '(không có)');
+      await new Promise((res) => setTimeout(res, 600));
+    }
+
+    const cached = /^(HIT|STALE)/.test(marks[1]);
+    if (!cached) {
+      report(path, `CDN không cache — x-vercel-cache: ${marks.join(', ')}`);
+    }
+  }
 }
 
 stopServer();
