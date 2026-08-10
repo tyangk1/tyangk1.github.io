@@ -92,8 +92,29 @@ export function mountPostListUi(
   // Mặc định của `onError` phải NHẬN tham số, dù nó không dùng: `() => {}` làm TypeScript
   // suy ra kiểu `() => void` cho cả tham số, nên chỗ gọi truyền `(message) => ...` bị báo
   // ts(2322). `astro check` bắt được điều đó ở `admin.astro`.
-  { loadRows, loadOne, onPick, statusOf, labels, onError = (_message) => {} },
+  {
+    loadRows,
+    loadOne,
+    onPick,
+    statusOf,
+    labels,
+    layout = 'compact',
+    onExit = null,
+    onError = (_message) => {},
+  },
 ) {
+  /*
+    HAI LAYOUT, cùng một logic.
+
+    'table'   — màn hình riêng, rộng cả trang: Tiêu đề | Trạng thái | Ngày | Tag. Đây là chỗ
+                DUYỆT và QUẢN LÝ: so sánh được giữa các bài, đọc được theo cột.
+    'compact' — cột hẹp cạnh trình soạn. Đây là chỗ NHẢY nhanh giữa các bài mà không rời khỏi
+                bài đang viết.
+
+    Hai chỗ dùng khác nhau nên hình dạng khác nhau, nhưng phần tìm/lọc/phân trang là một —
+    và đó chính là phần dễ lệch nhất nếu viết hai lần.
+  */
+  const isTable = layout === 'table';
   let rows = [];
   let term = '';
   let status = 'all';
@@ -115,7 +136,7 @@ export function mountPostListUi(
   root.style.minHeight = '0';
 
   root.innerHTML = `
-    <div class="pl-ui">
+    <div class="pl-ui${isTable ? ' pl-ui--table' : ''}">
     <div class="pl-tools">
       <label class="sr-only" for="pl-term">Tìm bài</label>
       <input id="pl-term" type="search" placeholder="Tìm theo tiêu đề, slug hoặc tag…" autocomplete="off" />
@@ -126,8 +147,34 @@ export function mountPostListUi(
         <option value="scheduled">${escapeHtml(labels.scheduled)}</option>
         <option value="draft">${escapeHtml(labels.draft)}</option>
       </select>
+      ${
+        /*
+          Đường quay lại, CHỈ ở chế độ bảng.
+
+          Không có nó thì màn hình danh sách là một cái bẫy: vào rồi chỉ ra được bằng cách
+          chọn một bài. Người vào để xem cho biết rồi muốn quay lại bài đang viết thì không
+          có lối. Chế độ gọn không cần vì nó nằm cạnh trình soạn.
+        */
+        isTable && onExit
+          ? `<button type="button" class="pl-exit" id="pl-exit">← Trình soạn</button>`
+          : ''
+      }
     </div>
-    <ul class="pl-list" id="pl-body"></ul>
+    ${
+      isTable
+        ? `<div class="pl-scroll">
+             <table class="pl-table">
+               <thead><tr>
+                 <th scope="col">Tiêu đề</th>
+                 <th scope="col">Trạng thái</th>
+                 <th scope="col">Ngày đăng</th>
+                 <th scope="col">Tag</th>
+               </tr></thead>
+               <tbody id="pl-body"></tbody>
+             </table>
+           </div>`
+        : `<ul class="pl-list" id="pl-body"></ul>`
+    }
     <div class="pl-foot">
       <span id="pl-count" aria-live="polite"></span>
       <span class="pl-pager">
@@ -159,8 +206,21 @@ export function mountPostListUi(
               không Enter được. Người viết bài dùng bàn phím rất nhiều, nên chỗ này phải là
               một phần tử tương tác thật.
             */
-            return `<li${row.slug === currentSlug ? ' aria-current="true"' : ''}>
-              <button type="button" class="pl-pick" data-slug="${escapeHtml(row.slug)}">
+            const pick = `<button type="button" class="pl-pick" data-slug="${escapeHtml(row.slug)}">`;
+            const current = row.slug === currentSlug ? ' aria-current="true"' : '';
+
+            if (isTable) {
+              return `<tr${current}>
+                <td>${pick}<span class="pl-title">${escapeHtml(row.title || row.slug)}</span></button>
+                    <div class="pl-slug">${escapeHtml(row.slug)}</div></td>
+                <td><span class="badge ${s}">${escapeHtml(labels[s])}</span></td>
+                <td class="pl-date">${escapeHtml(row.published_at ?? '')}</td>
+                <td class="pl-tags">${escapeHtml((row.tags ?? []).join(', '))}</td>
+              </tr>`;
+            }
+
+            return `<li${current}>
+              ${pick}
                 <span class="pl-title">${escapeHtml(row.title || row.slug)}</span>
                 <span class="pl-meta">
                   <span class="badge ${s}">${escapeHtml(labels[s])}</span>
@@ -170,7 +230,9 @@ export function mountPostListUi(
             </li>`;
           })
           .join('')
-      : `<li class="pl-empty">Không có bài nào khớp.</li>`;
+      : isTable
+        ? `<tr><td colspan="4" class="pl-empty">Không có bài nào khớp.</td></tr>`
+        : `<li class="pl-empty">Không có bài nào khớp.</li>`;
 
     el('pl-count').textContent = `${matched.length} bài${
       matched.length !== rows.length ? ` / ${rows.length}` : ''
@@ -217,6 +279,8 @@ export function mountPostListUi(
     page = 1;
     render();
   };
+
+  if (isTable && onExit) el('pl-exit').onclick = () => onExit();
 
   el('pl-prev').onclick = () => {
     page -= 1;
@@ -285,4 +349,37 @@ const POST_LIST_CSS = `
   .pl-pager { display: flex; align-items: center; gap: 4px; }
   .pl-pager button { min-width: 26px; min-height: 26px; padding: 2px 6px; font-size: 13px; line-height: 1; }
   .pl-pager button:disabled { opacity: .4; cursor: default; }
+
+  /* --- Chế độ bảng: màn hình riêng, rộng cả trang --------------------------- */
+  .pl-ui--table { padding: 0; }
+  /* Ba cột với nút thoát ở cột cuối: ô tìm và ô lọc vừa đúng nội dung, khoảng trống dồn vào
+     giữa. Bản trước để select rộng 100% nên nó giãn gần hết chiều ngang bảng — một ô chọn
+     bốn giá trị mà rộng 900px thì vừa xấu vừa khó bấm. */
+  .pl-ui--table .pl-tools { grid-template-columns: minmax(0, 420px) auto 1fr; align-items: center; padding: 12px 18px; }
+  .pl-ui--table .pl-tools input { font-size: 14px; padding: 8px 10px; }
+  .pl-ui--table .pl-tools select { width: auto; min-width: 170px; font-size: 14px; padding: 8px 10px; }
+  .pl-exit { justify-self: end; }
+  .pl-scroll { overflow: auto; flex: 1; min-height: 0; }
+  .pl-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  .pl-table th, .pl-table td { text-align: left; padding: 10px 18px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  /* Ghim hàng tiêu đề: cuộn 200 bài mà mất tên cột thì bảng không còn là bảng. */
+  .pl-table th { position: sticky; top: 0; z-index: 1; background: var(--panel); font-size: 11px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
+  .pl-table tbody tr:hover { background: var(--panel); }
+  .pl-table tbody tr[aria-current='true'] { background: var(--panel); box-shadow: inset 3px 0 0 var(--blue); }
+  /* Cột tiêu đề co giãn, ba cột còn lại vừa đúng nội dung — không để ngày tháng
+     chiếm một phần tư bảng trên màn rộng. */
+  .pl-table th:first-child, .pl-table td:first-child { width: 100%; }
+  .pl-table td:not(:first-child) { white-space: nowrap; }
+  .pl-ui--table .pl-title { font-size: 14px; }
+  .pl-slug { font-family: var(--mono); font-size: 11px; color: var(--muted); margin-top: 2px; }
+  .pl-tags { color: var(--muted); font-size: 12px; }
+  .pl-ui--table .pl-foot { padding: 10px 18px; font-size: 12px; }
+
+  /* Dưới 720px bảng không còn đủ chỗ cho bốn cột: bỏ Tag và Ngày, giữ Tiêu đề và
+     Trạng thái. Cuộn ngang một cái bảng trên điện thoại thì không ai đọc được. */
+  @media (max-width: 720px) {
+    .pl-table th:nth-child(3), .pl-table td:nth-child(3),
+    .pl-table th:nth-child(4), .pl-table td:nth-child(4) { display: none; }
+    .pl-ui--table .pl-tools { grid-template-columns: 1fr; }
+  }
 `;

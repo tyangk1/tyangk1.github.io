@@ -48,6 +48,10 @@
         border-bottom: 1px solid var(--border);
         display: flex;
         gap: 6px;
+        /* `flex-wrap` là bắt buộc, không phải cho đẹp: cột này rộng 270px và giờ có
+           năm nút. Không cho xuống dòng thì chúng tràn qua đường viền sang cột soạn —
+           đã thấy trên ảnh chụp màn hình sau khi thêm nút "Danh sách". */
+        flex-wrap: wrap;
       }
       .list {
         overflow-y: auto;
@@ -360,6 +364,17 @@
           grid-template-rows: auto 1fr;
         }
       }
+
+      /* Màn hình danh sách bài — bảng rộng cả trang.
+         Khác `#screen-queue`: nó KHÔNG chia cột, vì cái bảng chính là toàn bộ nội dung.
+         Đây là chỗ duyệt và quản lý; bấm một bài thì chuyển sang trình soạn. */
+      #screen-posts {
+        grid-column: 1 / -1;
+        display: flex;
+        flex-direction: column;
+        min-height: 0;
+        overflow: hidden;
+      }
       .note {
         color: var(--muted);
         font-size: 11px;
@@ -549,7 +564,8 @@
     <aside>
       <div class="header">
         <button class="primary" id="btn-new">+ Bài mới</button>
-        <button id="btn-queue" title="Hàng đợi chủ đề cho việc soạn bài tự động">Chủ đề</button>
+        <button id="btn-posts" title="Xem toan bo bai dang bang">Danh sách</button>
+          <button id="btn-queue" title="Hàng đợi chủ đề cho việc soạn bài tự động">Chủ đề</button>
         <button id="btn-sync" title="Kéo nội dung từ database ra file MDX">Đồng bộ</button>
         <button id="btn-publish" title="Bắt đầu deploy ngay, khỏi chờ nhịp 20 phút">
           Đăng ngay
@@ -712,6 +728,7 @@
       <input type="file" id="file-input" accept="image/*" multiple hidden />
     </main>
 
+    <div id="screen-posts" hidden></div>
     <div id="screen-queue" hidden></div>
 
     <script type="module">
@@ -987,7 +1004,11 @@
         `/api/posts` giờ trả cột NHẸ (không có `content`); `?slug=` trả một bài đầy đủ. Bản
         trước tải toàn bộ nội dung của mọi bài chỉ để vẽ tiêu đề.
       */
-      const postList = mountPostListUi($('ds'), {
+      /*
+        Nguồn dữ liệu, khai MỘT LẦN cho cả hai chỗ hiển thị: bảng rộng ở màn hình danh sách và
+        danh sách gọn ở cột cạnh trình soạn. Khai hai lần thì hai chỗ có thể đọc khác nhau.
+      */
+      const postListSource = {
         loadRows: async () => {
           const r = await fetch('/api/posts');
           if (!r.ok) {
@@ -1002,22 +1023,28 @@
           return r.ok ? r.json() : null;
         },
 
+        statusOf: postStatus,
+        labels: STATUS_LABELS,
+        onError: (message) => toast(message, 'bad'),
+      };
+
+      const postList = mountPostListUi($('ds'), {
+        ...postListSource,
         onPick: (row) => {
           fillForm(row);
           document.querySelector('.col').scrollTo(0, 0);
         },
-
-        statusOf: postStatus,
-        labels: STATUS_LABELS,
-        onError: (message) => toast(message, 'bad'),
       });
 
       function renderList() {
         postList.setCurrent(editingSlug);
+        postTable?.setCurrent(editingSlug);
       }
 
       async function loadPosts() {
         await postList.refresh();
+        // Bảng chỉ tải lại khi nó đã từng được mở. Chưa mở thì `refresh()` lúc mở sẽ lo.
+        if (postTable && !$('screen-posts').hidden) await postTable.refresh();
       }
 
       async function save({ silent = false } = {}) {
@@ -1241,9 +1268,43 @@
         },
       };
 
+      /*
+        Màn hình danh sách bài — bảng rộng cả trang.
+
+        Dựng một lần rồi giữ lại, cùng lý do như hàng đợi: dựng lại mỗi lần mở là mất từ khoá
+        đang tìm và trang đang xem.
+      */
+      let postTable = null;
+
+      function showPosts(show) {
+        document.querySelector('body > aside').hidden = show;
+        document.querySelector('body > main').hidden = show;
+        $('screen-queue').hidden = true;
+        $('screen-posts').hidden = !show;
+
+        if (!show) return;
+
+        if (!postTable) {
+          postTable = mountPostListUi($('screen-posts'), {
+            ...postListSource,
+            layout: 'table',
+            onExit: () => showPosts(false),
+            // Chọn một bài thì rời màn hình danh sách sang trình soạn — đó là toàn bộ mục
+            // đích của màn hình này.
+            onPick: (row) => {
+              showPosts(false);
+              fillForm(row);
+              document.querySelector('.col').scrollTo(0, 0);
+            },
+          });
+        }
+        postTable.refresh();
+      }
+
       function showQueue(show) {
         document.querySelector('body > aside').hidden = show;
         document.querySelector('body > main').hidden = show;
+        $('screen-posts').hidden = true;
         $('screen-queue').hidden = !show;
 
         // Quay về thì TẢI LẠI danh sách bài: thứ hay xảy ra giữa hai lần mở màn hình
@@ -1294,6 +1355,7 @@
         }
       };
 
+      $('btn-posts').onclick = () => showPosts(true);
       $('btn-queue').onclick = () => showQueue(true);
 
       $('btn-sync').onclick = async () => {
