@@ -25,15 +25,31 @@ name: Auto publish
 # Hệ quả: độ trễ của đặt lịch = nhịp cron. Bài hẹn 00:00 thường lên trong khoảng
 # 00:00–00:20, và có thể muộn hơn vì cron của GitHub hay trễ khi máy bận. Nếu cần
 # đúng phút thì cách này không làm được — nhưng với blog thì không cần.
+# ┌─────────────────────────────────────────────────────────────────────────────┐
+# │ TOÀN BỘ PHẦN TRÊN MÔ TẢ CÁCH LÀM CŨ. ĐỌC KHỐI NÀY TRƯỚC.                    │
+# └─────────────────────────────────────────────────────────────────────────────┘
+#
+# Trang bài, trang chủ, tag, RSS, sitemap và ảnh OG giờ ĐỌC DATABASE LÚC CÓ REQUEST.
+# Nghĩa là sửa bài không cần sync, không cần commit, không cần build, không cần deploy —
+# trang đổi ở lần tải kế tiếp, chậm nhất là sau 60 giây cache CDN.
+#
+# Nên workflow này KHÔNG còn là đường đăng bài. Việc nó còn làm được là kéo nội dung từ
+# database ra `src/content/blog/*.mdx`, và những file đó giờ chỉ dùng cho hai bộ kiểm
+# (`check:content` và ảnh chụp vàng của `check:renderer`) — tức là việc của người phát
+# triển, không phải việc của người đọc.
+#
+# CRON ĐÃ TẮT, và đây là lý do: nó gọi `build-and-deploy.yml`, mà workflow đó giờ dừng có
+# chủ ý vì GitHub Pages không chạy được máy chủ. Để cron chạy nghĩa là CI đỏ 20 phút một
+# lần — và một CI đỏ đều đặn là cách nhanh nhất dạy người ta bỏ qua CI, kể cả lúc nó đỏ
+# vì lý do thật.
+#
+# Chạy tay khi cần đồng bộ file: tab Actions → Run workflow. Xoá hẳn workflow này thì đợi
+# sau khi Vercel chạy ổn, để còn đường lùi.
 on:
-  schedule:
-    # Mỗi 20 phút. Đủ nhanh để không phải chờ lâu sau khi sửa bài, đủ chậm để
-    # không tốn phút CI vô ích — phần lớn lần chạy sẽ không có gì đổi và thoát sớm.
-    #
-    # GitHub cron chạy theo UTC và thường trễ vài phút khi máy bận. Không có cách
-    # nào đảm bảo đúng phút, nên đừng trông vào độ chính xác của nó.
-    - cron: '*/20 * * * *'
-  # Bấm chạy ngay, dùng khi vừa sửa bài và không muốn chờ tới nhịp kế tiếp.
+  # schedule:
+  #   - cron: '*/20 * * * *'
+
+  # Bấm chạy ngay — giờ là cách duy nhất workflow này chạy.
   workflow_dispatch:
 
   # Nút "Đăng ngay" trong admin.

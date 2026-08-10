@@ -1,7 +1,6 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "buildCommand": "pnpm build",
-  "outputDirectory": "dist",
+  "buildCommand": "pnpm build:ci",
   "framework": "astro",
   "cleanUrls": true,
   "trailingSlash": false,
@@ -21,14 +20,6 @@
     {
       "source": "/_astro/(.*)",
       "headers": [{ "key": "Cache-Control", "value": "public, max-age=31536000, immutable" }]
-    },
-    {
-      "source": "/og/(.*)",
-      "headers": [{ "key": "Cache-Control", "value": "public, max-age=31536000, immutable" }]
-    },
-    {
-      "source": "/pagefind/(.*)",
-      "headers": [{ "key": "Cache-Control", "value": "public, max-age=3600, must-revalidate" }]
     }
   ]
 }

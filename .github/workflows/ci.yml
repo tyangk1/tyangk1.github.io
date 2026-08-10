@@ -54,6 +54,13 @@ jobs:
       # giscus hoặc newsletter sẽ lọt qua CI rồi mới vỡ ở site thật.
       - name: Build
         env:
+          # Adapter Node, không phải Vercel.
+          #
+          # `pnpm check:ssr` cần một máy chủ gọi được bằng HTTP để đi qua từng route —
+          # adapter Vercel không sinh `dist/server/entry.mjs` để chạy như vậy. Thiếu dòng
+          # này thì bộ kiểm đó không có chỗ đứng, và mất lưới an toàn của toàn bộ phần
+          # chạy lúc request. Vercel tự build bằng adapter mặc định của nó.
+          BUILD_ADAPTER: node
           PUBLIC_GISCUS_REPO: ${{ vars.PUBLIC_GISCUS_REPO }}
           PUBLIC_GISCUS_REPO_ID: ${{ vars.PUBLIC_GISCUS_REPO_ID }}
           PUBLIC_GISCUS_CATEGORY: ${{ vars.PUBLIC_GISCUS_CATEGORY }}

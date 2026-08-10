@@ -20,8 +20,10 @@ const REST_PAGE_LIMIT = 200;
 function env(name: string): string {
   // `import.meta.env` được thay lúc build; `process.env` đọc được lúc chạy. Thử cả hai
   // để cùng một file dùng được ở dev, ở build tĩnh, và ở máy chủ SSR.
-  const fromVite = (import.meta.env as Record<string, string | undefined>)[name];
-  return fromVite ?? process.env[name] ?? '';
+  // `?.` vì Node thuần không định nghĩa `import.meta.env` — xem chú thích cùng chỗ trong
+  // `src/site.config.ts`, nơi việc thiếu nó làm chết cả file config.
+  const fromVite = (import.meta as { env?: Record<string, string | undefined> }).env;
+  return fromVite?.[name] ?? process.env[name] ?? '';
 }
 
 /** Ngày hôm nay theo múi giờ của site, dạng YYYY-MM-DD. */

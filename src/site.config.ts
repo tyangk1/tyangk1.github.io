@@ -5,14 +5,54 @@
  * ===========================================================================
  */
 
+/**
+ * URL production, đọc từ biến môi trường.
+ *
+ * Vì sao là biến chứ không phải chữ viết cứng: giá trị này đi vào canonical, sitemap, RSS
+ * và `og:image` — tức là vào những thứ Google index và mạng xã hội cache. Deploy lên một
+ * host mới mà quên sửa nó thì mọi trang tự khai canonical trỏ về tên miền CŨ, và Google
+ * sẽ không index site mới. Đó là loại lỗi không có triệu chứng nào nhìn thấy được.
+ *
+ * Vercel tự đặt `VERCEL_PROJECT_PRODUCTION_URL` (dạng `abc.vercel.app`, không có scheme),
+ * nên bản deploy đầu tiên tự đúng mà chưa cần làm gì. Có tên miền riêng thì đặt
+ * `PUBLIC_SITE_URL=https://ten-mien-cua-anh` và nó thắng.
+ *
+ * Thứ tự ưu tiên có chủ đích: `PUBLIC_SITE_URL` trước, vì tên miền riêng luôn là câu trả
+ * lời đúng khi cả hai cùng có — hai URL cùng phục vụ một nội dung là nội dung trùng lặp,
+ * và canonical phải chỉ về đúng một cái.
+ */
+function resolveSiteUrl(): string {
+  const explicit = readEnv('PUBLIC_SITE_URL');
+  if (explicit) return explicit.replace(/\/+$/, '');
+
+  const vercelHost = readEnv('VERCEL_PROJECT_PRODUCTION_URL');
+  if (vercelHost) return `https://${vercelHost.replace(/\/+$/, '')}`;
+
+  // Cuối cùng mới tới GitHub Pages: nó là chỗ site đang chạy lúc viết dòng này, nhưng nó
+  // không chạy được máy chủ nên không phải đích lâu dài.
+  return 'https://tyangk1.github.io';
+}
+
+/**
+ * Đọc biến ở cả hai phía: `import.meta.env` (được thay lúc build) và `process.env`
+ * (đọc được lúc chạy trên máy chủ). File này được nạp từ cả hai chỗ.
+ */
+function readEnv(name: string): string {
+  /*
+    `import.meta.env?.` — dấu `?` là BẮT BUỘC, không phải cẩn thận thừa.
+
+    `astro.config.ts` nạp file này bằng Node thuần (nó cần `SITE.url` cho khoá `site`), và
+    Node KHÔNG định nghĩa `import.meta.env`. Viết `import.meta.env[name]` thì cả file config
+    ném TypeError và build chết ngay từ dòng đầu, trước khi có thông báo nào hữu ích.
+  */
+  const env = (import.meta as { env?: Record<string, string | undefined> }).env;
+  const value = env?.[name] ?? process.env[name] ?? '';
+  return value.trim();
+}
+
 export const SITE = {
-  /**
-   * URL production. Dùng cho canonical, sitemap, RSS và ảnh OG.
-   *
-   * Đang trỏ tới GitHub Pages của repo `tyangk1.github.io`. Mua tên miền riêng
-   * thì đổi đúng một dòng này, rồi thêm file `public/CNAME` chứa tên miền đó.
-   */
-  url: 'https://tyangk1.github.io',
+  /** URL production. Dùng cho canonical, sitemap, RSS và ảnh OG. Xem `resolveSiteUrl`. */
+  url: resolveSiteUrl(),
 
   /** Tên hiển thị trên header và thẻ title. */
   title: 'Thân Trọng Trường Giang',

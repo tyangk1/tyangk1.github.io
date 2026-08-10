@@ -47,3 +47,6 @@ Thumbs.db
 .vscode/*
 !.vscode/extensions.json
 .idea/
+
+# Output cua adapter Vercel — sinh lai moi lan build.
+.vercel/

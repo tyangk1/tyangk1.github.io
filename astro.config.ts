@@ -1,6 +1,7 @@
 import { defineConfig } from 'astro/config';
 import mdx from '@astrojs/mdx';
 import node from '@astrojs/node';
+import vercel from '@astrojs/vercel';
 import tailwindcss from '@tailwindcss/vite';
 import { readFileSync } from 'node:fs';
 import { unified, rehypeHeadingIds } from '@astrojs/markdown-remark';
@@ -70,11 +71,21 @@ export default defineConfig({
     lúc build. Đặt `output: 'server'` là đảo mặc định: mọi trang thành động, và mỗi
     người đọc trả tiền cho một lần chạy hàm để nhận về thứ vốn không đổi.
 
-    Adapter Node ở đây là để CHỨNG MINH tại máy: nó cho chạy `node dist/server/entry.mjs`
-    và thấy sửa database là trang đổi, không cần build lại. Đổi sang Vercel là đổi đúng
-    dòng `adapter` này — phần còn lại của repo không biết nó đang chạy trên gì.
+    HAI ADAPTER, CHỌN BẰNG BIẾN MÔI TRƯỜNG — và đây là lý do chứ không phải sự cẩn thận
+    thừa.
+
+    Vercel là chỗ chạy thật, nên nó là mặc định. Nhưng `pnpm check:ssr` cần một máy chủ
+    gọi được bằng HTTP để đi qua từng route và kiểm alt ảnh, id trùng, sitemap có bài, ảnh
+    OG sinh được — và adapter Vercel không sinh ra `dist/server/entry.mjs` để chạy như vậy.
+
+    Nếu chỉ có adapter Vercel thì bộ kiểm đó phải bỏ, tức là mất lưới an toàn của TOÀN BỘ
+    phần chạy lúc request, đúng lúc phần đó vừa trở thành phần quan trọng nhất. Nên CI
+    build bằng `BUILD_ADAPTER=node` để kiểm, còn Vercel build mặc định để deploy.
+
+    Đánh đổi đã biết: hai bản build khác nhau, nên CI không kiểm được đúng artifact mà
+    Vercel chạy. Phần khác nhau là lớp vỏ HTTP; toàn bộ code trang là một.
   */
-  adapter: node({ mode: 'standalone' }),
+  adapter: readEnvVar('BUILD_ADAPTER') === 'node' ? node({ mode: 'standalone' }) : vercel(),
 
   /*
     KHÔNG dùng `@astrojs/sitemap` nữa. Sitemap do `src/pages/sitemap.xml.ts` sinh.

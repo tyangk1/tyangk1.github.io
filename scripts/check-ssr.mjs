@@ -15,26 +15,24 @@
 import { readdirSync, readFileSync, existsSync } from 'node:fs';
 import { spawn } from 'node:child_process';
 
-const PORT = Number(process.env.SSR_CHECK_PORT ?? 4326);
-const ORIGIN = `http://127.0.0.1:${PORT}`;
 const GOLDEN_DIR = 'tests/renderer-golden';
 
-if (!existsSync('dist/server/entry.mjs')) {
-  console.error('Chưa có dist/server/entry.mjs. Chạy `pnpm build` trước.');
-  process.exit(1);
-}
+/**
+ * Chạy được vào MỘT SITE THẬT, không chỉ vào bản build ở máy.
+ *
+ *   pnpm check:ssr                                       tự dựng máy chủ từ dist/
+ *   node scripts/check-ssr.mjs --url=https://abc.vercel.app   gọi thẳng site đã deploy
+ *
+ * Vì sao đáng có: sau khi deploy lên Vercel, câu hỏi thật là "site THẬT có đúng không",
+ * và cách trả lời không phải là tin vào một bản build ở máy khác. Cùng một bộ luật, chạy
+ * vào cả hai chỗ, nên không có phép kiểm nào chỉ đúng ở một phía.
+ */
+const urlArg = process.argv.find((a) => a.startsWith('--url='))?.slice('--url='.length);
+const PORT = Number(process.env.SSR_CHECK_PORT ?? 4326);
+const ORIGIN = (urlArg ?? `http://127.0.0.1:${PORT}`).replace(/\/+$/, '');
 
-const server = spawn(process.execPath, ['dist/server/entry.mjs'], {
-  env: { ...process.env, HOST: '127.0.0.1', PORT: String(PORT) },
-  stdio: ['ignore', 'pipe', 'pipe'],
-});
-
+let server = null;
 let serverLog = '';
-server.stdout.on('data', (d) => (serverLog += d));
-server.stderr.on('data', (d) => (serverLog += d));
-
-const stopServer = () => server.kill();
-process.on('exit', stopServer);
 
 /** Chờ máy chủ nhận kết nối. Không chờ thì phép thử đầu tiên luôn hỏng. */
 async function waitForServer() {
@@ -49,10 +47,33 @@ async function waitForServer() {
   return false;
 }
 
+const stopServer = () => server?.kill();
+
+if (!urlArg) {
+  if (!existsSync('dist/server/entry.mjs')) {
+    console.error(
+      'Chưa có dist/server/entry.mjs.\n' +
+        'Chạy `pnpm build` với BUILD_ADAPTER=node, hoặc dùng --url=<site đã deploy>.',
+    );
+    process.exit(1);
+  }
+
+  server = spawn(process.execPath, ['dist/server/entry.mjs'], {
+    env: { ...process.env, HOST: '127.0.0.1', PORT: String(PORT) },
+    stdio: ['ignore', 'pipe', 'pipe'],
+  });
+
+  server.stdout.on('data', (d) => (serverLog += d));
+  server.stderr.on('data', (d) => (serverLog += d));
+  process.on('exit', stopServer);
+}
+
 if (!(await waitForServer())) {
-  console.error(`Máy chủ không lên sau 15 giây.\n${serverLog}`);
+  console.error(`Không gọi được ${ORIGIN} sau 15 giây.\n${serverLog}`);
   process.exit(1);
 }
+
+console.log(`Kiểm ${ORIGIN}\n`);
 
 const problems = [];
 const report = (path, message) => problems.push(`${path} — ${message}`);

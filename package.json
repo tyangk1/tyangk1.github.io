@@ -37,7 +37,8 @@
     "newsletter:auto": "node scripts/newsletter-send.mjs --auto",
     "check:parse": "node scripts/check-parse-draft.mjs",
     "admin:password": "node scripts/admin-password.mjs",
-    "deploy:token": "node scripts/deploy-token.mjs"
+    "deploy:token": "node scripts/deploy-token.mjs",
+    "check:deploy": "node scripts/check-ssr.mjs"
   },
   "dependencies": {
     "@astrojs/markdown-remark": "^7.2.2",
@@ -55,6 +56,7 @@
   "devDependencies": {
     "@astrojs/check": "^0.9.10",
     "@astrojs/node": "^11.1.0",
+    "@astrojs/vercel": "^11.0.5",
     "@types/hast": "^3.0.5",
     "prettier": "^3.9.6",
     "prettier-plugin-astro": "^0.14.1",
