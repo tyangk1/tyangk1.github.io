@@ -472,6 +472,9 @@ const enabled = Boolean(ENV.publicSupabaseUrl && ENV.publicSupabaseAnonKey);
                   + Bài mới
                 </button>
                 <button id="btn-queue">Chủ đề</button>
+                <button id="btn-publish" title="Bắt đầu deploy ngay, khỏi chờ nhịp 20 phút">
+                  Đăng ngay
+                </button>
                 <button id="btn-logout">Đăng xuất</button>
               </div>
               <div class="list" id="ds" />
@@ -1150,6 +1153,49 @@ const enabled = Boolean(ENV.publicSupabaseUrl && ENV.publicSupabaseAnonKey);
         }
 
         $('btn-queue')!.onclick = () => showQueue(true);
+
+        /* --- Đăng ngay --------------------------------------------------------
+
+           Site là tĩnh, nên publish nghĩa là build lại — không có cách nào về 0 giây.
+           Đo trên repo này: sync+commit ~30s rồi build+deploy ~35s, tức khoảng 60–90 giây.
+
+           Nút này bỏ phần CHỜ: thay vì cron 20 phút hỏi thăm database, database gọi thẳng
+           GitHub qua `rpc/request_deploy` (pg_net, token trong Supabase Vault — không có bí
+           mật nào trong trang này).
+
+           Cron vẫn giữ, vì nó GỘP: sửa một bài là nhiều lần Lưu, và không ai muốn 10 lần
+           deploy cho 10 lần Lưu.
+        */
+        $('btn-publish')!.onclick = async () => {
+          const btn = $('btn-publish') as HTMLButtonElement;
+          btn.disabled = true;
+          toast('Đang gọi deploy…');
+
+          try {
+            const r = await api('/rest/v1/rpc/request_deploy', {
+              method: 'POST',
+              body: JSON.stringify({ reason: 'bấm Đăng ngay' }),
+            });
+            const result = String(await r.text()).replace(/^"|"$/g, '');
+
+            if (!r.ok) {
+              toast(`Không gọi được deploy (HTTP ${r.status})`, 'bad');
+            } else if (result === 'qua_som') {
+              toast('Vừa có một lần deploy — đợi nó xong đã', 'bad');
+            } else if (result === 'chua_cau_hinh') {
+              toast('Chưa cất token GitHub: chạy `pnpm deploy:token`', 'bad');
+            } else {
+              toast('Đã gọi deploy — bài lên trong khoảng 1–2 phút', 'ok');
+            }
+          } catch (e) {
+            toast(`Lỗi: ${e instanceof Error ? e.message : String(e)}`, 'bad');
+          } finally {
+            // Mở lại sau 60s, khớp `min_gap_seconds` của RPC: bấm sớm hơn chỉ nhận `qua_som`.
+            setTimeout(() => {
+              btn.disabled = false;
+            }, 60_000);
+          }
+        };
 
         // --- Đăng nhập ------------------------------------------------------
         async function restoreSession() {

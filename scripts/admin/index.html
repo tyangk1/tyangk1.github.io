@@ -551,6 +551,9 @@
         <button class="primary" id="btn-new">+ Bài mới</button>
         <button id="btn-queue" title="Hàng đợi chủ đề cho việc soạn bài tự động">Chủ đề</button>
         <button id="btn-sync" title="Kéo nội dung từ database ra file MDX">Đồng bộ</button>
+        <button id="btn-publish" title="Bắt đầu deploy ngay, khỏi chờ nhịp 20 phút">
+          Đăng ngay
+        </button>
       </div>
       <div class="list" id="ds"></div>
     </aside>
@@ -1247,6 +1250,34 @@
         }
         queueUi.refresh();
       }
+
+      /* --- Đăng ngay ---------------------------------------------------------
+
+         Site tĩnh nên publish nghĩa là build lại — sàn là khoảng 60–90 giây, đã đo. Nút này
+         bỏ phần CHỜ: database gọi thẳng GitHub thay vì để cron 20 phút hỏi thăm.
+
+         Khác nút "Đồng bộ" bên cạnh: Đồng bộ chỉ kéo nội dung ra file MDX Ở MÁY để xem
+         trước; Đăng ngay là đưa lên site thật.
+      */
+      $('btn-publish').onclick = async () => {
+        const btn = $('btn-publish');
+        btn.disabled = true;
+        toast('Đang gọi deploy…');
+
+        try {
+          const r = await fetch('/api/publish-now', { method: 'POST' });
+          const j = await r.json();
+
+          if (!r.ok) toast(Không gọi được deploy: ${j.errors ?? r.status}, 'bad');
+          else if (j.result === 'qua_som') toast('Vừa có một lần deploy — đợi nó xong đã', 'bad');
+          else if (j.result === 'chua_cau_hinh') toast('Chưa cất token: chạy pnpm deploy:token', 'bad');
+          else toast('Đã gọi deploy — bài lên trong khoảng 1–2 phút', 'ok');
+        } catch (e) {
+          toast(`Lỗi: ${e.message}, 'bad');
+        } finally {
+          setTimeout(() => (btn.disabled = false), 60000);
+        }
+      };
 
       $('btn-queue').onclick = () => showQueue(true);
 

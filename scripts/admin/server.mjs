@@ -230,6 +230,21 @@ const server = createServer(async (req, res) => {
       Validate ở ĐÂY nữa dù giao diện đã validate: giao diện là thứ dễ bỏ qua nhất —
       gọi `curl` vào cổng này là đi thẳng qua nó. Cùng lý do với `/api/posts`.
     */
+    /*
+      "Đăng ngay": gọi 
+pc/request_deploy để database bắn repository_dispatch tới GitHub.
+
+      Đi qua server chứ không để trang gọi thẳng: trang cục bộ không có JWT nào, còn server
+      thì có service key — và RPC nhận service_role.
+    */
+    if (req.method === 'POST' && path === '/api/publish-now') {
+      const { data, error } = await supabase.rpc('request_deploy', {
+        reason: 'bấm Đăng ngay (admin cục bộ)',
+      });
+      if (error) return json(res, 422, { errors: error.message });
+      return json(res, 200, { result: data });
+    }
+
     if (req.method === 'GET' && path === '/api/queue') {
       const { data, error } = await supabase
         .from('content_queue')

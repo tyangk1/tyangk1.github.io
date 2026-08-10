@@ -80,7 +80,10 @@ declare
   repo text;
   last_at timestamptz;
 begin
-  if not public.is_admin() then
+  -- service_role cũng được: admin cục bộ (pnpm admin) dùng service key, và ai có khoá
+  -- đó thì đã insert into deploy_requests rồi tự gọi GitHub được — chặn ở đây không
+  -- thêm lớp an toàn nào, chỉ làm bản cục bộ thiếu một nút mà bản deploy có.
+  if not (public.is_admin() or coalesce(auth.role(), '') = 'service_role') then
     raise exception 'Chỉ admin được yêu cầu deploy.';
   end if;
 
