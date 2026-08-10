@@ -665,6 +665,7 @@ const enabled = Boolean(ENV.publicSupabaseUrl && ENV.publicSupabaseAnonKey);
         slugify,
       } from '../../scripts/lib/post.mjs';
       import { mountQueueUi } from '../../scripts/lib/queue-ui.mjs';
+      import { mountPostListUi } from '../../scripts/lib/post-list-ui.mjs';
 
       const cfg = (window as unknown as { __ADMIN?: Record<string, unknown> }).__ADMIN;
       const $ = (id: string) => document.getElementById(id) as HTMLElement | null;
@@ -677,7 +678,6 @@ const enabled = Boolean(ENV.publicSupabaseUrl && ENV.publicSupabaseAnonKey);
         const SESSION_KEY = 'admin-session';
 
         let session: { access_token: string; refresh_token: string } | null = null;
-        let posts: Record<string, unknown>[] = [];
         let editingSlug: string | null = null;
 
         // --- Gọi Supabase ---------------------------------------------------
@@ -926,33 +926,52 @@ const enabled = Boolean(ENV.publicSupabaseUrl && ENV.publicSupabaseAnonKey);
           renderList();
         }
 
+        /*
+          Danh sách bài: bảng có tìm, lọc, phân trang — dựng bởi `post-list-ui.mjs`, dùng
+          chung với admin cục bộ.
+
+          `LIST_COLUMNS` cố ý KHÔNG có `content`. Bản trước gọi `select=*`, tức tải toàn bộ
+          nội dung của mọi bài chỉ để vẽ tiêu đề: 10 bài thì không ai thấy, 200 bài mỗi bài
+          10KB là 2MB mỗi lần mở admin. Nội dung đầy đủ tải khi bấm vào một bài.
+        */
+        const LIST_COLUMNS = 'slug,title,published_at,draft,featured,tags';
+
+        const postList = mountPostListUi($('ds')!, {
+          loadRows: async () => {
+            const r = await api(
+              `/rest/v1/posts?select=${LIST_COLUMNS}&order=published_at.desc`,
+            );
+            if (!r.ok) {
+              toast('Không tải được danh sách', 'bad');
+              return null;
+            }
+            return r.json();
+          },
+
+          loadOne: async (slug: string) => {
+            const r = await api(
+              `/rest/v1/posts?select=*&slug=eq.${encodeURIComponent(slug)}&limit=1`,
+            );
+            if (!r.ok) return null;
+            return (await r.json())[0] ?? null;
+          },
+
+          onPick: (row: any) => {
+            fillForm(row);
+            document.querySelector('.col')?.scrollTo(0, 0);
+          },
+
+          statusOf: postStatus,
+          labels: STATUS_LABELS,
+          onError: (message: string) => toast(message, 'bad'),
+        });
+
         function renderList() {
-          $('ds')!.innerHTML = posts
-            .map((b: any) => {
-              const t = String(b.title).replace(/</g, '&lt;');
-              return `<div class="item" data-slug="${b.slug}" ${b.slug === editingSlug ? 'aria-current="true"' : ''}>
-                <b>${t}</b>
-                <small><span class="badge ${postStatus(b)}">${STATUS_LABELS[postStatus(b)]}</span>${b.published_at ?? ''}</small>
-              </div>`;
-            })
-            .join('');
-          for (const el of $('ds')!.querySelectorAll<HTMLElement>('.item')) {
-            el.onclick = () => {
-              const b = posts.find((x: any) => x.slug === el.dataset['slug']);
-              if (b) fillForm(b as any);
-              document.querySelector('.col')?.scrollTo(0, 0);
-            };
-          }
+          postList.setCurrent(editingSlug);
         }
 
         async function loadPosts() {
-          const r = await api('/rest/v1/posts?select=*&order=published_at.desc');
-          if (!r.ok) {
-            toast('Không tải được danh sách', 'bad');
-            return;
-          }
-          posts = await r.json();
-          renderList();
+          await postList.refresh();
         }
 
         async function save() {

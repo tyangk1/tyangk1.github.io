@@ -72,13 +72,29 @@ async function readBody(req, limits = 12 * 1024 * 1024) {
 
 // --- API -------------------------------------------------------------------
 
+/**
+ * Các cột đủ để VẼ danh sách, không đủ để sửa bài — cố ý.
+ *
+ * `FIELDS` có `content`, tức mỗi lần mở admin là tải toàn bộ chữ của mọi bài chỉ để hiện
+ * tiêu đề. 10 bài thì không ai thấy; 200 bài mỗi bài 10KB là 2MB. Danh sách dùng bộ cột nhẹ
+ * này, còn nội dung đầy đủ lấy theo từng bài khi người viết bấm vào — xem `getPost`.
+ */
+const LIST_FIELDS = 'slug,title,published_at,draft,featured,tags';
+
 async function listPosts() {
   const { data, error } = await supabase
     .from('posts')
-    .select(FIELDS)
+    .select(LIST_FIELDS)
     .order('published_at', { ascending: false });
   if (error) throw new Error(error.message);
   return data;
+}
+
+/** Một bài, đầy đủ mọi cột. Gọi khi người viết chọn bài trong danh sách. */
+async function getPost(slug) {
+  const { data, error } = await supabase.from('posts').select(FIELDS).eq('slug', slug).limit(1);
+  if (error) throw new Error(error.message);
+  return data[0] ?? null;
 }
 
 /**
@@ -206,6 +222,20 @@ const server = createServer(async (req, res) => {
     }
 
     if (req.method === 'GET' && path === '/api/posts') {
+      /*
+        Có `?slug=` thì trả MỘT bài đầy đủ; không có thì trả danh sách cột nhẹ.
+
+        Một route, hai hình dạng — thay vì thêm `/api/post/:slug`. Lý do rất cụ thể: bộ
+        định tuyến ở đây so `path` bằng `===`, nên một route có tham số trong đường dẫn
+        phải đổi cả cách so. Query param thì không đụng gì tới nó.
+      */
+      const slug = url.searchParams.get('slug');
+      if (slug) {
+        const post = await getPost(slug);
+        if (!post) return json(res, 404, { loi: 'Không có bài này' });
+        return json(res, 200, post);
+      }
+
       return json(res, 200, await listPosts());
     }
 

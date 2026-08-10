@@ -726,10 +726,10 @@
       // Màn hình hàng đợi dùng CHUNG với `/admin` trên site. Ở đây chỉ tiêm cách nói
       // chuyện với database: qua `/api/queue` của server cục bộ (server dùng service key).
       import { mountQueueUi } from '/lib/queue-ui.mjs';
+      import { mountPostListUi } from '/lib/post-list-ui.mjs';
 
       const $ = (id) => document.getElementById(id);
       let config = { limits: {} };
-      let posts = [];
       let editingSlug = null;
 
       const FIELDS = [
@@ -980,29 +980,44 @@
         renderList();
       }
 
+      /*
+        Danh sách bài: bảng có tìm, lọc, phân trang — dựng bởi `/lib/post-list-ui.mjs`, dùng
+        chung với admin đã deploy.
+
+        `/api/posts` giờ trả cột NHẸ (không có `content`); `?slug=` trả một bài đầy đủ. Bản
+        trước tải toàn bộ nội dung của mọi bài chỉ để vẽ tiêu đề.
+      */
+      const postList = mountPostListUi($('ds'), {
+        loadRows: async () => {
+          const r = await fetch('/api/posts');
+          if (!r.ok) {
+            toast('Không tải được danh sách', 'bad');
+            return null;
+          }
+          return r.json();
+        },
+
+        loadOne: async (slug) => {
+          const r = await fetch(`/api/posts?slug=${encodeURIComponent(slug)}`);
+          return r.ok ? r.json() : null;
+        },
+
+        onPick: (row) => {
+          fillForm(row);
+          document.querySelector('.col').scrollTo(0, 0);
+        },
+
+        statusOf: postStatus,
+        labels: STATUS_LABELS,
+        onError: (message) => toast(message, 'bad'),
+      });
+
       function renderList() {
-        $('ds').innerHTML = posts
-          .map(
-            (
-              b,
-            ) => `<div class="item" data-slug="${b.slug}" ${b.slug === editingSlug ? 'aria-current="true"' : ''}>
-              <b>${b.title.replace(/</g, '&lt;')}</b>
-              <small><span class="badge ${postStatus(b)}">${STATUS_LABELS[postStatus(b)]}</span>${b.published_at ?? ''}</small>
-            </div>`,
-          )
-          .join('');
-        for (const el of $('ds').querySelectorAll('.item')) {
-          el.onclick = () => {
-            const b = posts.find((x) => x.slug === el.dataset.slug);
-            if (b) fillForm(b);
-            document.querySelector('.col').scrollTo(0, 0);
-          };
-        }
+        postList.setCurrent(editingSlug);
       }
 
       async function loadPosts() {
-        posts = await (await fetch('/api/posts')).json();
-        renderList();
+        await postList.refresh();
       }
 
       async function save({ silent = false } = {}) {
