@@ -1,11 +1,11 @@
 ---
-import type { GetStaticPaths } from 'astro';
-import { render } from 'astro:content';
 import { Image } from 'astro:assets';
+
+import { layBaiTheoSlug, layBaiDaDang, headingsFromHtml } from '~/lib/post-live';
+import { renderContent } from '~/lib/render-content';
 
 import { SITE, AUTHOR } from '~/site.config';
 import {
-  getPublishedPosts,
   relatedPosts,
   adjacentPosts,
   seriesPosts,
@@ -25,33 +25,59 @@ import PostCard from '~/components/PostCard.astro';
 import ViewCount from '~/components/ViewCount.astro';
 import Icon from '~/components/Icon.astro';
 
-import Callout from '~/components/mdx/Callout.astro';
-import PullQuote from '~/components/mdx/PullQuote.astro';
-import Steps from '~/components/mdx/Steps.astro';
-import Figure from '~/components/mdx/Figure.astro';
 import Takeaways from '~/components/mdx/Takeaways.astro';
 
-/**
- * Bộ thành phần dùng được trong mọi file MDX mà KHÔNG cần import ở từng bài.
- * Khai báo một chỗ ở đây, thêm thành phần mới là mọi bài cũ cũng dùng được ngay.
- */
-const mdxComponents = { Callout, PullQuote, Steps, Figure, Takeaways };
+/*
+  TRANG NÀY CHẠY LÚC CÓ REQUEST, KHÔNG PHẢI LÚC BUILD.
 
-export const getStaticPaths: GetStaticPaths = async () => {
-  const posts = await getPublishedPosts();
-  return posts.map((post) => ({
-    params: { slug: post.id },
-    props: { post, posts },
-  }));
-};
+  Đây là route duy nhất trong site làm vậy. Lý do: nội dung bài nằm trong database,
+  nhưng Content Layer biên dịch bài lúc build và cất vào `.astro/data-store.json` —
+  nên `getCollection()` luôn trả về bản chụp lúc build, và sửa một bài chỉ hiện ra sau
+  khi build lại. Đó là toàn bộ lý do "đăng ngay" từng mất 56 giây.
 
-interface Props {
-  post: Post;
-  posts: Post[];
-}
+  Mọi trang khác vẫn tĩnh: trang chủ, tag, RSS, sitemap, ảnh OG. Chúng đổi khi tập bài
+  đổi, không đổi theo từng người đọc, nên cho chúng thành động là bắt người đọc trả tiền
+  chạy hàm để nhận về thứ vốn không đổi.
+*/
+export const prerender = false;
 
-const { post, posts } = Astro.props;
-const { Content, headings } = await render(post);
+const slug = Astro.params.slug;
+
+if (!slug) return Astro.rewrite('/404');
+
+const [baiLive, danhSachLive] = await Promise.all([
+  layBaiTheoSlug(slug, SITE.timeZone),
+  layBaiDaDang(SITE.timeZone),
+]);
+
+/*
+  Không có bài thì 404 THẬT, không phải trang trống.
+
+  `layBaiTheoSlug` trả `null` cho cả ba trường hợp: không tồn tại, còn nháp, và chưa tới
+  ngày đăng. Cả ba đều phải là 404 với người lạ — trả 200 kèm trang trống thì Google
+  index một URL rỗng, và một bài hẹn giờ bị lộ là có tồn tại.
+*/
+if (!baiLive) return Astro.rewrite('/404');
+
+/*
+  Một chỗ ép kiểu, cố ý, và chỉ đúng một chỗ.
+
+  `Post` là `CollectionEntry<'blog'>` — kiểu của Content Layer, kèm `collection`,
+  `filePath`, `digest`, `rendered`, thứ không có nghĩa gì với một dòng database. Dựng lại
+  đủ kiểu đó chỉ để làm vừa lòng bộ kiểm kiểu là dựng một lời nói dối dài hơn.
+
+  Ép kiểu ở đây an toàn vì phần được đọc thật đã khai đủ trong `PostLike`, và các hàm
+  trong `~/utils/posts` chỉ đọc `.id`, `.data.tags`, `.data.publishedAt`,
+  `.data.seriesName`, `.data.seriesPart`, `.data.featured`. Nếu sau này có chỗ đọc thêm
+  trường khác thì nó sẽ là `undefined` lúc chạy — nên `PostLike` phải được cập nhật
+  cùng lúc, và đó là lý do nó khai từng trường thay vì dùng `Record<string, unknown>`.
+*/
+const post = baiLive as unknown as Post;
+const posts = danhSachLive as unknown as Post[];
+
+const daRender = await renderContent(post.body ?? '');
+const contentHtml = daRender.html;
+const headings = headingsFromHtml(contentHtml);
 
 const { minutes } = readingTime(post.body ?? '');
 const related = relatedPosts(post, posts);
@@ -337,7 +363,12 @@ const schema = [
             nó luôn ở đúng vị trí và người viết chỉ cần điền frontmatter. */
         }
         {post.data.takeaways && <Takeaways items={post.data.takeaways} />}
-        <Content components={mdxComponents} />
+        {
+          /* HTML đã dựng sẵn từ nguồn MDX bởi `~/lib/render-content`, không qua bước
+            build. `pnpm check:renderer` giữ cho nó không lệch khỏi hình dạng mà đường
+            MDX sinh ra — 9 ảnh chụp vàng trong `tests/renderer-golden/`. */
+        }
+        <Fragment set:html={contentHtml} />
       </div>
 
       {

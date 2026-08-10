@@ -9,7 +9,38 @@
 import { readdir, readFile, stat } from 'node:fs/promises';
 import { join, relative, sep } from 'node:path';
 
-const DIST = 'dist';
+/*
+  `dist/client`, không phải `dist`.
+
+  Có adapter thì Astro chia output làm hai: `dist/client` là thứ phục vụ cho trình duyệt,
+  `dist/server` là mã chạy trên máy chủ. Trỏ vào `dist` thì script vẫn tìm ra file HTML
+  (nó đệ quy), nhưng phần kiểm LIÊN KẾT NỘI BỘ sẽ sai hết: một link `/tags/astro` được
+  giải thành `dist/tags/astro` — đường không tồn tại — nên mọi liên kết đúng đều bị báo
+  là hỏng. Kiểm sai kiểu này tệ hơn không kiểm, vì nó dạy người ta bỏ qua kết quả.
+*/
+const DIST = 'dist/client';
+
+/*
+  Route chạy lúc có request, nên KHÔNG có file nào trên đĩa để đối chiếu.
+
+  Trang bài đọc database lúc có request, nên `dist/client/blog/<slug>/index.html` không
+  tồn tại. Không có ngoại lệ này thì mọi link tới mọi bài đều bị báo gãy — 20 báo động
+  giả, và một bộ kiểm toàn báo động giả là bộ kiểm bị bỏ qua.
+
+  Cố ý đối chiếu với thư mục nội dung chứ không phải một mẫu `^/blog/.+$`. Mẫu đó nhận
+  cả `/blog/bai-khong-he-ton-tai`, tức là bỏ luôn thứ bộ kiểm này sinh ra để bắt: link
+  gõ sai slug. Ở đây tập slug đúng vẫn là tập file MDX mà `db-sync` vừa ghi ra.
+*/
+const SLUG_BAI = new Set(
+  (await readdir('src/content/blog').catch(() => [])).map((f) => f.replace(/\.mdx?$/, '')),
+);
+
+function laRouteChay(duong) {
+  if (duong === '/404') return true;
+
+  const m = duong.match(/^\/blog\/([^/]+)$/);
+  return m ? SLUG_BAI.has(m[1]) : false;
+}
 
 async function htmlFiles(dir) {
   const found = [];
@@ -94,7 +125,7 @@ for (const file of files) {
       (await exists(`${target}.html`)) ||
       (await exists(join(target, 'index.html')));
 
-    if (!ok) report(file, `link gãy: ${href}`);
+    if (!ok && !laRouteChay(clean)) report(file, `link gãy: ${href}`);
   }
 }
 

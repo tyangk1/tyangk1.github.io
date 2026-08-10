@@ -71,6 +71,18 @@ jobs:
       - name: Kiểm HTML đã build
         run: pnpm check:html
 
+      # Giữ cho renderer runtime không lệch khỏi hình dạng mà đường MDX sinh ra.
+      # `Callout.astro` và `render-content.ts` mô tả cùng một hộp bằng hai đoạn code;
+      # sửa một bên mà quên bên kia thì bài đổi hình dạng và không có gì báo.
+      - name: Kiểm renderer khớp ảnh chụp vàng
+        run: pnpm check:renderer
+
+      # Trang bài không còn là file trong `dist/` nên `check:html` không thấy nó nữa.
+      # Bước này dựng máy chủ SSR và gọi từng route bài để kiểm alt ảnh, id trùng,
+      # mục lục và thẻ meta — phần vùng phủ đã mất khi bỏ prerender.
+      - name: Kiểm route chạy lúc request
+        run: pnpm check:ssr
+
       - name: Đưa bản build sang job deploy
         uses: actions/upload-artifact@v4
         with:

@@ -5,8 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "node scripts/db-sync.mjs --drafts --allow-offline && astro dev",
-    "build": "node scripts/db-sync.mjs && astro build && pagefind --site dist",
-    "build:ci": "astro build && pagefind --site dist",
+    "build": "node scripts/db-sync.mjs && astro build && node scripts/build-search-index.mjs",
+    "build:ci": "astro build && node scripts/build-search-index.mjs",
     "preview": "astro preview",
     "sync": "node scripts/db-sync.mjs",
     "sync:drafts": "node scripts/db-sync.mjs --drafts",
@@ -26,7 +26,8 @@
     "check:content": "node scripts/check-frontmatter.mjs",
     "check:html": "node scripts/check-html.mjs",
     "check:renderer": "node scripts/check-renderer.mjs",
-    "check:all": "pnpm typecheck && pnpm build && pnpm check:content && pnpm check:parse && pnpm check:html && pnpm check:renderer",
+    "check:ssr": "node scripts/check-ssr.mjs",
+    "check:all": "pnpm typecheck && pnpm build && pnpm check:content && pnpm check:parse && pnpm check:html && pnpm check:renderer && pnpm check:ssr",
     "lighthouse": "pnpm dlx lighthouse@12 http://localhost:4321/ --output=html --output-path=./lighthouse-report.html --chrome-flags=\"--headless=new\"",
     "icons": "node scripts/generate-icons.mjs",
     "format": "prettier --write .",
@@ -55,6 +56,7 @@
   },
   "devDependencies": {
     "@astrojs/check": "^0.9.10",
+    "@astrojs/node": "^11.1.0",
     "@types/hast": "^3.0.5",
     "prettier": "^3.9.6",
     "prettier-plugin-astro": "^0.14.1",

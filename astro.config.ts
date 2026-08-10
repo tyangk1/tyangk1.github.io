@@ -1,6 +1,7 @@
 import { defineConfig } from 'astro/config';
 import mdx from '@astrojs/mdx';
 import sitemap from '@astrojs/sitemap';
+import node from '@astrojs/node';
 import tailwindcss from '@tailwindcss/vite';
 import { readFileSync } from 'node:fs';
 import { unified, rehypeHeadingIds } from '@astrojs/markdown-remark';
@@ -60,6 +61,21 @@ const supabaseHost = (() => {
 
 export default defineConfig({
   site: SITE.url,
+
+  /*
+    KHÔNG đặt `output: 'server'`.
+
+    Mặc định là `static`, và có adapter thì từng trang tự chọn ra khỏi đó bằng
+    `export const prerender = false`. Nhờ vậy đúng MỘT route chạy lúc có request —
+    trang bài — còn trang chủ, trang tag, RSS, sitemap, ảnh OG vẫn là file tĩnh sinh
+    lúc build. Đặt `output: 'server'` là đảo mặc định: mọi trang thành động, và mỗi
+    người đọc trả tiền cho một lần chạy hàm để nhận về thứ vốn không đổi.
+
+    Adapter Node ở đây là để CHỨNG MINH tại máy: nó cho chạy `node dist/server/entry.mjs`
+    và thấy sửa database là trang đổi, không cần build lại. Đổi sang Vercel là đổi đúng
+    dòng `adapter` này — phần còn lại của repo không biết nó đang chạy trên gì.
+  */
+  adapter: node({ mode: 'standalone' }),
 
   integrations: [
     mdx(),

@@ -12,12 +12,34 @@
  *   node scripts/check-renderer.mjs          # tóm tắt
  *   node scripts/check-renderer.mjs --chi-tiet   # in chỗ lệch đầu tiên
  */
-import { readFileSync, readdirSync, existsSync } from 'node:fs';
+import { readFileSync, readdirSync, existsSync, writeFileSync, mkdirSync } from 'node:fs';
 
 import { renderContent } from '../src/lib/render-content.ts';
 
 const CHI_TIET = process.argv.includes('--chi-tiet');
+const CAP_NHAT = process.argv.includes('--cap-nhat');
 const MO = '<div class="prose mt-10">';
+
+/**
+ * Ảnh chụp vàng: HTML mà đường MDX lúc build sinh ra, đã chuẩn hoá và commit vào repo.
+ *
+ * Vì sao không đọc thẳng `dist/` nữa: trang bài giờ render lúc chạy, nên nó KHÔNG còn
+ * được prerender — `dist/blog/<slug>/index.html` không tồn tại, và sự thật gốc để đối
+ * chiếu biến mất cùng nó.
+ *
+ * Nhưng thứ cần bảo vệ vẫn còn nguyên: `Callout.astro` và `render-content.ts` mô tả
+ * CÙNG một hộp bằng hai đoạn code khác nhau. Sửa một bên mà quên bên kia thì bài đổi
+ * hình dạng, và không có gì báo. Ảnh chụp vàng giữ đúng lời hứa đó mà không cần build.
+ *
+ *   node scripts/check-renderer.mjs               so với ảnh chụp
+ *   node scripts/check-renderer.mjs --cap-nhat    sinh lại ảnh chụp từ dist/
+ *
+ * Sinh lại CẦN một bản build còn prerender trang bài, tức phải tạm bật lại prerender
+ * trong `src/pages/blog/[slug].astro`. Cố ý làm cho hơi khó: sinh lại ảnh chụp là nói
+ * "hình dạng mới này mới đúng", và đó phải là một quyết định có ý thức, không phải một
+ * bước tự động chạy kèm để làm bộ kiểm im lặng.
+ */
+const GOLDEN_DIR = 'tests/renderer-golden';
 
 /**
  * Cắt phần bên trong `<div class="prose mt-10">`, đếm độ sâu thẻ div.
@@ -284,32 +306,58 @@ console.log(`Ca kiểm tĩnh: ${caDat}/${CA_KIEM.length} đạt.`);
 for (const l of caLoi) console.log(`  ✗ ${l}`);
 console.log('');
 
-if (!existsSync('dist/blog')) {
-  console.error('Chưa có dist/. Chạy `pnpm build` trước để so với bản build.');
+/*
+  PHẦN 2 — so với ảnh chụp vàng.
+*/
+if (CAP_NHAT) {
+  if (!existsSync('dist/blog')) {
+    console.error(
+      'Cần một bản build CÒN prerender trang bài để sinh ảnh chụp.\n' +
+        'Tạm đặt `prerender = true` trong src/pages/blog/[slug].astro, chạy `pnpm build`, rồi chạy lại.',
+    );
+    process.exit(1);
+  }
+
+  mkdirSync(GOLDEN_DIR, { recursive: true });
+  let viet = 0;
+
+  for (const file of readdirSync('src/content/blog').filter((f) => f.endsWith('.mdx')).sort()) {
+    const slug = file.replace(/\.mdx$/, '');
+    const trang = `dist/blog/${slug}/index.html`;
+    if (!existsSync(trang)) continue;
+
+    const than = catThanBai(readFileSync(trang, 'utf8'));
+    if (than === null) continue;
+
+    writeFileSync(`${GOLDEN_DIR}/${slug}.html`, `${chuanHoa(than)}\n`, 'utf8');
+    viet += 1;
+  }
+
+  console.log(`Đã ghi ${viet} ảnh chụp vào ${GOLDEN_DIR}/.`);
+  process.exit(0);
+}
+
+if (!existsSync(GOLDEN_DIR)) {
+  console.error(`Chưa có ${GOLDEN_DIR}/. Xem chú thích ở đầu file để sinh.`);
   process.exit(1);
 }
 
-const files = readdirSync('src/content/blog').filter((f) => f.endsWith('.mdx'));
+const goldens = readdirSync(GOLDEN_DIR).filter((f) => f.endsWith('.html'));
 let dat = 0;
 const lech = [];
 const boQua = [];
 
-for (const file of files.sort()) {
-  const slug = file.replace(/\.mdx$/, '');
-  const trang = `dist/blog/${slug}/index.html`;
+for (const g of goldens.sort()) {
+  const slug = g.replace(/\.html$/, '');
+  const nguon = `src/content/blog/${slug}.mdx`;
 
-  if (!existsSync(trang)) {
-    boQua.push(`${slug} — không có trong dist (bài nháp hoặc hẹn giờ)`);
+  if (!existsSync(nguon)) {
+    boQua.push(`${slug} — có ảnh chụp nhưng không còn file MDX`);
     continue;
   }
 
-  const build = catThanBai(readFileSync(trang, 'utf8'));
-  if (build === null) {
-    boQua.push(`${slug} — không tìm thấy '${MO}' trong trang đã build`);
-    continue;
-  }
-
-  const mdx = boFrontmatter(readFileSync(`src/content/blog/${file}`, 'utf8'));
+  const build = readFileSync(`${GOLDEN_DIR}/${g}`, 'utf8').trim();
+  const mdx = boFrontmatter(readFileSync(nguon, 'utf8'));
   let ra;
   try {
     ra = await renderContent(mdx);

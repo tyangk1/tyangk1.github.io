@@ -1,4 +1,17 @@
 ---
+/*
+  Trang này chạy lúc có request, không phải lúc build.
+
+  Không phải vì nội dung nó động — nó tĩnh. Lý do là kỹ thuật: trang bài giờ chạy
+  on-demand và khi không tìm thấy bài thì gọi `Astro.rewrite('/404')`. Một route
+  on-demand không rewrite được sang route đã prerender — máy chủ ném "unable to find a
+  component instance for route /404" và người đọc nhận HTTP 500 thay vì 404. Đã đo:
+  slug không tồn tại và bài còn nháp đều trả 500 trước khi sửa dòng này.
+
+  Chi phí chỉ phát sinh khi có người vào URL sai, nên đây là chỗ rẻ nhất để trả.
+*/
+export const prerender = false;
+
 import { getPublishedPosts, collectTags } from '~/utils/posts';
 import BaseLayout from '~/layouts/BaseLayout.astro';
 import Icon from '~/components/Icon.astro';

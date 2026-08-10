@@ -94,6 +94,29 @@ jobs:
           PUBLIC_NEWSLETTER_ACTION: ${{ vars.PUBLIC_NEWSLETTER_ACTION }}
         run: pnpm build:ci
 
+      # CHẶN CÓ CHỦ Ý — đọc hết trước khi bỏ bước này đi.
+      #
+      # Trang bài giờ chạy lúc có request (`src/pages/blog/[slug].astro`), nên bản build
+      # sinh ra `dist/server/` cần một máy chủ Node. GitHub Pages chỉ phục vụ file tĩnh.
+      #
+      # Deploy trong tình trạng này KHÔNG chỉ làm mất trang bài: có adapter thì Astro
+      # dồn file cho trình duyệt vào `dist/client/`, nên `path: dist` đẩy cả site xuống
+      # một tầng và MỌI trang cùng chết, kể cả trang chủ.
+      #
+      # Vì vậy chặn ở đây thay vì để nó lặng lẽ deploy một site vỡ. Site đang chạy vẫn
+      # còn nguyên — GitHub Pages tiếp tục phục vụ bản deploy tốt cuối cùng.
+      #
+      # Bỏ chặn khi nào: đã chuyển sang host chạy được Node (Vercel), và workflow này
+      # được thay bằng bước deploy của host đó. Muốn quay lại site tĩnh hoàn toàn thì
+      # phải bỏ `adapter` trong `astro.config.ts` và cho trang bài prerender trở lại.
+      - name: Chặn deploy tĩnh khi build có route chạy lúc request
+        run: |
+          if [ -d dist/server ]; then
+            echo "::error::Bản build có route chạy lúc request (dist/server tồn tại) nên KHÔNG deploy được lên GitHub Pages."
+            echo "::error::Đẩy dist/ lên Pages sẽ làm sập toàn bộ site, không chỉ trang bài — xem chú thích trong workflow này."
+            exit 1
+          fi
+
       - uses: actions/configure-pages@v5
 
       - uses: actions/upload-pages-artifact@v4
