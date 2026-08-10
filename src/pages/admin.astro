@@ -84,6 +84,16 @@ const enabled = Boolean(ENV.publicSupabaseUrl && ENV.publicSupabaseAnonKey);
         margin: 0 0 20px;
       }
 
+      /* Man hinh danh sach bai - bang rong ca trang.
+         Khong dung class .shell: .shell chia hai cot 260px + 1fr, con day thi cai bang
+         chinh la toan bo noi dung nen no can ca chieu ngang. */
+      #screen-posts {
+        display: flex;
+        flex-direction: column;
+        height: 100dvh;
+        overflow: hidden;
+      }
+
       /* --- Khung chính --- */
       .shell {
         display: grid;
@@ -471,7 +481,8 @@ const enabled = Boolean(ENV.publicSupabaseUrl && ENV.publicSupabaseAnonKey);
                 <button class="primary" id="btn-new">
                   + Bài mới
                 </button>
-                <button id="btn-queue">Chủ đề</button>
+                <button id="btn-posts">Danh sách</button>
+          <button id="btn-queue">Chủ đề</button>
                 <button id="btn-publish" title="Bắt đầu deploy ngay, khỏi chờ nhịp 20 phút">
                   Đăng ngay
                 </button>
@@ -636,7 +647,8 @@ const enabled = Boolean(ENV.publicSupabaseUrl && ENV.publicSupabaseAnonKey);
             </main>
           </div>
 
-          <div class="shell" id="screen-queue" hidden />
+          <div id="screen-posts" hidden />
+    <div class="shell" id="screen-queue" hidden />
 
           <input type="file" id="file-input" accept="image/*" multiple hidden />
         </>
@@ -734,10 +746,12 @@ const enabled = Boolean(ENV.publicSupabaseUrl && ENV.publicSupabaseAnonKey);
         function logout() {
           session = null;
           localStorage.removeItem(SESSION_KEY);
-          // Ẩn CẢ HAI màn hình. Thiếu `screen-queue` thì đăng xuất xong vẫn còn thấy
-          // danh sách chủ đề trên màn hình — dữ liệu đã nạp trước đó không tự biến mất.
+          // Ẩn CẢ BA màn hình. Thiếu một cái thì đăng xuất xong vẫn còn thấy dữ liệu của
+          // nó trên màn hình — thứ đã nạp trước đó không tự biến mất. Thêm màn hình mới
+          // vào đây là việc dễ quên nhất, và quên thì nó thành lỗ rò dữ liệu sau đăng xuất.
           $('screen-main')!.hidden = true;
           $('screen-queue')!.hidden = true;
+          $('screen-posts')!.hidden = true;
           $('screen-login')!.hidden = false;
         }
 
@@ -936,7 +950,12 @@ const enabled = Boolean(ENV.publicSupabaseUrl && ENV.publicSupabaseAnonKey);
         */
         const LIST_COLUMNS = 'slug,title,published_at,draft,featured,tags';
 
-        const postList = mountPostListUi($('ds')!, {
+        /*
+          Nguồn dữ liệu, khai MỘT LẦN cho cả hai chỗ hiển thị: bảng rộng ở màn hình danh
+          sách và danh sách gọn ở cột cạnh trình soạn. Khai hai lần thì hai chỗ có thể đọc
+          khác nhau.
+        */
+        const postListSource = {
           loadRows: async () => {
             const r = await api(
               `/rest/v1/posts?select=${LIST_COLUMNS}&order=published_at.desc`,
@@ -956,22 +975,59 @@ const enabled = Boolean(ENV.publicSupabaseUrl && ENV.publicSupabaseAnonKey);
             return (await r.json())[0] ?? null;
           },
 
+          statusOf: postStatus,
+          labels: STATUS_LABELS,
+          onError: (message: string) => toast(message, 'bad'),
+        };
+
+        const postList = mountPostListUi($('ds')!, {
+          ...postListSource,
           onPick: (row: any) => {
             fillForm(row);
             document.querySelector('.col')?.scrollTo(0, 0);
           },
-
-          statusOf: postStatus,
-          labels: STATUS_LABELS,
-          onError: (message: string) => toast(message, 'bad'),
         });
+
+        /*
+          Bảng rộng cả trang. Dựng một lần rồi giữ lại, cùng lý do như hàng đợi: dựng lại
+          mỗi lần mở là mất từ khoá đang tìm và trang đang xem.
+        */
+        let postTable: { refresh: () => Promise<void>; setCurrent: (s: string | null) => void } | null =
+          null;
+
+        function showPosts(show: boolean) {
+          $('screen-main')!.hidden = show;
+          $('screen-queue')!.hidden = true;
+          $('screen-posts')!.hidden = !show;
+
+          if (!show) return;
+
+          if (!postTable) {
+            postTable = mountPostListUi($('screen-posts')!, {
+              ...postListSource,
+              layout: 'table',
+              onExit: () => showPosts(false),
+              // Chọn một bài thì rời màn hình danh sách sang trình soạn — đó là toàn bộ
+              // mục đích của màn hình này.
+              onPick: (row: any) => {
+                showPosts(false);
+                fillForm(row);
+                document.querySelector('.col')?.scrollTo(0, 0);
+              },
+            });
+          }
+          void postTable.refresh();
+        }
 
         function renderList() {
           postList.setCurrent(editingSlug);
+          postTable?.setCurrent(editingSlug);
         }
 
         async function loadPosts() {
           await postList.refresh();
+          // Bảng chỉ tải lại khi nó đang mở. Chưa mở thì `refresh()` lúc mở sẽ lo.
+          if (postTable && !$('screen-posts')!.hidden) await postTable.refresh();
         }
 
         async function save() {
@@ -1149,6 +1205,7 @@ const enabled = Boolean(ENV.publicSupabaseUrl && ENV.publicSupabaseAnonKey);
 
         function showQueue(show: boolean) {
           $('screen-main')!.hidden = show;
+          $('screen-posts')!.hidden = true;
           $('screen-queue')!.hidden = !show;
 
           // Quay về thì TẢI LẠI danh sách bài. Lý do cụ thể: thứ hay xảy ra giữa hai
@@ -1171,6 +1228,7 @@ const enabled = Boolean(ENV.publicSupabaseUrl && ENV.publicSupabaseAnonKey);
           void queueUi.refresh();
         }
 
+        $('btn-posts')!.onclick = () => showPosts(true);
         $('btn-queue')!.onclick = () => showQueue(true);
 
         /* --- Đăng ngay --------------------------------------------------------

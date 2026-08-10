@@ -99,7 +99,14 @@ export function mountPostListUi(
     statusOf,
     labels,
     layout = 'compact',
-    onExit = null,
+    /*
+      Chú thích kiểu là BẮT BUỘC, không phải cho đẹp.
+
+      Viết `onExit = null` thì TypeScript suy ra kiểu của tham số là `null`, nên chỗ gọi
+      truyền một hàm vào bị `astro check` báo ts(2322). Trình duyệt không quan tâm — chỉ
+      bộ kiểm kiểu bắt được, và đó chính là việc của nó. Đúng loại lỗi đã gặp ở `onError`.
+    */
+    onExit = /** @type {null | (() => void)} */ (null),
     onError = (_message) => {},
   },
 ) {
