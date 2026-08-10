@@ -113,13 +113,32 @@ function withMarkdownBody(open: string, body: string, close: string): string {
   return `${open}\n\n${inner}\n\n${close}`;
 }
 
-function calloutHtml(attrs: Record<string, string>, body: string): string {
-  const preset = CALLOUT_PRESET[attrs['type'] ?? 'note'] ?? CALLOUT_PRESET['note']!;
-  const title = attrs['title']?.trim() ? attrs['title'] : preset.label;
+function calloutHtml(attrs: Record<string, string>, body: string, loi: string[]): string {
+  const type = attrs['type'] ?? 'note';
+  const preset = CALLOUT_PRESET[type];
+
+  /*
+    Type lạ thì BÁO LỖI, không âm thầm rơi về `note`.
+
+    `Callout.astro` viết `PRESET[type] ?? PRESET['note']`, nên một type sai không làm
+    vỡ build — nó ra hộp sai màu sai nhãn và không ai biết. Đã trả giá thật để học:
+    prompt soạn bài ghi `info | warning | success | tip` trong khi component chỉ nhận
+    `note | tip | warning | danger`, và một bài AI đã đăng với hai type không tồn tại.
+    Sửa prompt là sửa một lần; báo lỗi ở đây là sửa cả loại lỗi.
+  */
+  if (!preset) {
+    loi.push(
+      `<Callout type="${type}"> — type không tồn tại. ` +
+        `Chỉ có: ${Object.keys(CALLOUT_PRESET).join(', ')}.`,
+    );
+  }
+
+  const dung = preset ?? CALLOUT_PRESET['note']!;
+  const title = attrs['title']?.trim() ? attrs['title'] : dung.label;
 
   return withMarkdownBody(
-    `<aside class="callout callout--${escapeAttr(attrs['type'] ?? 'note')}">` +
-      `<p class="callout__label">${icon(preset.icon, 17)}` +
+    `<aside class="callout callout--${escapeAttr(type)}">` +
+      `<p class="callout__label">${icon(dung.icon, 17)}` +
       `<span>${escapeText(title)}</span></p>` +
       `<div class="callout__body">`,
     body,
@@ -127,11 +146,11 @@ function calloutHtml(attrs: Record<string, string>, body: string): string {
   );
 }
 
-function stepsHtml(_attrs: Record<string, string>, body: string): string {
+function stepsHtml(_attrs: Record<string, string>, body: string, _loi: string[]): string {
   return withMarkdownBody('<div class="steps">', body, '</div>');
 }
 
-function pullQuoteHtml(attrs: Record<string, string>, body: string): string {
+function pullQuoteHtml(attrs: Record<string, string>, body: string, _loi: string[]): string {
   const cite = attrs['cite']?.trim()
     ? `<figcaption class="pullquote__cite">${escapeText(attrs['cite'])}</figcaption>`
     : '';
@@ -144,7 +163,14 @@ function pullQuoteHtml(attrs: Record<string, string>, body: string): string {
   );
 }
 
-function figureHtml(attrs: Record<string, string>): string {
+function figureHtml(attrs: Record<string, string>, loi: string[]): string {
+  // `alt` là bắt buộc, đúng như tài liệu của `Figure.astro`: chú thích phía dưới là
+  // thứ mọi người đọc, `alt` là thứ dành riêng cho người dùng screen reader — cái nọ
+  // không thay thế được cái kia. Thiếu `alt` là lỗi accessibility thật, và nó lặng lẽ
+  // hơn mọi lỗi khác vì trang vẫn hiện ra bình thường với người nhìn thấy ảnh.
+  if (!attrs['src']?.trim()) loi.push('<Figure> thiếu thuộc tính src.');
+  if (attrs['alt'] === undefined) loi.push('<Figure> thiếu thuộc tính alt (bắt buộc).');
+
   const size =
     (attrs['width'] ? ` width="${escapeAttr(attrs['width'])}"` : '') +
     (attrs['height'] ? ` height="${escapeAttr(attrs['height'])}"` : '');
@@ -159,7 +185,10 @@ function figureHtml(attrs: Record<string, string>): string {
   );
 }
 
-const PAIRED: Record<string, (attrs: Record<string, string>, body: string) => string> = {
+const PAIRED: Record<
+  string,
+  (attrs: Record<string, string>, body: string, loi: string[]) => string
+> = {
   Callout: calloutHtml,
   Steps: stepsHtml,
   PullQuote: pullQuoteHtml,
@@ -175,21 +204,30 @@ export const KNOWN_COMPONENTS = [...Object.keys(PAIRED), 'Figure'];
  * nào khác bên trong. Nhờ vậy `<Callout>` bọc `<Steps>` cũng đúng, và không cần
  * regex nào phải hiểu lồng nhau — thứ regex không làm được.
  */
-export function expandComponents(source: string): string {
+export function expandComponents(source: string, loi: string[] = []): string {
+  /*
+    Phần thuộc tính là `(?:"…"|'…'|[^>])*`, KHÔNG phải `[^>]*`.
+
+    Với `[^>]*` thì thẻ bị cắt ở dấu `>` đầu tiên — kể cả khi dấu đó nằm TRONG giá trị
+    thuộc tính. Một tiêu đề như `title="Bước 1 -> Bước 2"` là đủ để vỡ: thuộc tính bị
+    cắt giữa, phần còn lại rơi xuống thân bài. Ca kiểm tĩnh bắt được chỗ này.
+  */
+  const attrPart = `(?:"[^"]*"|'[^']*'|[^>])*`;
+
   let out = source.replace(
-    /<Figure\b([^>]*?)\/>/g,
-    (_all, rawAttrs: string) => figureHtml(parseAttrs(rawAttrs)),
+    new RegExp(`<Figure\\b(${attrPart}?)/>`, 'g'),
+    (_all, rawAttrs: string) => figureHtml(parseAttrs(rawAttrs), loi),
   );
 
   const names = Object.keys(PAIRED).join('|');
   const innermost = new RegExp(
-    `<(${names})\\b([^>]*)>((?:(?!<(?:${names})\\b)[\\s\\S])*?)<\\/\\1>`,
+    `<(${names})\\b(${attrPart})>((?:(?!<(?:${names})\\b)[\\s\\S])*?)<\\/\\1>`,
   );
 
   // Chặn trên là số cặp thẻ có thể có; hết vòng mà còn thẻ là có thẻ không đóng.
   for (let guard = 0; guard < 200; guard += 1) {
     const next = out.replace(innermost, (_all, name: string, rawAttrs: string, body: string) =>
-      PAIRED[name]!(parseAttrs(rawAttrs), body),
+      PAIRED[name]!(parseAttrs(rawAttrs), body, loi),
     );
     if (next === out) break;
     out = next;
@@ -198,10 +236,17 @@ export function expandComponents(source: string): string {
   return out;
 }
 
-/** Component còn sót lại sau khi expand — thẻ không đóng, hoặc tên bịa ra. */
-export function unknownComponents(rendered: string): string[] {
+/**
+ * Component còn sót sau khi expand — tên bịa ra, hoặc thẻ mở thiếu thẻ đóng.
+ *
+ * Phải quét NGUỒN đã expand, KHÔNG quét HTML đã render. Bản đầu tôi quét HTML và nó
+ * không bắt được gì cả: parser HTML hạ tên thẻ lạ thành chữ thường, nên `<Bogus>`
+ * thành `<bogus>` và mẫu `<[A-Z]` không bao giờ khớp. Cửa kiểm trông như đang chạy
+ * mà thực ra luôn trả về rỗng — loại lỗi tệ nhất. Ca kiểm tĩnh bắt được nó.
+ */
+export function unknownComponents(expanded: string): string[] {
   const found = new Set<string>();
-  for (const m of rendered.matchAll(/<([A-Z][A-Za-z0-9]*)\b/g)) found.add(m[1]!);
+  for (const m of expanded.matchAll(/<\/?([A-Z][A-Za-z0-9]*)[\s/>]/g)) found.add(m[1]!);
 
   return [...found];
 }
@@ -237,14 +282,18 @@ function getProcessor() {
 
 export interface RenderResult {
   html: string;
-  /** Component không nhận ra. Rỗng là bình thường. */
+  /** Component không nhận ra — tên bịa ra, hoặc thẻ mở thiếu thẻ đóng. */
   unknown: string[];
+  /** Component nhận ra nhưng dùng sai: type lạ, thiếu thuộc tính bắt buộc. */
+  invalid: string[];
 }
 
 /** Nguồn MDX của một bài → HTML thân bài. */
 export async function renderContent(source: string): Promise<RenderResult> {
   const processor = await getProcessor();
-  const { code } = await processor.render(expandComponents(source));
+  const invalid: string[] = [];
+  const expanded = expandComponents(source, invalid);
+  const { code } = await processor.render(expanded);
 
-  return { html: code, unknown: unknownComponents(code) };
+  return { html: code, unknown: unknownComponents(expanded), invalid };
 }

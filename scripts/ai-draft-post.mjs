@@ -34,6 +34,7 @@ import { loadEnv, env } from './lib/env.mjs';
 import { resolveAuth, makeRest, SUPABASE_URL } from './lib/db-auth.mjs';
 import { LIMITS, validatePost, normalizePost, slugify, today } from './lib/post.mjs';
 import { systemPrompt, userPrompt, fixPrompt } from './lib/draft-prompt.mjs';
+import { renderContent, KNOWN_COMPONENTS } from '../src/lib/render-content.ts';
 import { parseDraft, describeRaw } from './lib/parse-draft.mjs';
 
 // Phải nạp TRƯỚC khi đọc biến bên dưới — `node` thuần không tự đọc `.env`.
@@ -103,6 +104,53 @@ const MAX_TOKENS = num('AI_MAX_TOKENS', 24000);
  * có chủ ý là quyền của người viết. Chỉ bài do máy soạn mới phải giữ đúng lời prompt.
  */
 const MIN_WORDS = num('AI_MIN_WORDS', 900);
+
+/**
+ * Kiểm thân bài có RENDER NỔI hay không, trước khi nhận bài.
+ *
+ * Lỗ hổng đã bịt: `validatePost` chỉ đếm ký tự và đếm tag — nó không biết gì về MDX.
+ * Nên model bịa ra một component không tồn tại, hoặc quên đóng thẻ, thì bài vẫn qua
+ * validate, vẫn được ghi vào database, vẫn được commit — rồi vỡ ở bước BUILD trong CI,
+ * lúc 1 giờ sáng, sau khi mọi người đã đi ngủ. Prompt có câu "KHÔNG bịa ra thành phần
+ * nào khác — build sẽ vỡ", nhưng một câu trong prompt không phải một ràng buộc.
+ *
+ * Trả lỗi về dạng giống `validatePost` để nó đi tiếp vào cùng vòng sửa: model được xem
+ * lỗi và sửa, thay vì cả brief bị đánh dấu thất bại.
+ */
+async function loiRender(content) {
+  let ra;
+  try {
+    ra = await renderContent(content);
+  } catch (e) {
+    return [
+      {
+        field: 'content',
+        message:
+          `Thân bài không render được: ${e.message.split('\n')[0]}. ` +
+          `Kiểm lại cú pháp MDX, nhất là thẻ mở mà thiếu thẻ đóng.`,
+      },
+    ];
+  }
+
+  const loi = [];
+
+  if (ra.unknown.length) {
+    loi.push({
+      field: 'content',
+      message:
+        `Thân bài dùng thành phần không tồn tại: ${ra.unknown.join(', ')}. ` +
+        `Chỉ có đúng bốn thành phần: ${KNOWN_COMPONENTS.join(', ')}. ` +
+        `Bỏ chúng đi hoặc đổi sang một trong bốn cái đó. ` +
+        `Cũng kiểm cả thẻ đóng — thẻ mở không có thẻ đóng cũng hiện ra ở đây.`,
+    });
+  }
+
+  for (const v of ra.invalid) {
+    loi.push({ field: 'content', message: `Thân bài dùng thành phần sai: ${v}` });
+  }
+
+  return loi;
+}
 
 const argv = process.argv.slice(2);
 const flag = (name) => argv.includes(`--${name}`);
@@ -234,6 +282,8 @@ async function draftPost(item, log) {
           `chứ không chỉ một câu kết luận.`,
       });
     }
+
+    errors.push(...(await loiRender(post.content)));
 
     if (errors.length === 0) return post;
 

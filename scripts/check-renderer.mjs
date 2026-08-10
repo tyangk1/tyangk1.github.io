@@ -169,8 +169,123 @@ function lechDauTien(a, b) {
   };
 }
 
+/*
+  PHẦN 1 — ca kiểm tĩnh.
+
+  Chín bài thật không đi qua những đường này: không bài nào có component bịa ra, thẻ
+  thiếu đóng, component lồng nhau, hay `<Figure>`. Nên phần so với bản build ở dưới
+  KHÔNG kiểm được chúng, và đó đúng là những chỗ dễ vỡ nhất.
+
+  Chạy trước phần so, và không cần `dist/` — nhờ vậy vẫn dùng được khi chưa build.
+*/
+const CA_KIEM = [
+  {
+    ten: 'component bịa ra thì bị bắt',
+    mdx: 'Đoạn mở.\n\n<Bogus foo="bar">Nội dung.</Bogus>\n',
+    kiem: (r) => (r.unknown.includes('Bogus') ? null : `unknown = [${r.unknown}]`),
+  },
+  {
+    ten: 'thẻ mở thiếu thẻ đóng thì bị bắt',
+    mdx: '<Callout type="note" title="Hở">\nNội dung không bao giờ được đóng.\n',
+    kiem: (r) => (r.unknown.includes('Callout') ? null : `unknown = [${r.unknown}]`),
+  },
+  {
+    ten: 'Callout type lạ thì báo lỗi, không âm thầm về note',
+    mdx: '<Callout type="success">\nXong rồi.\n</Callout>\n',
+    kiem: (r) =>
+      r.invalid.some((v) => v.includes('success')) ? null : `invalid = [${r.invalid}]`,
+  },
+  {
+    ten: 'cả bốn type hợp lệ đều ra đúng nhãn',
+    mdx: ['note', 'tip', 'warning', 'danger']
+      .map((t) => `<Callout type="${t}">\nRuột.\n</Callout>`)
+      .join('\n\n'),
+    kiem: (r) => {
+      if (r.invalid.length) return `invalid = [${r.invalid}]`;
+      const thieu = ['Ghi chú', 'Mách nhỏ', 'Lưu ý', 'Cẩn thận'].filter(
+        (nhan) => !r.html.includes(`<span>${nhan}</span>`),
+      );
+      return thieu.length ? `thiếu nhãn: ${thieu.join(', ')}` : null;
+    },
+  },
+  {
+    ten: 'component lồng nhau: Steps bên trong Callout',
+    mdx: '<Callout type="tip" title="Ba bước">\n<Steps>\n1. Một.\n2. Hai.\n</Steps>\n</Callout>\n',
+    kiem: (r) => {
+      if (r.unknown.length || r.invalid.length) return `unknown/invalid còn sót`;
+      const i = r.html.indexOf('class="callout');
+      const j = r.html.indexOf('class="steps"');
+      if (i === -1 || j === -1) return 'thiếu callout hoặc steps';
+      if (j < i) return 'steps nằm ngoài callout';
+      return r.html.includes('<li>') ? null : 'danh sách không thành <li>';
+    },
+  },
+  {
+    ten: 'ruột component được xử lý như markdown',
+    mdx: '<Callout type="note">\nCó `mã nội dòng` và **chữ đậm**.\n</Callout>\n',
+    kiem: (r) =>
+      r.html.includes('<code>mã nội dòng</code>') && r.html.includes('<strong>chữ đậm</strong>')
+        ? null
+        : 'ruột không được xử lý như markdown',
+  },
+  {
+    ten: 'Figure thiếu alt thì bị bắt',
+    mdx: '<Figure src="https://a.b/c.png" caption="Chú thích" />\n',
+    kiem: (r) => (r.invalid.some((v) => v.includes('alt')) ? null : `invalid = [${r.invalid}]`),
+  },
+  {
+    ten: 'Figure đủ thuộc tính thì không báo lỗi',
+    mdx: '<Figure src="https://a.b/c.png" alt="Mô tả" caption="Chú thích" />\n',
+    kiem: (r) => {
+      if (r.invalid.length || r.unknown.length) return `invalid=[${r.invalid}] unknown=[${r.unknown}]`;
+      return r.html.includes('alt="Mô tả"') && r.html.includes('<figcaption>Chú thích</figcaption>')
+        ? null
+        : 'HTML không có alt hoặc chú thích';
+    },
+  },
+  {
+    /*
+      Ca này ban đầu tôi viết sai: nó đòi dấu ngoặc kép phải được escape. Tiêu đề đi
+      vào NỘI DUNG VĂN BẢN của `<span>`, và ở đó dấu ngoặc kép không cần escape —
+      chỉ `<` mới cần, vì `<` mở một thẻ. Kiểm sai thì hoặc báo động giả, hoặc tệ hơn,
+      buộc phải "sửa" code cho vừa một yêu cầu không có thật.
+    */
+    ten: 'dấu < trong tiêu đề bị escape, không thành thẻ',
+    mdx: '<Callout type="note" title=\'Dấu " và <thẻ>\'>\nRuột.\n</Callout>\n',
+    kiem: (r) => {
+      if (r.html.includes('<thẻ>')) return '`<thẻ>` lọt vào HTML thành thẻ thật';
+      if (!r.html.includes('&#x3C;thẻ') && !r.html.includes('&lt;thẻ')) {
+        return 'không thấy `<thẻ>` ở dạng đã escape';
+      }
+      return null;
+    },
+  },
+];
+
+let caDat = 0;
+const caLoi = [];
+
+for (const ca of CA_KIEM) {
+  let ketQua;
+  try {
+    ketQua = ca.kiem(await renderContent(ca.mdx));
+  } catch (e) {
+    ketQua = `ném lỗi: ${e.message.split('\n')[0]}`;
+  }
+
+  if (ketQua === null) {
+    caDat += 1;
+  } else {
+    caLoi.push(`${ca.ten} — ${ketQua}`);
+  }
+}
+
+console.log(`Ca kiểm tĩnh: ${caDat}/${CA_KIEM.length} đạt.`);
+for (const l of caLoi) console.log(`  ✗ ${l}`);
+console.log('');
+
 if (!existsSync('dist/blog')) {
-  console.error('Chưa có dist/. Chạy `pnpm build` trước.');
+  console.error('Chưa có dist/. Chạy `pnpm build` trước để so với bản build.');
   process.exit(1);
 }
 
@@ -203,8 +318,16 @@ for (const file of files.sort()) {
     continue;
   }
 
-  if (ra.unknown.length) {
-    lech.push({ slug, ly_do: `component không nhận ra: ${ra.unknown.join(', ')}` });
+  if (ra.unknown.length || ra.invalid.length) {
+    lech.push({
+      slug,
+      ly_do: [
+        ra.unknown.length ? `component không nhận ra: ${ra.unknown.join(', ')}` : '',
+        ...ra.invalid,
+      ]
+        .filter(Boolean)
+        .join(' | '),
+    });
     continue;
   }
 
@@ -228,6 +351,11 @@ for (const file of files.sort()) {
 for (const b of boQua) console.log(`  – ${b}`);
 
 console.log(`\n${dat}/${dat + lech.length} bài khớp.`);
+
+if (caLoi.length) {
+  console.log(`\n${caLoi.length} ca kiểm tĩnh không đạt — xem danh sách phía trên.`);
+  process.exit(1);
+}
 
 if (lech.length) {
   console.log('\nKhông khớp:');
