@@ -1,0 +1,83 @@
+---
+title: "Workflow xanh chưa chắc làm được việc: Bài học từ GitHub Actions"
+description: "Học cách xử lý sự cố GitHub Actions báo xanh nhưng không chạy deploy bài viết mới. Bài viết hướng dẫn dùng reusable workflow để tự động hóa an toàn."
+publishedAt: 2026-08-10
+tags: ["CI/CD","GitHub Actions"]
+takeaways: ["Tích xanh CI/CD chỉ chứng tỏ tiến trình không bị crash, không đảm bảo logic hệ thống chạy đúng.","GitHub cố ý không kích hoạt workflow nối tiếp từ GITHUB_TOKEN để tránh lặp vô hạn.","Tách pipeline build và deploy thành reusable workflow giúp sửa triệt để sự cố mà không cần thêm Personal Access Token."]
+coverImage: "https://aglhmdrxpiwvnafctbxy.supabase.co/storage/v1/object/public/anh-blog/2026/pexels-pixabay-162389.jpg"
+coverAlt: "123"
+draft: false
+featured: false
+---
+
+Lịch sử chạy CI/CD của tôi xuất hiện tích xanh đều đặn suốt nhiều tuần, nhưng bài viết mới vẫn không hề hiện lên blog. Tôi dựng blog tĩnh trên GitHub Pages và lưu trữ toàn bộ nội dung ở Supabase. Mỗi 20 phút, một workflow cron chạy để lấy dữ liệu mới, sinh file MDX rồi commit vào repository. Tôi đã mặc định rằng commit đó sẽ kích hoạt pipeline deploy. Nhưng bài viết vẫn trả về lỗi 404 dù file MDX đã nằm ngay ngắn ở nhánh main.
+
+## Tích xanh dối trá suốt nhiều tuần
+
+Khi mở bảng điều khiển GitHub Actions, tôi thấy một dải màu xanh hoàn hảo. Cứ đúng 20 phút, workflow cron lại thức dậy, chạy kịch bản đồng bộ và kết thúc thành công. Tôi từng tin tưởng hoàn toàn vào giao diện này.
+
+Sự thật đơn giản đến mức chua chát. Trong suốt nhiều tuần đó, tôi không viết bài mới nào có ngày xuất bản trùng với thời điểm cron chạy. Khi kịch bản đồng bộ kiểm tra Supabase, nó phát hiện không có dữ liệu mới. Nó in ra dòng nhật ký: "Không có gì đổi. Thoát." rồi dừng lại với mã thoát 0.
+
+GitHub Actions thấy tiến trình không báo lỗi nên đánh dấu xanh. Dấu tích xanh đó xuất hiện không phải vì hệ thống đã deploy bài viết thành công. Nó xanh chỉ vì nó không làm gì cả.
+
+<PullQuote>
+Hệ thống báo xanh chỉ chứng tỏ kịch bản không bị sập, chứ không chứng minh nghiệp vụ đã chạy đúng như kỳ vọng.
+</PullQuote>
+
+## Cơ chế tự vệ chặn vòng lặp của GitHub
+
+Khi tôi phát hiện ra vấn đề và kiểm tra lại cơ chế hoạt động, sự thật mới lộ ra. Đây không phải lỗi ngẫu nhiên mà là một thiết kế có chủ đích của GitHub.
+
+Khi bạn sử dụng `GITHUB_TOKEN` mặc định do GitHub Actions cấp để thực hiện lệnh commit và push code, GitHub sẽ cố ý chặn không cho sự kiện push đó kích hoạt bất kỳ workflow nào khác. 
+
+Nếu GitHub không làm như vậy, một kịch bản tự động commit có thể vô tình kích hoạt lại chính nó hoặc một kịch bản khác. Hệ thống sẽ rơi vào vòng lặp vô tận, cắn sạch tài nguyên chạy pipeline của bạn. Việc chặn sự kiện từ `GITHUB_TOKEN` là một lá chắn an toàn bắt buộc.
+
+Tôi đã giả định sai lầm rằng commit tạo ra từ workflow sẽ có giá trị kích hoạt pipeline giống hệt commit push từ máy cá nhân.
+
+## Cách tôi phát hiện ra sự thật bằng một bài kiểm tra
+
+Để khẳng định chắc chắn nghi vấn, tôi thực hiện một bài kiểm tra thực tế từ đầu đến cuối trên chính hệ thống của mình.
+
+<Steps>
+1. Tạo một bài viết mới trong Supabase và đổi ngày xuất bản về đúng thời điểm hiện tại.
+2. Vào tab Actions trên GitHub và bấm nút Run workflow để kích hoạt cron thủ công.
+3. Kiểm tra repository và xác nhận cron đã commit đúng một file MDX mới lên nhánh main.
+4. Mở danh sách Workflow Runs để tìm lượt chạy deploy tương ứng với commit vừa tạo.
+</Steps>
+
+Kết quả đúng như nghi vấn. File MDX đã nằm trên nhánh main, nhưng không có bất kỳ workflow nào được kích hoạt cho commit đó. Trang web hiển thị lỗi 404 khi truy cập vào đường dẫn bài viết mới.
+
+## Cạm bẫy từ hai giải pháp đầu tiên tôi cân nhắc
+
+Tôi bắt đầu tìm giải pháp xử lý. Hai phương án đầu tiên hiện ra rất nhanh, nhưng cả hai đều chứa đựng những cạm bẫy kỹ thuật rõ ràng.
+
+<Callout type="warning" title="Phương án 1: Đẩy code bằng Personal Access Token (PAT)">
+Thay vì dùng GITHUB_TOKEN, tôi có thể tạo một PAT cá nhân và đưa vào Secret. GitHub cho phép commit dùng PAT kích hoạt các workflow khác. Nhưng giải pháp này bắt tôi phải quản lý thêm một credential cá nhân, có nguy cơ lộ thưởng và phải đặt lịch xoay token định kỳ. Tôi đang tự phá bỏ cơ chế an toàn của hệ thống chỉ để lách luật.
+</Callout>
+
+<Callout type="warning" title="Phương án 2: Cho Deploy chạy sau MỌI lần cron hoàn thành">
+Tôi có thể thiết lập cho job Deploy chạy ngay sau khi job cron kết thúc. Tuy nhiên, cron chạy mỗi 20 phút một lần và phần lớn các lần chạy đều không có nội dung mới. Cách này sẽ tạo ra 72 lần deploy mỗi ngày chỉ để đẩy đi cùng một nội dung không hề thay đổi.
+</Callout>
+
+## Giải pháp tối ưu với reusable workflow
+
+Tôi quyết định chọn phương án thứ ba: tách toàn bộ tiến trình build và deploy ra thành một workflow độc lập dùng sự kiện `workflow_call` (reusable workflow).
+
+Cả workflow deploy thông thường (khi push code thủ công) và workflow cron đồng bộ nội dung đều sẽ GỌI trực tiếp đến reusable workflow này. 
+
+Cách làm này đem lại ba lợi ích rõ ràng:
+- Không cần tạo hay quản lý thêm bất kỳ credential hay token nào.
+- Không sinh ra các lần deploy vô ích khi nội dung không thay đổi.
+- Cả hai luồng chạy đều dùng chung một bộ bước duy nhất, tránh tình trạng hai kịch bản deploy bị trôi lệch cấu hình theo thời gian.
+
+Tôi thêm điều kiện kiểm tra vào job deploy trong workflow cron. Tiến trình chỉ gọi reusable workflow khi có bước commit xuất ra trạng thái `da-commit == true`. Nhờ điều kiện này, nhịp chạy 20 phút hoàn toàn không sinh ra lượt deploy nào khi không có nội dung mới.
+
+<Callout type="tip" title="Chi tiết kỹ thuật quan trọng về Commit SHA">
+Bạn bắt buộc phải truyền mã SHA cụ thể của commit vừa tạo vào reusable workflow, thay vì để job deploy tự checkout nhánh main. Nếu chỉ checkout main, hệ thống có thể sẽ deploy nhầm một commit của người khác vừa đẩy lên giữa chừng, dẫn đến sai lệch phiên bản.
+</Callout>
+
+## Kiểm tra ngay workflow của bạn hôm nay
+
+Hệ thống CI/CD báo xanh chỉ cho biết câu lệnh không bị lỗi cú pháp hay crash giữa chừng. Nó không hề đảm bảo rằng luồng dữ liệu tự động của bạn đang thực sự chảy đến điểm cuối.
+
+Hãy mở danh sách kịch bản GitHub Actions của bạn ngay hôm nay. Tìm những workflow đang dùng `GITHUB_TOKEN` để commit code và kỳ vọng một kịch bản khác chạy tiếp theo. Thử tạo một dữ liệu thực tế và bấm chạy end-to-end để xác nhận trang web hoặc ứng dụng của bạn có thực sự nhận được cập nhật mới hay không.
