@@ -86,6 +86,24 @@ const MAX_FIXES = num('AI_MAX_FIXES', 2);
  */
 const MAX_TOKENS = num('AI_MAX_TOKENS', 24000);
 
+/**
+ * Sàn số từ cho thân bài. 900.
+ *
+ * Prompt yêu cầu 1200–2000 từ, nhưng KHÔNG có gì kiểm điều đó: `validatePost` đếm ký tự
+ * tiêu đề và mô tả, không đếm từ thân bài. Nên `gemini-flash-lite-latest` trả về 646 từ
+ * và bài vẫn hợp lệ, vẫn được ghi — vòng sửa lỗi không có cơ hội can thiệp.
+ *
+ * CONTENT-GUIDE nói dưới 800 từ là "chưa đủ sâu để ai đó lưu lại". Bài nửa độ dài yêu cầu
+ * là bài kém, nhưng nó lọt IM LẶNG — loại lỗi tệ nhất.
+ *
+ * Đặt sàn ở 900 chứ không phải 1200: dưới ngưỡng yêu cầu một chút thì vẫn dùng được, và
+ * bắt gắt quá thì tốn thêm lượt gọi API cho một bài chỉ thiếu vài chục từ.
+ *
+ * KHÔNG đưa vào `validatePost`: hàm đó dùng chung với bài người viết tay, và một bài ngắn
+ * có chủ ý là quyền của người viết. Chỉ bài do máy soạn mới phải giữ đúng lời prompt.
+ */
+const MIN_WORDS = num('AI_MIN_WORDS', 900);
+
 const argv = process.argv.slice(2);
 const flag = (name) => argv.includes(`--${name}`);
 const value = (name) =>
@@ -204,6 +222,19 @@ async function draftPost(item, log) {
     });
 
     const errors = validatePost(post);
+
+    // Sàn số từ, chỉ áp cho bài do máy soạn. Xem chú thích ở `MIN_WORDS`.
+    const words = post.content.trim().split(/\s+/).filter(Boolean).length;
+    if (words < MIN_WORDS) {
+      errors.push({
+        field: 'content',
+        message:
+          `Thân bài chỉ ${words} từ, cần ít nhất ${MIN_WORDS} (yêu cầu là 1.200–2.000). ` +
+          `Viết sâu thêm: mỗi heading một ý trọn vẹn, và phần cạm bẫy phải có chi tiết cụ thể ` +
+          `chứ không chỉ một câu kết luận.`,
+      });
+    }
+
     if (errors.length === 0) return post;
 
     if (attempt === MAX_FIXES) {
