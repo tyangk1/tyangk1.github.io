@@ -1007,6 +1007,9 @@ const enabled = Boolean(ENV.publicSupabaseUrl && ENV.publicSupabaseAnonKey);
               ...postListSource,
               layout: 'table',
               onExit: () => showPosts(false),
+              // Mỗi dòng là một link thật tới `?slug=…`, mở ở tab mới. Xem `hrefFor` trong
+              // `post-list-ui.mjs` để biết vì sao phải là link chứ không phải onclick.
+              hrefFor: (slug: string) => `?slug=${encodeURIComponent(slug)}`,
               // Chọn một bài thì rời màn hình danh sách sang trình soạn — đó là toàn bộ
               // mục đích của màn hình này.
               onPick: (row: any) => {
@@ -1280,6 +1283,28 @@ const enabled = Boolean(ENV.publicSupabaseUrl && ENV.publicSupabaseAnonKey);
           $('screen-main')!.hidden = false;
           await loadPosts();
           fillForm(null);
+
+          /*
+            Có `?slug=` trong URL thì vào THẲNG trình soạn bài đó.
+
+            Nửa còn lại của việc "chọn một dòng thì mở tab ra soạn": bảng sinh link
+            `?slug=…`, và tab mới mở ra phải hiểu link đó. Thiếu chỗ này thì tab mới lại
+            hiện bảng và cái link chẳng dẫn tới đâu.
+
+            Ở đây nó nằm trong `restoreSession()` — tức SAU khi đăng nhập. Mở link khi chưa
+            đăng nhập thì thấy trang đăng nhập trước, rồi vào đúng bài; query string không
+            mất vì trang không điều hướng đi đâu.
+          */
+          const slugFromUrl = new URLSearchParams(location.search).get('slug');
+          if (slugFromUrl) {
+            const row = await postListSource.loadOne(slugFromUrl);
+            if (row) {
+              fillForm(row as any);
+              document.title = `${(row as any).title} — Quản trị`;
+              return;
+            }
+            toast(`Không có bài "${slugFromUrl}"`, 'bad');
+          }
 
           /*
             ĐĂNG NHẬP XONG LÀ THẤY BẢNG, không phải thấy form trống.

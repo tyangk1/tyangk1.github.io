@@ -107,6 +107,18 @@ export function mountPostListUi(
       bộ kiểm kiểu bắt được, và đó chính là việc của nó. Đúng loại lỗi đã gặp ở `onError`.
     */
     onExit = /** @type {null | (() => void)} */ (null),
+
+    /*
+      Có `hrefFor` thì mỗi dòng là một LINK THẬT, không phải `<button>`.
+
+      Đây là cái `onclick` không bao giờ làm được: Ctrl+click, chuột giữa, chuột phải →
+      "Mở trong tab mới", kéo vào bookmark, và nút Back của trình duyệt. Muốn "chọn một bài
+      thì mở tab ra soạn" thì trình soạn phải có URL — không có cách nào khác.
+
+      Dùng cho chế độ bảng. Chế độ gọn cạnh trình soạn vẫn dùng `onPick` và sửa ngay tại
+      chỗ, vì ở đó mở tab mới cho mỗi lần nhảy bài là ngược ý muốn.
+    */
+    hrefFor = /** @type {null | ((slug: string) => string)} */ (null),
     onError = (_message) => {},
   },
 ) {
@@ -213,12 +225,22 @@ export function mountPostListUi(
               không Enter được. Người viết bài dùng bàn phím rất nhiều, nên chỗ này phải là
               một phần tử tương tác thật.
             */
-            const pick = `<button type="button" class="pl-pick" data-slug="${escapeHtml(row.slug)}">`;
             const current = row.slug === currentSlug ? ' aria-current="true"' : '';
+
+            /*
+              `target="_blank"` kèm `rel="noopener"` — `noopener` là bắt buộc, không phải
+              cho gọn: thiếu nó thì trang mở ra giữ được `window.opener` và với tới tab
+              admin đang mở. Ở đây cả hai tab là cùng origin nên rủi ro thấp, nhưng đây là
+              thói quen không nên có ngoại lệ.
+            */
+            const pick = hrefFor
+              ? `<a class="pl-pick" href="${escapeHtml(hrefFor(row.slug))}" target="_blank" rel="noopener" data-slug="${escapeHtml(row.slug)}">`
+              : `<button type="button" class="pl-pick" data-slug="${escapeHtml(row.slug)}">`;
+            const unpick = hrefFor ? '</a>' : '</button>';
 
             if (isTable) {
               return `<tr${current}>
-                <td>${pick}<span class="pl-title">${escapeHtml(row.title || row.slug)}</span></button>
+                <td>${pick}<span class="pl-title">${escapeHtml(row.title || row.slug)}</span>${unpick}
                     <div class="pl-slug">${escapeHtml(row.slug)}</div></td>
                 <td><span class="badge ${s}">${escapeHtml(labels[s])}</span></td>
                 <td class="pl-date">${escapeHtml(row.published_at ?? '')}</td>
@@ -233,7 +255,7 @@ export function mountPostListUi(
                   <span class="badge ${s}">${escapeHtml(labels[s])}</span>
                   <span class="pl-date">${escapeHtml(row.published_at ?? '')}</span>
                 </span>
-              </button>
+              ${unpick}
             </li>`;
           })
           .join('')
@@ -247,6 +269,14 @@ export function mountPostListUi(
     el('pl-page').textContent = `${page}/${pageCount}`;
     el('pl-prev').disabled = page <= 1;
     el('pl-next').disabled = page >= pageCount;
+
+    /*
+      Là link thì KHÔNG gắn handler — để trình duyệt điều hướng.
+
+      Gắn `onclick` lên một `<a target="_blank">` là vừa mở tab mới vừa chạy handler ở tab
+      cũ: hai việc cùng lúc, và tab cũ đổi trạng thái sau lưng người dùng.
+    */
+    if (hrefFor) return;
 
     for (const button of el('pl-body').querySelectorAll('.pl-pick')) {
       button.onclick = async () => {

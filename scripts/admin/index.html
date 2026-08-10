@@ -1292,6 +1292,9 @@
             ...postListSource,
             layout: 'table',
             onExit: () => showPosts(false),
+            // Mỗi dòng là một link thật tới `?slug=…`, mở ở tab mới. Xem `hrefFor` trong
+            // `post-list-ui.mjs` để biết vì sao phải là link chứ không phải onclick.
+            hrefFor: (slug) => `?slug=${encodeURIComponent(slug)}`,
             // Chọn một bài thì rời màn hình danh sách sang trình soạn — đó là toàn bộ mục
             // đích của màn hình này.
             onPick: (row) => {
@@ -1450,6 +1453,30 @@
       fillForm(null);
 
       /*
+        Có `?slug=` trong URL thì vào THẲNG trình soạn bài đó.
+
+        Đây là nửa còn lại của việc "chọn một dòng thì mở tab ra soạn": bảng sinh link
+        `?slug=…`, và tab mới mở ra phải hiểu link đó. Thiếu chỗ này thì tab mới lại hiện
+        bảng, và cái link chẳng dẫn tới đâu.
+
+        Slug không tồn tại thì rơi về bảng kèm một dòng báo — không để trình soạn mở ra với
+        form trống mà người dùng tưởng là bài của mình.
+      */
+      const slugTuUrl = new URLSearchParams(location.search).get('slug');
+      if (slugTuUrl) {
+        const bai = await postListSource.loadOne(slugTuUrl);
+        if (bai) {
+          fillForm(bai);
+          document.title = `${bai.title} — Admin`;
+        } else {
+          toast(`Không có bài "${slugTuUrl}"`, 'bad');
+          showPosts(true);
+        }
+      } else {
+        showPostsMacDinh();
+      }
+
+      /*
         MỞ RA LÀ THẤY BẢNG, không phải thấy form trống.
 
         Đây là thứ tự đúng của một công cụ quản lý nội dung: danh sách là cửa sổ chính, chọn
@@ -1460,7 +1487,9 @@
         `fillForm(null)` vẫn gọi TRƯỚC: nó dựng trạng thái sạch cho trình soạn, nên khi người
         dùng bấm "Bài mới" hoặc chọn một bài thì form đã ở trạng thái xác định.
       */
-      showPosts(true);
+      function showPostsMacDinh() {
+        showPosts(true);
+      }
     </script>
   </body>
 </html>
