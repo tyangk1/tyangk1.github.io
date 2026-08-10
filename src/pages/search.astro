@@ -2,6 +2,7 @@
 import { getPublishedPosts, collectTags } from '~/utils/posts';
 import { searchPosts, type SearchHit } from '~/lib/post-live';
 import { postHref } from '~/lib/routes';
+import { CACHE_LIST, CACHE_PRIVATE, setCache } from '~/lib/cache';
 import BaseLayout from '~/layouts/BaseLayout.astro';
 import Icon from '~/components/Icon.astro';
 import PostCard from '~/components/PostCard.astro';
@@ -46,6 +47,17 @@ if (term.length >= 2) {
 }
 
 const hasQuery = term.length >= 2;
+
+/*
+  Có truy vấn thì KHÔNG cache; không có thì cache như một trang danh sách.
+
+  Xem `CACHE_PRIVATE`: Vercel cache theo URL đầy đủ kể cả query string, nên cache
+  `/search?q=...` là giữ lại câu người đọc gõ trên máy chủ biên.
+
+  Thiếu hẳn header là chuyện khác và tệ hơn — `pnpm check:ssr` bắt được `/search` không có
+  Cache-Control nào, ngay sau khi tôi thêm phép kiểm đó vì đã bỏ sót đúng lỗi này ở trang bài.
+*/
+setCache(Astro.response, hasQuery ? CACHE_PRIVATE : CACHE_LIST);
 ---
 
 <BaseLayout

@@ -3,6 +3,7 @@ import { Image } from 'astro:assets';
 
 import { getPostBySlug, fetchPublishedPosts, headingsFromHtml } from '~/lib/post-live';
 import { renderContent } from '~/lib/render-content';
+import { CACHE_POST, CACHE_NOT_FOUND, setCache } from '~/lib/cache';
 
 import { SITE, AUTHOR } from '~/site.config';
 import {
@@ -43,7 +44,10 @@ export const prerender = false;
 
 const slug = Astro.params.slug;
 
-if (!slug) return Astro.rewrite('/404');
+if (!slug) {
+  setCache(Astro.response, CACHE_NOT_FOUND);
+  return Astro.rewrite('/404');
+}
 
 const [postRow, postRows] = await Promise.all([
   getPostBySlug(slug, SITE.timeZone),
@@ -57,7 +61,23 @@ const [postRow, postRows] = await Promise.all([
   ngày đăng. Cả ba đều phải là 404 với người lạ — trả 200 kèm trang trống thì Google
   index một URL rỗng, và một bài hẹn giờ bị lộ là có tồn tại.
 */
-if (!postRow) return Astro.rewrite('/404');
+if (!postRow) {
+  setCache(Astro.response, CACHE_NOT_FOUND);
+  return Astro.rewrite('/404');
+}
+
+/*
+  Header cache — thiếu dòng này là lỗ hổng ĐÃ ĐO ĐƯỢC trên production.
+
+  Không đặt Cache-Control thì Vercel không cache, và trang bài trả `x-vercel-cache: MISS`
+  ở MỌI request: đo được 966–2360 ms mỗi lần, mỗi lần một vòng tới Supabase. Đây là route
+  được đọc nhiều nhất site, nên nó cũng là chỗ đắt nhất để bỏ sót — trong khi trang chủ
+  (có đặt header) trả về trong 231 ms từ cache.
+
+  `CACHE_POST` từng là một hằng số khai ra rồi không ai dùng. Chỉ có phép đo trên site thật
+  mới lộ ra điều đó; bộ kiểm route không thấy, vì trang vẫn trả đúng nội dung.
+*/
+setCache(Astro.response, CACHE_POST);
 
 /*
   Một chỗ ép kiểu, cố ý, và chỉ đúng một chỗ.

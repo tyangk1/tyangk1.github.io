@@ -89,6 +89,29 @@ if (slugs.length === 0) {
   process.exit(1);
 }
 
+/**
+ * Mọi route chạy lúc request PHẢI khai `s-maxage`.
+ *
+ * Thiếu nó thì CDN không cache, và mỗi người đọc là một vòng tới database. Lỗ này đã xảy ra
+ * thật: `src/pages/blog/[slug].astro` — route được đọc nhiều nhất site — không đặt header,
+ * nên nó trả `x-vercel-cache: MISS` ở mọi request, 966–2360 ms mỗi lần. Không có phép kiểm
+ * nào thấy, vì trang vẫn trả đúng nội dung; chỉ đo trên site thật mới lộ ra.
+ *
+ * Kiểm `s-maxage` chứ không phải chỉ `Cache-Control` tồn tại: `no-store` cũng là một
+ * Cache-Control hợp lệ, và nó đúng cho `/search.json` nhưng sai cho một trang bài.
+ */
+function checkCacheHeader(path, res) {
+  const value = res.headers.get('cache-control') ?? '';
+
+  if (!value) {
+    report(path, 'không có Cache-Control — CDN sẽ không cache, mỗi người đọc một vòng database');
+    return;
+  }
+  if (!/s-maxage=\d+/.test(value)) {
+    report(path, `Cache-Control thiếu s-maxage: "${value}"`);
+  }
+}
+
 /** Bộ luật dùng chung cho mọi trang HTML — cùng luật với `check:html`. */
 function checkHtmlPage(path, html, { needsToc = false } = {}) {
   if (!/<title>[^<]+<\/title>/.test(html)) report(path, 'thiếu <title>');
@@ -124,6 +147,7 @@ for (const slug of slugs.sort()) {
     continue;
   }
 
+  checkCacheHeader(path, res);
   checkHtmlPage(path, html, { needsToc: true });
   if (!html.includes('class="prose')) report(path, 'không tìm thấy khối .prose');
 }
@@ -146,6 +170,7 @@ for (const path of LIST_PAGES) {
     continue;
   }
 
+  checkCacheHeader(path, res);
   checkHtmlPage(path, html);
 }
 
@@ -160,6 +185,7 @@ for (const t of tagSlugs) {
     report(path, `HTTP ${res.status}`);
     continue;
   }
+  checkCacheHeader(path, res);
   checkHtmlPage(path, await res.text());
 }
 

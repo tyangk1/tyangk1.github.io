@@ -40,6 +40,22 @@ export const CACHE_POST = 'public, max-age=0, s-maxage=30, stale-while-revalidat
 /** Trang lỗi. Không cache lâu, vì thứ làm nó lỗi thường được sửa ngay sau đó. */
 export const CACHE_NOT_FOUND = 'public, max-age=0, s-maxage=10';
 
+/**
+ * Không cache gì cả — cho phản hồi phụ thuộc thứ người đọc gõ vào.
+ *
+ * Dùng cho `/search?q=...`. Hai lý do, và lý do thứ hai mới là lý do chính:
+ *
+ *  1. Truy vấn tìm kiếm gần như vô hạn biến thể, nên tỉ lệ trúng cache thấp tới mức vô
+ *     nghĩa, còn mỗi biến thể lại chiếm một chỗ.
+ *  2. Câu người ta gõ vào hộp tìm kiếm là dữ liệu riêng của họ. Vercel cache theo URL đầy
+ *     đủ, kể cả query string — nên cache nó nghĩa là giữ lại câu đó trên máy chủ biên.
+ *     Không có lý do gì để làm vậy.
+ *
+ * `/search` KHÔNG có truy vấn thì lại là một trang danh sách bình thường, và nó dùng
+ * `CACHE_LIST`. Phân biệt hai trường hợp thay vì chọn một cái cho cả hai.
+ */
+export const CACHE_PRIVATE = 'no-store';
+
 export function setCache(response: { headers: Headers }, value: string): void {
   response.headers.set('Cache-Control', value);
 }
